@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Decompiler, BasicBlock, Instruction } from '../src/disassembler/decompiler';
+import { Decompiler, BasicBlock, Instruction } from '../src/disassembler/decompiler.js';
 
 describe('Decompiler Core Analysis', () => {
   // Helper to construct basic blocks easily

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calculateEntropy, findHighEntropyBlocks, mapSectionEntropy } from '../src/analyzer/entropy';
-import { Section } from '../src/disassembler/types';
+import { calculateEntropy, findHighEntropyBlocks, mapSectionEntropy } from '../src/analyzer/entropy.js';
+import { Section } from '../src/disassembler/types.js';
 
 describe('Shannon Entropy Analyzer Unit Tests', () => {
   describe('calculateEntropy', () => {

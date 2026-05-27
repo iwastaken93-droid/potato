@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractStrings, isFilePath, isApiName, isUrl } from '../src/analyzer/strings';
+import { extractStrings, isFilePath, isApiName, isUrl } from '../src/analyzer/strings.js';
 
 describe('String Analyzer Helper Tests', () => {
   it('should identify file paths correctly', () => {

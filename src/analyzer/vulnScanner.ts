@@ -6,7 +6,7 @@
  * - Integer overflows (arithmetic operations on untrusted sizes or near potential bounds)
  */
 
-import { Instruction, Section, Symbol } from '../disassembler/types.js';
+import { Section, Symbol } from '../disassembler/types.js';
 
 export interface VulnMatch {
   /** Vulnerability type: 'unsafe_api' | 'buffer_overflow' | 'integer_overflow' | 'format_string' */
@@ -69,7 +69,6 @@ export class VulnScanner {
       // Direct symbol scan
       for (const sym of symbols) {
         const cleanedName = this.cleanSymbolName(sym.name);
-        console.log("DEBUG_VULN", { name: sym.name, cleanedName, has: VulnScanner.UNSAFE_APIS.has(cleanedName) });
         if (VulnScanner.UNSAFE_APIS.has(cleanedName)) {
           const apiInfo = VulnScanner.UNSAFE_APIS.get(cleanedName)!;
           matches.push({

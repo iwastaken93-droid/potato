@@ -301,7 +301,7 @@ export class AIExplanationEngine {
       timeComp = 'O(N) where N is the size of the buffer to write/read';
       spaceComp = 'O(1) auxiliary space (excluding buffer itself)';
       suggestions.push(
-        'Verify path sanitization is in place to prevent path traversal vulnerabilities (e.g., passing "../../etc/passwd").',
+        'Verify path sanitization is in place to prevent path traversal vulnerabilities (e.g., passing "../../etc/passwd.js").',
         'Check if file access checks are performed correctly before writing critical files.'
       );
     }

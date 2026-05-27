@@ -5,8 +5,8 @@ import {
   searchInstructions,
   searchInstructionSequence,
   parseHexPattern,
-} from '../src/analyzer/search';
-import { Instruction } from '../src/disassembler/types';
+} from '../src/analyzer/search.js';
+import { Instruction } from '../src/disassembler/types.js';
 
 describe('Binary Search and Pattern Matching Engine', () => {
   describe('Text Search', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SignatureScanner, SignatureRule } from '../src/analyzer/signatures';
+import { SignatureScanner, SignatureRule } from '../src/analyzer/signatures.js';
 
 describe('Binary Signature Scanner Unit Tests', () => {
   describe('Custom Signature Registration & Clearing', () => {

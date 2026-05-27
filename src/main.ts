@@ -1634,13 +1634,10 @@ export class ApplicationCoordinator {
         this.switchTab(targetView);
       },
       onCommentSynced: (address: number, comment: string) => {
-        console.log(`Comment synced at 0x${address.toString(16)}: ${comment}`);
       },
       onHighlightSynced: (address: number, color: string) => {
-        console.log(`Highlight synced at 0x${address.toString(16)}: ${color}`);
       },
       onRenameSynced: (oldName: string, newName: string, type: 'function' | 'variable') => {
-        console.log(`Rename synced: ${oldName} -> ${newName} (${type})`);
         const sym = this.state.symbols.find(s => s.name === oldName);
         if (sym) {
           sym.name = newName;

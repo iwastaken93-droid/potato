@@ -96,7 +96,7 @@ rule Common_Strings {
       style.id = 'yara-panel-styles';
       style.textContent = `
         .yara-panel-root {
-          background: rgba(22, 26, 33, 0.45);
+          background: var(--bg-glass);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
           border: 1px solid var(--border-color);
@@ -109,8 +109,8 @@ rule Common_Strings {
           justify-content: space-between;
           align-items: center;
           gap: 1rem;
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px solid rgba(255, 255, 255, 0.04);
+          background: var(--bg-glass);
+          border: 1px solid var(--border-color);
           padding: 1.25rem;
           border-radius: var(--radius-md);
           flex-wrap: wrap;
@@ -165,7 +165,7 @@ rule Common_Strings {
           background: rgba(10, 12, 16, 0.6);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
-          color: #e2e8f0;
+          color: var(--text-secondary);
           font-family: var(--font-mono);
           font-size: 0.85rem;
           padding: 1rem;
@@ -188,14 +188,14 @@ rule Common_Strings {
         }
 
         .yara-compile-status.success {
-          background: rgba(16, 185, 129, 0.1);
-          color: #34d399;
+          background: var(--success-glow);
+          color: var(--success);
           border: 1px solid rgba(16, 185, 129, 0.2);
         }
 
         .yara-compile-status.error {
           background: rgba(239, 68, 68, 0.1);
-          color: #f87171;
+          color: var(--error);
           border: 1px solid rgba(239, 68, 68, 0.2);
         }
 
@@ -224,7 +224,7 @@ rule Common_Strings {
         }
 
         .yara-card {
-          background: rgba(255, 255, 255, 0.015);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
           padding: 1rem;
@@ -235,8 +235,8 @@ rule Common_Strings {
         }
 
         .yara-card:hover {
-          background: rgba(255, 255, 255, 0.035);
-          border-color: rgba(99, 102, 241, 0.3);
+          background: var(--bg-glass-hover);
+          border-color: var(--border-hover);
         }
 
         .yara-card-header {
@@ -248,7 +248,7 @@ rule Common_Strings {
         .yara-card-title {
           font-weight: 700;
           font-size: 0.95rem;
-          color: #a5b4fc;
+          color: var(--accent-start);
         }
 
         .yara-card-badge {
@@ -260,8 +260,8 @@ rule Common_Strings {
         }
 
         .yara-card-badge.matched {
-          background: rgba(16, 185, 129, 0.1);
-          color: #6ee7b7;
+          background: var(--success-glow);
+          color: var(--success);
           border: 1px solid rgba(16, 185, 129, 0.2);
         }
 
@@ -292,7 +292,7 @@ rule Common_Strings {
         .yara-match-table th, .yara-match-table td {
           text-align: left;
           padding: 0.4rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+          border-bottom: 1px solid var(--border-color);
         }
 
         .yara-match-table th {
@@ -302,17 +302,17 @@ rule Common_Strings {
 
         .yara-match-id {
           font-family: var(--font-mono);
-          color: #fdba74;
+          color: var(--warning);
         }
 
         .yara-match-offset {
           font-family: var(--font-mono);
-          color: #38bdf8;
+          color: var(--accent-start);
         }
 
         .yara-match-val {
           font-family: var(--font-mono);
-          color: #e2e8f0;
+          color: var(--text-secondary);
           word-break: break-all;
         }
 

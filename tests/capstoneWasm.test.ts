@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { CapstoneWasmEngine } from '../src/disassembler/capstoneWasm';
-import { DisassemblerRouter } from '../src/disassembler/router';
+import { CapstoneWasmEngine } from '../src/disassembler/capstoneWasm.js';
+import { DisassemblerRouter } from '../src/disassembler/router.js';
 
 describe('CapstoneWasmEngine Unit Tests', () => {
   it('should initialize with correct architecture and mode, and start unloaded', () => {

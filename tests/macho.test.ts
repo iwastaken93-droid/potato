@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseMacho } from '../src/parser/macho';
-import { DisassemblerRouter } from '../src/disassembler/router';
+import { parseMacho } from '../src/parser/macho.js';
+import { DisassemblerRouter } from '../src/disassembler/router.js';
 
 describe('Mach-O Parser Unit Tests', () => {
   it('should successfully parse a valid 64-bit Little Endian Mach-O header', () => {

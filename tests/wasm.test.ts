@@ -4,7 +4,7 @@ import {
   ValueType,
   ExportKind,
   SectionId,
-} from '../src/parser/wasm';
+} from '../src/parser/wasm.js';
 
 // Helper functions to generate binary WASM structures for testing
 function encodeVarUint(val: number): number[] {

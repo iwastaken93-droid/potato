@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PluginManager, AnalyzerPlugin, AnalyzerContext, AnalyzerResult } from '../src/analyzer/plugins';
+import { PluginManager, AnalyzerPlugin, AnalyzerContext, AnalyzerResult } from '../src/analyzer/plugins.js';
 
 describe('Plugin System Architecture Unit Tests', () => {
   let manager: PluginManager;

@@ -476,4 +476,159 @@ describe('IR/SSA Framework Unit Tests', () => {
     expect(optB1.instructions[1].op).toBe(IROp.SHR);
     expect(optB1.instructions[1].args[1].value).toBe(2);
   });
+
+  it('should handle copy propagation edge cases (chains, self-copy, circular reference, ssa versioning)', () => {
+    const translator = new IRTranslator();
+    const optimizer = new IROptimizer();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        endAddress: 0x1020,
+        instructions: [
+          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+          { address: 0x1001, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+          { address: 0x1002, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+          { address: 0x1003, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+          { address: 0x1004, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // 1. Chain of copy propagations:
+    // x_0 = y_0
+    // z_0 = x_0
+    // w_0 = z_0
+    // use of w_0 -> should resolve to y_0
+    b1.instructions[0].op = IROp.MOV;
+    b1.instructions[0].dest = { type: 'var', name: 'x', version: 0 };
+    b1.instructions[0].args = [{ type: 'var', name: 'y', version: 0 }];
+
+    b1.instructions[1].op = IROp.MOV;
+    b1.instructions[1].dest = { type: 'var', name: 'z', version: 0 };
+    b1.instructions[1].args = [{ type: 'var', name: 'x', version: 0 }];
+
+    b1.instructions[2].op = IROp.MOV;
+    b1.instructions[2].dest = { type: 'var', name: 'w', version: 0 };
+    b1.instructions[2].args = [{ type: 'var', name: 'z', version: 0 }];
+
+    // A use instruction using w_0
+    b1.instructions[3].op = IROp.ADD;
+    b1.instructions[3].dest = { type: 'var', name: 'res', version: 0 };
+    b1.instructions[3].args = [
+      { type: 'var', name: 'w', version: 0 },
+      { type: 'imm', value: 5 },
+    ];
+
+    // 2. Circular/self copy to ensure no infinite loop
+    // a_0 = b_0
+    // b_0 = a_0 (though SSA typically prevents this, we test copy propagation's safety checks)
+    // and self-copy: c_0 = c_0
+    b1.instructions[4].op = IROp.MOV;
+    b1.instructions[4].dest = { type: 'var', name: 'a', version: 0 };
+    b1.instructions[4].args = [{ type: 'var', name: 'b', version: 0 }];
+
+    const optimized = optimizer.copyPropagation(irCfg);
+    const optB1 = optimized.blocks.get('block_1')!;
+
+    // The use of w_0 in ADD should be resolved to y_0
+    expect(optB1.instructions[3].args[0].name).toBe('y');
+    expect(optB1.instructions[3].args[0].version).toBe(0);
+  });
+
+  it('should handle strength reduction edge cases (mul by 0/1/non-pow2, div by 1/0/non-pow2)', () => {
+    const translator = new IRTranslator();
+    const optimizer = new IROptimizer();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        endAddress: 0x1030,
+        instructions: [
+          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'mul', opStr: '', operands: [], size: 1 },
+          { address: 0x1001, bytes: new Uint8Array([]), mnemonic: 'mul', opStr: '', operands: [], size: 1 },
+          { address: 0x1002, bytes: new Uint8Array([]), mnemonic: 'mul', opStr: '', operands: [], size: 1 },
+          { address: 0x1003, bytes: new Uint8Array([]), mnemonic: 'div', opStr: '', operands: [], size: 1 },
+          { address: 0x1004, bytes: new Uint8Array([]), mnemonic: 'div', opStr: '', operands: [], size: 1 },
+          { address: 0x1005, bytes: new Uint8Array([]), mnemonic: 'div', opStr: '', operands: [], size: 1 },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // 1. mul by 0
+    b1.instructions[0].op = IROp.MUL;
+    b1.instructions[0].args = [
+      { type: 'var', name: 'rax', version: 0 },
+      { type: 'imm', value: 0 },
+    ];
+    // 2. mul by 1
+    b1.instructions[1].op = IROp.MUL;
+    b1.instructions[1].args = [
+      { type: 'var', name: 'rax', version: 0 },
+      { type: 'imm', value: 1 },
+    ];
+    // 3. mul by non-power of two (e.g. 10)
+    b1.instructions[2].op = IROp.MUL;
+    b1.instructions[2].args = [
+      { type: 'var', name: 'rax', version: 0 },
+      { type: 'imm', value: 10 },
+    ];
+    // 4. div by 1
+    b1.instructions[3].op = IROp.DIV;
+    b1.instructions[3].args = [
+      { type: 'var', name: 'rbx', version: 0 },
+      { type: 'imm', value: 1 },
+    ];
+    // 5. div by 0 (should be untouched)
+    b1.instructions[4].op = IROp.DIV;
+    b1.instructions[4].args = [
+      { type: 'var', name: 'rbx', version: 0 },
+      { type: 'imm', value: 0 },
+    ];
+    // 6. div by non-power of two (e.g. 7, should be untouched)
+    b1.instructions[5].op = IROp.DIV;
+    b1.instructions[5].args = [
+      { type: 'var', name: 'rbx', version: 0 },
+      { type: 'imm', value: 7 },
+    ];
+
+    const optimized = optimizer.strengthReduction(irCfg);
+    const optB1 = optimized.blocks.get('block_1')!;
+
+    // mul by 0 => MOV 0
+    expect(optB1.instructions[0].op).toBe(IROp.MOV);
+    expect(optB1.instructions[0].args[0].value).toBe(0);
+
+    // mul by 1 => MOV rax_0
+    expect(optB1.instructions[1].op).toBe(IROp.MOV);
+    expect(optB1.instructions[1].args[0].name).toBe('rax');
+    expect(optB1.instructions[1].args[0].version).toBe(0);
+
+    // mul by 10 => stays MUL
+    expect(optB1.instructions[2].op).toBe(IROp.MUL);
+    expect(optB1.instructions[2].args[1].value).toBe(10);
+
+    // div by 1 => MOV rbx_0
+    expect(optB1.instructions[3].op).toBe(IROp.MOV);
+    expect(optB1.instructions[3].args[0].name).toBe('rbx');
+    expect(optB1.instructions[3].args[0].version).toBe(0);
+
+    // div by 0 => stays DIV
+    expect(optB1.instructions[4].op).toBe(IROp.DIV);
+    expect(optB1.instructions[4].args[1].value).toBe(0);
+
+    // div by 7 => stays DIV
+    expect(optB1.instructions[5].op).toBe(IROp.DIV);
+    expect(optB1.instructions[5].args[1].value).toBe(7);
+  });
 });

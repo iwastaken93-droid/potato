@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DisassemblerRouter } from '../src/disassembler/router';
+import { DisassemblerRouter } from '../src/disassembler/router.js';
 
 describe('DisassemblerRouter Unit Tests', () => {
   describe('DEX/Dalvik Routing', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PEParser } from '../src/parser/pe';
+import { PEParser } from '../src/parser/pe.js';
 
 describe('PE Parser Unit Tests', () => {
   it('should successfully parse a valid 32-bit PE (PE32) binary header', () => {

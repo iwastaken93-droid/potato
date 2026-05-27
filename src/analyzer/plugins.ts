@@ -109,6 +109,8 @@ export class PluginManager {
 
   /**
    * Retrieve the singleton instance of the PluginManager.
+   * 
+   * @returns The singleton PluginManager instance.
    */
   public static getInstance(): PluginManager {
     if (!PluginManager.instance) {
@@ -118,8 +120,11 @@ export class PluginManager {
   }
 
   /**
-   * Registers a new plugin with the manager.
-   * Runs the plugin's `init` lifecycle hook if present.
+   * Registers a new plugin with the manager and runs its `init` lifecycle hook if present.
+   * 
+   * @param plugin The analyzer plugin to register.
+   * @throws {Error} If the plugin is missing metadata, has no ID, or if a plugin with the same ID is already registered.
+   * @returns A promise that resolves when the plugin registration and initialization are complete.
    */
   public async register(plugin: AnalyzerPlugin): Promise<void> {
     if (!plugin.metadata || !plugin.metadata.id) {
@@ -137,8 +142,10 @@ export class PluginManager {
   }
 
   /**
-   * Unregisters an existing plugin by ID.
-   * Runs the plugin's `destroy` lifecycle hook if present.
+   * Unregisters an existing plugin by its ID and runs its `destroy` lifecycle hook if present.
+   * 
+   * @param id The unique identifier of the plugin to unregister.
+   * @returns A promise resolving to true if the plugin was successfully unregistered; false if the plugin was not found.
    */
   public async unregister(id: string): Promise<boolean> {
     const plugin = this.plugins.get(id);
@@ -158,14 +165,19 @@ export class PluginManager {
   }
 
   /**
-   * Gets a registered plugin by ID.
+   * Retrieves a registered plugin by its ID.
+   * 
+   * @param id The unique identifier of the plugin to retrieve.
+   * @returns The registered plugin, or undefined if no plugin matches the given ID.
    */
   public getPlugin(id: string): AnalyzerPlugin | undefined {
     return this.plugins.get(id);
   }
 
   /**
-   * Returns a list of all registered plugins.
+   * Returns a list of all currently registered plugins.
+   * 
+   * @returns An array of all registered analyzer plugins.
    */
   public getPlugins(): AnalyzerPlugin[] {
     return Array.from(this.plugins.values());
@@ -173,6 +185,8 @@ export class PluginManager {
 
   /**
    * Clears all registered plugins, running their destroy methods.
+   * 
+   * @returns A promise that resolves when all plugins have been unregistered and cleaned up.
    */
   public async clear(): Promise<void> {
     const ids = Array.from(this.plugins.keys());
@@ -182,7 +196,11 @@ export class PluginManager {
   }
 
   /**
-   * Runs analysis using all registered (and compatible) plugins.
+   * Runs analysis using all registered and compatible plugins.
+   * 
+   * @param context The binary and symbols context provided for analysis.
+   * @param options Optional configuration parameters for plugins, keyed by plugin ID.
+   * @returns A promise resolving to an array of results from each executed plugin.
    */
   public async runAll(context: AnalyzerContext, options?: Record<string, any>): Promise<AnalyzerResult[]> {
     const results: AnalyzerResult[] = [];

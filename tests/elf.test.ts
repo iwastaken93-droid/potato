@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseElf } from '../src/parser/elf';
+import { parseElf } from '../src/parser/elf.js';
 
 describe('ELF Parser Unit Tests', () => {
   it('should successfully parse a valid 64-bit Little Endian ELF header', () => {

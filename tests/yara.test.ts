@@ -5,7 +5,7 @@ import {
   matchPattern,
   evaluateCondition,
   YaraEngine
-} from '../src/analyzer/yara';
+} from '../src/analyzer/yara.js';
 
 describe('YARA-like Signature Engine Unit Tests', () => {
   describe('unescapeString', () => {

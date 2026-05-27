@@ -5,7 +5,7 @@ import {
   readSleb128,
   decodeMutf8,
   parseAccessFlags,
-} from '../src/parser/dex';
+} from '../src/parser/dex.js';
 
 describe('DEX Parser Helpers', () => {
   it('should parse ULEB128 correctly', () => {
@@ -341,7 +341,7 @@ describe('DEX Parser Core', () => {
   });
 });
 
-import { DisassemblerRouter } from '../src/disassembler/router';
+import { DisassemblerRouter } from '../src/disassembler/router.js';
 
 describe('DEX Router Integration', () => {
   it('should detect DEX magic bytes correctly', () => {

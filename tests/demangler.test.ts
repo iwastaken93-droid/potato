@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { demangle } from '../src/analyzer/demangler';
+import { demangle } from '../src/analyzer/demangler.js';
 
 describe('Symbol Demangler Unit Tests', () => {
   describe('Unmangled symbols', () => {

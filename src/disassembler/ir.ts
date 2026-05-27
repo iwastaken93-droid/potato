@@ -8,53 +8,104 @@
 import { Instruction } from './types.js';
 import { BasicBlock } from './cfg.js';
 
+/**
+ * Operations supported in the Intermediate Representation.
+ */
 export enum IROp {
+  /** Addition */
   ADD = 'ADD',
+  /** Subtraction */
   SUB = 'SUB',
+  /** Multiplication */
   MUL = 'MUL',
+  /** Division */
   DIV = 'DIV',
+  /** Bitwise AND */
   AND = 'AND',
+  /** Bitwise OR */
   OR = 'OR',
+  /** Bitwise XOR */
   XOR = 'XOR',
+  /** Shift left */
   SHL = 'SHL',
+  /** Shift right */
   SHR = 'SHR',
+  /** Load from memory */
   LOAD = 'LOAD',
+  /** Store to memory */
   STORE = 'STORE',
+  /** PHI function for SSA form */
   PHI = 'PHI',
+  /** Conditional branch */
   BRANCH = 'BRANCH',
+  /** Move value */
   MOV = 'MOV',
+  /** Compare values */
   CMP = 'CMP',
+  /** Unconditional jump */
   JMP = 'JMP',
+  /** Return from function */
   RET = 'RET',
+  /** Call function */
   CALL = 'CALL',
 }
 
+/**
+ * Valid operand types for IR instructions.
+ */
 export type IROperandType = 'reg' | 'temp' | 'imm' | 'mem' | 'var';
 
+/**
+ * Represents an operand in an IR instruction.
+ */
 export interface IROperand {
+  /** The type of the operand */
   type: IROperandType;
+  /** Name of the register, temp, or variable, if applicable */
   name?: string;
+  /** Immediate value or constant, if applicable */
   value?: bigint | number;
+  /** SSA version number, if applicable */
   version?: number;
+  /** Memory offset, if applicable */
   offset?: number;
 }
 
+/**
+ * Represents a single instruction in the Intermediate Representation.
+ */
 export interface IRInstruction {
+  /** The operation code */
   op: IROp;
+  /** The destination operand, if the operation writes a result */
   dest?: IROperand;
+  /** Arguments / source operands for the operation */
   args: IROperand[];
+  /** Virtual address of the original machine instruction */
   address?: number;
 }
 
+/**
+ * Represents a basic block containing IR instructions.
+ */
 export interface IRBlock {
+  /** Unique identifier for the block */
   id: string;
+  /** Sequence of IR instructions in the block */
   instructions: IRInstruction[];
+  /** List of predecessor block IDs */
   predecessors: string[];
+  /** List of successor block IDs */
   successors: string[];
+  /** Start virtual address of the block, if known */
   startAddress?: number;
 }
 
+/**
+ * Represents the Control Flow Graph (CFG) of IR blocks.
+ */
 export interface IRCFG {
+  /** Map of block ID to basic block */
   blocks: Map<string, IRBlock>;
 }
 
@@ -63,7 +114,10 @@ export interface IRCFG {
  */
 export class IRTranslator {
   /**
-   * Translates a list of instructions into IR instructions.
+   * Translates a list of target-dependent machine instructions into target-independent IR instructions.
+   * 
+   * @param instructions Array of disassembled machine instructions.
+   * @returns An array of translated IR instructions.
    */
   public translateInstructions(instructions: Instruction[]): IRInstruction[] {
     const irInsts: IRInstruction[] = [];
@@ -161,7 +215,10 @@ export class IRTranslator {
   }
 
   /**
-   * Translates CFG basic blocks to IR CFG.
+   * Translates CFG basic blocks to an IR Control Flow Graph.
+   * 
+   * @param cfgBlocks Array of basic blocks from the disassembler's CFG.
+   * @returns The generated target-independent IR Control Flow Graph.
    */
   public translateCFG(cfgBlocks: BasicBlock[]): IRCFG {
     const irBlocks = new Map<string, IRBlock>();
@@ -216,6 +273,9 @@ export class SSABuilder {
 
   /**
    * Converts an IR CFG into SSA form by versioning registers/variables and inserting PHI nodes.
+   * 
+   * @param cfg The IR Control Flow Graph to transform into SSA form.
+   * @returns The modified IR Control Flow Graph in SSA form.
    */
   public buildSSA(cfg: IRCFG): IRCFG {
     this.varVersions.clear();
@@ -354,6 +414,9 @@ export class SSABuilder {
 export class IROptimizer {
   /**
    * Constant folding: Simplifies arithmetic operations on constant arguments.
+   * 
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph.
    */
   public constantFolding(cfg: IRCFG): IRCFG {
     for (const block of cfg.blocks.values()) {
@@ -399,6 +462,9 @@ export class IROptimizer {
 
   /**
    * Dead Code Elimination (DCE): Removes instructions whose outputs are never read.
+   * 
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph with dead code removed.
    */
   public deadCodeElimination(cfg: IRCFG): IRCFG {
     const readCount = new Map<string, number>();
@@ -437,6 +503,9 @@ export class IROptimizer {
 
   /**
    * Copy propagation: Replaces uses of variables that are copies of other variables or constants.
+   * 
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph with copy propagation applied.
    */
   public copyPropagation(cfg: IRCFG): IRCFG {
     const copyMap = new Map<string, IROperand>();
@@ -515,6 +584,9 @@ export class IROptimizer {
   /**
    * Strength Reduction: Replaces expensive operations (like MUL/DIV by powers of two)
    * with cheaper operations (like SHL/SHR).
+   * 
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph with strength reductions applied.
    */
   public strengthReduction(cfg: IRCFG): IRCFG {
     for (const block of cfg.blocks.values()) {

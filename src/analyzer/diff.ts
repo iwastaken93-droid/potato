@@ -388,6 +388,9 @@ export function diffInstructions(
     if (x.size !== y.size) return false;
     
     // Compare bytes safely
+    if (x.address !== undefined && y.address !== undefined) {
+      if (Math.abs(x.address - y.address) > 0x2000) return false;
+    }
     if (x.bytes && y.bytes) {
       if (x.bytes.length !== y.bytes.length) return false;
       for (let i = 0; i < x.bytes.length; i++) {

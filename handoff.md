@@ -9,13 +9,13 @@
 
 ## 🚨🚨🚨 NEXT SESSION (Session 11): START BUILDING IMMEDIATELY 🚨🚨🚨
 
-# ⚡ LAUNCH 10+ SUBAGENTS RIGHT NOW ⚡
+# ⚡ LAUNCH 5 SUBAGENTS RIGHT NOW ⚡
 
 > [!CAUTION]
 > **DO NOT READ THIS ENTIRE DOCUMENT BEFORE STARTING. Skim the failing test section, then START CODING. You can reference this document as you go. Every second counts.**
 
 1. **Read the failing test section below** — there are **4 failing tests** across 3 files (details below)
-2. **Launch 10+ subagents IMMEDIATELY** to work in parallel
+2. **Launch 5 subagents IMMEDIATELY** to work in parallel
 3. **Fix the 4 failing tests FIRST** — see exact details and fixes below
 4. **Then `git add -A && git commit`** — there are modified + untracked files needing commit
 5. **Then build the incomplete features** listed in the Roadmap below
@@ -712,7 +712,7 @@ pnpm eslint src/
 git add -A && git commit -m "feat: session 10 - Java/debugSymbols/dotnet/archive parsers, GDB/Frida/aiOnDevice, virtual scrolling, coverage expansion, memory leak fixes"
 ```
 
-### ⚡ STEP 3: Launch 10+ Subagents NOW
+### ⚡ STEP 3: Launch 5 Subagents NOW
 
 | # | Subagent Task | Priority |
 |---|---------------|----------|
@@ -770,7 +770,7 @@ git add -A && git commit -m "feat: session 10 - Java/debugSymbols/dotnet/archive
 5. **Update `DEVLOG.md`** with timestamped entries after completing work
 6. **Use `uv pip`** instead of `pip` for any Python tooling
 7. **DO NOT SPAWN SUBAGENTS** if you ARE a subagent
-8. **Keep 10+ subagents active** at all times (orchestrator rule)
+8. **Keep 5 subagents active** at all times (orchestrator rule)
 9. **Git commit frequently** — `git add -A && git commit -m "feat: <description>"`
 10. **Follow the glassmorphic dark theme** — use CSS variables, never plain colors
 11. **Tell subagents NOT to launch their own subagents** — only orchestrator spawns
@@ -779,4 +779,4 @@ git add -A && git commit -m "feat: session 10 - Java/debugSymbols/dotnet/archive
 
 ---
 
-*Session 11 must IMMEDIATELY START BUILDING. Fix the 4 failing tests, commit everything, then launch 10+ subagents to build new features. Focus on completing incomplete Session 10 tasks (Mach-O ObjC, code signature, WASM name section, GDB panel, type system). We are at 564/568 tests passing (99.3%) — let's hit 600+ tests and zero failures. SCALE TOWARD 1M LOC. 🚀🚀🚀*
+*Session 11 must IMMEDIATELY START BUILDING. Fix the 4 failing tests, commit everything, then launch 5 subagents to build new features. Focus on completing incomplete Session 10 tasks (Mach-O ObjC, code signature, WASM name section, GDB panel, type system). We are at 564/568 tests passing (99.3%) — let's hit 600+ tests and zero failures. SCALE TOWARD 1M LOC. 🚀🚀🚀*

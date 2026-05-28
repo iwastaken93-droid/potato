@@ -631,4 +631,248 @@ describe('IR/SSA Framework Unit Tests', () => {
     expect(optB1.instructions[5].op).toBe(IROp.DIV);
     expect(optB1.instructions[5].args[1].value).toBe(7);
   });
+
+  it('should simplify algebraic expressions', () => {
+    const translator = new IRTranslator();
+    const optimizer = new IROptimizer();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        endAddress: 0x1010,
+        instructions: [
+          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'add', opStr: '', operands: [], size: 1 },
+          { address: 0x1001, bytes: new Uint8Array([]), mnemonic: 'add', opStr: '', operands: [], size: 1 },
+          { address: 0x1002, bytes: new Uint8Array([]), mnemonic: 'sub', opStr: '', operands: [], size: 1 },
+          { address: 0x1003, bytes: new Uint8Array([]), mnemonic: 'sub', opStr: '', operands: [], size: 1 },
+          { address: 0x1004, bytes: new Uint8Array([]), mnemonic: 'xor', opStr: '', operands: [], size: 1 },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // x + 0
+    b1.instructions[0].op = IROp.ADD;
+    b1.instructions[0].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'imm', value: 0 },
+    ];
+    // 0 + x
+    b1.instructions[1].op = IROp.ADD;
+    b1.instructions[1].args = [
+      { type: 'imm', value: 0 },
+      { type: 'var', name: 'x', version: 0 },
+    ];
+    // x - 0
+    b1.instructions[2].op = IROp.SUB;
+    b1.instructions[2].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'imm', value: 0 },
+    ];
+    // x - x
+    b1.instructions[3].op = IROp.SUB;
+    b1.instructions[3].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'var', name: 'x', version: 0 },
+    ];
+    // x ^ x
+    b1.instructions[4].op = IROp.XOR;
+    b1.instructions[4].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'var', name: 'x', version: 0 },
+    ];
+
+    const optimized = optimizer.algebraicSimplification(irCfg);
+    const optB1 = optimized.blocks.get('block_1')!;
+
+    // ADD x, 0 => MOV x
+    expect(optB1.instructions[0].op).toBe(IROp.MOV);
+    expect(optB1.instructions[0].args[0].name).toBe('x');
+    expect(optB1.instructions[0].args[0].version).toBe(0);
+
+    // ADD 0, x => MOV x
+    expect(optB1.instructions[1].op).toBe(IROp.MOV);
+    expect(optB1.instructions[1].args[0].name).toBe('x');
+    expect(optB1.instructions[1].args[0].version).toBe(0);
+
+    // SUB x, 0 => MOV x
+    expect(optB1.instructions[2].op).toBe(IROp.MOV);
+    expect(optB1.instructions[2].args[0].name).toBe('x');
+    expect(optB1.instructions[2].args[0].version).toBe(0);
+
+    // SUB x, x => MOV 0
+    expect(optB1.instructions[3].op).toBe(IROp.MOV);
+    expect(optB1.instructions[3].args[0].value).toBe(0);
+
+    // XOR x, x => MOV 0
+    expect(optB1.instructions[4].op).toBe(IROp.MOV);
+    expect(optB1.instructions[4].args[0].value).toBe(0);
+  });
+
+  it('should simplify phi nodes with identical arguments', () => {
+    const translator = new IRTranslator();
+    const optimizer = new IROptimizer();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        endAddress: 0x1005,
+        instructions: [
+          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // x_1 = PHI(x_0, x_0)
+    b1.instructions[0].op = IROp.PHI;
+    b1.instructions[0].dest = { type: 'var', name: 'x', version: 1 };
+    b1.instructions[0].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'var', name: 'x', version: 0 },
+    ];
+
+    const optimized = optimizer.phiSimplification(irCfg);
+    const optB1 = optimized.blocks.get('block_1')!;
+
+    expect(optB1.instructions[0].op).toBe(IROp.MOV);
+    expect(optB1.instructions[0].args[0].name).toBe('x');
+    expect(optB1.instructions[0].args[0].version).toBe(0);
+  });
+
+  it('should construct SSA and handle nested control flow, loop nesting, and multiple phi nodes', () => {
+    const translator = new IRTranslator();
+    const builder = new SSABuilder();
+
+    // Simulate nested loops:
+    // block_entry -> block_loop1_header <-> block_loop2_header <-> block_loop2_body
+    //                     |                       |
+    //                     v                       v
+    //                block_exit              block_loop1_latch
+    //
+    // x is initialized in entry. Loop 1 header has PHI.
+    // Loop 2 header has another PHI because of the nested loop.
+    //
+    // BasicBlock structures:
+    const blocks: BasicBlock[] = [
+      {
+        id: 'entry',
+        startAddress: 0x1000,
+        instructions: [
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: 'rax, 0',
+            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 0n }],
+            size: 5,
+          },
+        ],
+        successors: ['loop1_header'],
+      },
+      {
+        id: 'loop1_header',
+        startAddress: 0x1010,
+        instructions: [
+          {
+            address: 0x1010,
+            bytes: new Uint8Array([]),
+            mnemonic: 'cmp',
+            opStr: 'rax, 10',
+            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 10n }],
+            size: 5,
+          },
+        ],
+        successors: ['loop2_header', 'exit'],
+      },
+      {
+        id: 'loop2_header',
+        startAddress: 0x1020,
+        instructions: [
+          {
+            address: 0x1020,
+            bytes: new Uint8Array([]),
+            mnemonic: 'cmp',
+            opStr: 'rax, 20',
+            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 20n }],
+            size: 5,
+          },
+        ],
+        successors: ['loop2_body', 'loop1_latch'],
+      },
+      {
+        id: 'loop2_body',
+        startAddress: 0x1030,
+        instructions: [
+          {
+            address: 0x1030,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: 'rax, 1',
+            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 1n }],
+            size: 5,
+          },
+        ],
+        successors: ['loop2_header'],
+      },
+      {
+        id: 'loop1_latch',
+        startAddress: 0x1040,
+        instructions: [
+          {
+            address: 0x1040,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: 'rax, 2',
+            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 2n }],
+            size: 5,
+          },
+        ],
+        successors: ['loop1_header'],
+      },
+      {
+        id: 'exit',
+        startAddress: 0x1050,
+        instructions: [
+          {
+            address: 0x1050,
+            bytes: new Uint8Array([]),
+            mnemonic: 'ret',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const ssaCfg = builder.buildSSA(irCfg);
+
+    // Verify entry block
+    const entry = ssaCfg.blocks.get('entry')!;
+    expect(entry.instructions[0].dest?.name).toBe('rax');
+    expect(entry.instructions[0].dest?.version).toBe(2);
+
+    // Verify loop1_header has PHI node because predecessors are entry and loop1_latch
+    const l1h = ssaCfg.blocks.get('loop1_header')!;
+    expect(l1h.instructions[0].op).toBe(IROp.PHI);
+    expect(l1h.instructions[0].dest?.name).toBe('rax');
+    expect(l1h.instructions[0].dest?.version).toBe(3);
+
+    // Verify loop2_header has PHI node because predecessors are loop1_header and loop2_body
+    const l2h = ssaCfg.blocks.get('loop2_header')!;
+    expect(l2h.instructions[0].op).toBe(IROp.PHI);
+    expect(l2h.instructions[0].dest?.name).toBe('rax');
+    expect(l2h.instructions[0].dest?.version).toBe(4);
+  });
 });

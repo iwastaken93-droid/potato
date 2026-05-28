@@ -2,6 +2,7 @@ import { Section, Symbol } from '../disassembler/types.js';
 import { ScanResult } from './signatures.js';
 import { ExtractedString } from './strings.js';
 import { EntropyBlock } from './entropy.js';
+import { PEParser } from '../parser/pe.js';
 
 export interface ReportData {
   fileName: string;
@@ -16,11 +17,38 @@ export interface ReportData {
     highEntropyBlocks: EntropyBlock[];
   };
   strings: ExtractedString[];
+  binaryData?: Uint8Array;
 }
 
 export class ReportGenerator {
   public static generateJSON(data: ReportData): string {
-    return JSON.stringify(data, null, 2);
+    const reportObj: any = { ...data };
+    delete reportObj.binaryData;
+
+    if (data.binaryData && data.binaryData.length > 64 && data.binaryData[0] === 0x4d && data.binaryData[1] === 0x5a) {
+      try {
+        const peParser = new PEParser(data.binaryData.buffer);
+        const pe = peParser.parse();
+        if (pe.resources) {
+          reportObj.peResources = {
+            manifests: pe.resources.manifests,
+            stringsCount: Object.keys(pe.resources.strings).length,
+            iconsCount: pe.resources.icons.length,
+            allResources: pe.resources.all.map(r => ({
+              typeName: r.typeName,
+              name: r.name,
+              language: r.language,
+              size: r.size,
+              offset: r.offset
+            }))
+          };
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
+    return JSON.stringify(reportObj, null, 2);
   }
 
   public static generateMarkdown(data: ReportData): string {
@@ -131,6 +159,56 @@ export class ReportGenerator {
       md += `No strings extracted.\n`;
     }
     md += `\n`;
+
+    // PE Resources section if it exists
+    if (data.binaryData && data.binaryData.length > 64 && data.binaryData[0] === 0x4d && data.binaryData[1] === 0x5a) {
+      try {
+        const peParser = new PEParser(data.binaryData.buffer);
+        const pe = peParser.parse();
+        if (pe.resources && pe.resources.all && pe.resources.all.length > 0) {
+          const r = pe.resources;
+          md += `## 📦 PE Resource (.rsrc) Section\n\n`;
+          
+          md += `### All Resources\n\n`;
+          md += `| Type Name | Name/ID | Lang ID | Size | Offset |\n`;
+          md += `|---|---|---|---|---|\n`;
+          for (const res of r.all) {
+            md += `| \`${res.typeName}\` | ${res.name} | ${res.language} | ${res.size} B | 0x${res.offset.toString(16).toUpperCase()} |\n`;
+          }
+          md += `\n`;
+
+          if (r.manifests && r.manifests.length > 0) {
+            md += `### Manifests\n\n`;
+            for (const m of r.manifests) {
+              md += `\`\`\`xml\n${m}\n\`\`\`\n\n`;
+            }
+          }
+
+          const stringKeys = Object.keys(r.strings);
+          if (stringKeys.length > 0) {
+            md += `### Parsed String Table Resources\n\n`;
+            md += `| ID | String Value |\n`;
+            md += `|---|---|\n`;
+            for (const k of stringKeys) {
+              md += `| ${k} | \`${r.strings[Number(k)]}\` |\n`;
+            }
+            md += `\n`;
+          }
+
+          if (r.icons && r.icons.length > 0) {
+            md += `### Icons & Group Icons\n\n`;
+            md += `| Type | Size | File Offset |\n`;
+            md += `|---|---|---|\n`;
+            for (const i of r.icons) {
+              md += `| ${i.type} | ${i.size} B | 0x${i.offset.toString(16).toUpperCase()} |\n`;
+            }
+            md += `\n`;
+          }
+        }
+      } catch (e) {
+        // Ignore PE parsing errors
+      }
+    }
 
     return md;
   }

@@ -7,6 +7,7 @@ import { parseElf } from './parser/elf.js';
 import { PEParser } from './parser/pe.js';
 import { parseWasm } from './parser/wasm.js';
 import { parseMacho } from './parser/macho.js';
+import { parseObjcMetadata } from './parser/machoObjc.js';
 import { parseDex } from './parser/dex.js';
 import { DisassemblerRouter, Architecture } from './disassembler/router.js';
 import { buildCFG, BasicBlock as CoreBasicBlock } from './disassembler/cfg.js';
@@ -39,6 +40,7 @@ import { TypeSystemPanel } from './ui/typeSystemPanel.js';
 import { MetadataPanel } from './ui/metadataPanel.js';
 import { DemanglerPanel } from './ui/demanglerPanel.js';
 import { DiffPanel } from './ui/diffPanel.js';
+import { PluginsPanel } from './ui/pluginsPanel.js';
 
 // App state management
 interface AppState {
@@ -51,7 +53,7 @@ interface AppState {
   symbols: Symbol[];
   instructions: Instruction[];
   cfgBlocks: CoreBasicBlock[];
-  activeTab: 'hex' | 'assembly' | 'cfg' | 'decompiler' | 'strings' | 'search' | 'dependencies' | 'signatures' | 'emulator' | 'report' | 'xrefs' | 'importsExports' | 'patcher' | 'fcg' | 'collab' | 'yara' | 'typeSystem' | 'metadata' | 'demangler' | 'diff';
+  activeTab: 'hex' | 'assembly' | 'cfg' | 'decompiler' | 'strings' | 'search' | 'dependencies' | 'signatures' | 'emulator' | 'report' | 'xrefs' | 'importsExports' | 'patcher' | 'fcg' | 'collab' | 'yara' | 'typeSystem' | 'metadata' | 'demangler' | 'diff' | 'plugins';
   selectedSymbol: Symbol | null;
   searchQuery: string;
   extractedStrings: ExtractedString[];
@@ -62,6 +64,7 @@ interface AppState {
     locals: { name: string; address: number; calls: string[] }[];
   };
   lastModified?: number;
+  objc?: any;
 }
 
 export class ApplicationCoordinator {
@@ -90,6 +93,7 @@ export class ApplicationCoordinator {
   private metadataPanel: MetadataPanel | null = null;
   private demanglerPanel: DemanglerPanel | null = null;
   private diffPanel: DiffPanel | null = null;
+  private pluginsPanel: PluginsPanel | null = null;
 
   // DOM elements cache
   private appContainer!: HTMLDivElement;
@@ -331,6 +335,7 @@ export class ApplicationCoordinator {
               <button class="tab-btn" data-tab="typeSystem">Type System</button>
               <button class="tab-btn" data-tab="demangler">Demangler</button>
               <button class="tab-btn" data-tab="diff">Diff Viewer</button>
+              <button class="tab-btn" data-tab="plugins">Plugins</button>
             </div>
             <button class="btn btn-secondary" id="open-mem-map-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem; border-radius: var(--radius-md);">
               🗺️ Memory Map
@@ -441,9 +446,14 @@ export class ApplicationCoordinator {
             <div id="demangler-panel-container" style="height: 100%;"></div>
           </div>
 
-          <!-- Diff Tab Panel -->
+           <!-- Diff Tab Panel -->
           <div class="tab-content" id="panel-diff" style="display: none;">
             <div id="diff-panel-container" style="height: 100%;"></div>
+          </div>
+
+          <!-- Plugins Tab Panel -->
+          <div class="tab-content" id="panel-plugins" style="display: none;">
+            <div id="plugins-panel-container" style="height: 100%;"></div>
           </div>
         </main>
       </div>
@@ -571,7 +581,7 @@ export class ApplicationCoordinator {
     });
   }
 
-  private switchTab(tabName: 'hex' | 'assembly' | 'cfg' | 'decompiler' | 'strings' | 'search' | 'dependencies' | 'signatures' | 'emulator' | 'report' | 'xrefs' | 'importsExports' | 'patcher' | 'fcg' | 'collab' | 'yara' | 'typeSystem' | 'metadata' | 'demangler' | 'diff') {
+  private switchTab(tabName: 'hex' | 'assembly' | 'cfg' | 'decompiler' | 'strings' | 'search' | 'dependencies' | 'signatures' | 'emulator' | 'report' | 'xrefs' | 'importsExports' | 'patcher' | 'fcg' | 'collab' | 'yara' | 'typeSystem' | 'metadata' | 'demangler' | 'diff' | 'plugins') {
     if (this.state.activeTab === tabName) return;
 
     // Toggle button active classes
@@ -611,6 +621,13 @@ export class ApplicationCoordinator {
           window.dispatchEvent(resizeEvent);
         }
       }, 50);
+    } else if (tabName === 'plugins' && this.pluginsPanel) {
+      this.pluginsPanel.updateData(
+        this.state.binaryData,
+        this.state.sections,
+        this.state.symbols,
+        this.state.instructions
+      );
     }
   }
 
@@ -637,6 +654,7 @@ export class ApplicationCoordinator {
     let symbols: Symbol[] = [];
     let graphImports: { library: string; name: string; address?: number }[] = [];
     let graphExports: { name: string; address?: number }[] = [];
+    let objcMetadata: any = null;
 
     // Format & parser dispatches
     try {
@@ -771,6 +789,11 @@ export class ApplicationCoordinator {
       ) {
         // Mach-O binary parsing
         const macho = parseMacho(arrayBuffer);
+        try {
+          objcMetadata = parseObjcMetadata(macho, arrayBuffer);
+        } catch (e) {
+          console.error('Failed to parse Objective-C metadata from Mach-O:', e);
+        }
         sections = macho.sections.map((s: any) => ({
           name: s.sectname,
           virtualAddress: Number(s.addr),
@@ -887,7 +910,9 @@ export class ApplicationCoordinator {
       );
     }
 
-    // Standard fallback fallback routines
+
+
+    // Standard fallback routines
     if (sections.length === 0) {
       sections = [
         {
@@ -920,6 +945,8 @@ export class ApplicationCoordinator {
       entryPoint,
     });
 
+
+
     // Populate extra symbols based on branch/calls targets to make it look full
     const additionalFuncs = new Set<number>();
     instructions.forEach((inst: Instruction) => {
@@ -938,8 +965,9 @@ export class ApplicationCoordinator {
       }
     });
 
+    const existingAddresses = new Set(symbols.map(s => s.address));
     additionalFuncs.forEach((addr: number) => {
-      if (!symbols.some((s) => s.address === addr)) {
+      if (!existingAddresses.has(addr)) {
         symbols.push({
           name: `sub_0x${addr.toString(16)}`,
           address: addr,
@@ -954,6 +982,8 @@ export class ApplicationCoordinator {
 
     // Build Control Flow Graph (CFG)
     const cfgBlocks = buildCFG(instructions);
+
+
 
     if (graphImports.length === 0) {
       graphImports = [
@@ -970,12 +1000,25 @@ export class ApplicationCoordinator {
       }));
     }
 
-    // Resolve local calls
+    // Resolve local calls in O(S + I)
+    const symbolMap = new Map<number, Symbol>();
+    symbols.forEach(s => symbolMap.set(s.address, s));
+
+    const symbolInsts = new Map<number, Instruction[]>();
+    symbols.forEach(sym => symbolInsts.set(sym.address, []));
+    
+    let symIdx = 0;
+    for (const inst of instructions) {
+      while (symIdx + 1 < symbols.length && symbols[symIdx + 1].address <= inst.address) {
+        symIdx++;
+      }
+      if (symIdx < symbols.length && symbols[symIdx].address <= inst.address) {
+        symbolInsts.get(symbols[symIdx].address)!.push(inst);
+      }
+    }
+
     const graphLocals = symbols.map(sym => {
-      const nextSym = symbols.find(s => s.address > sym.address);
-      const endAddr = nextSym ? nextSym.address : sym.address + 0x200;
-      
-      const funcInsts = instructions.filter(inst => inst.address >= sym.address && inst.address < endAddr);
+      const funcInsts = symbolInsts.get(sym.address) || [];
       const calls: string[] = [];
       
       funcInsts.forEach(inst => {
@@ -985,7 +1028,7 @@ export class ApplicationCoordinator {
         ) {
           const target = inst.operands?.find((op: any) => op.type === 'imm')?.imm;
           if (typeof target === 'number') {
-            const targetSym = symbols.find(s => s.address === target);
+            const targetSym = symbolMap.get(target);
             if (targetSym) {
               calls.push(targetSym.name);
             }
@@ -1017,7 +1060,6 @@ export class ApplicationCoordinator {
       locals: graphLocals,
     };
 
-    // Extract printable strings from sections
     const extractedStrings = extractStrings(data, {
       sections: sections.map((s: any) => ({
         fileOffset: s.fileOffset,
@@ -1045,6 +1087,7 @@ export class ApplicationCoordinator {
       extractedStrings,
       dependencies: dependencyData,
       lastModified: lastModified || Date.now(),
+      objc: objcMetadata,
     } as any;
 
     // Update Header Status UI
@@ -1072,6 +1115,7 @@ export class ApplicationCoordinator {
     this.initFCGViewer();
     this.initCollabPanel();
     this.initYaraPanel();
+    this.initPluginsPanel();
     this.initMetadataPanel();
     this.initTypeSystemPanel();
     this.initDemanglerPanel();
@@ -1687,6 +1731,33 @@ export class ApplicationCoordinator {
     }
   }
 
+  private initPluginsPanel() {
+    const container = document.getElementById('plugins-panel-container')!;
+    if (this.pluginsPanel) {
+      this.pluginsPanel.updateData(
+        this.state.binaryData,
+        this.state.sections,
+        this.state.symbols,
+        this.state.instructions
+      );
+    } else {
+      this.pluginsPanel = new PluginsPanel(container, {
+        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+          if (targetView === 'assembly' && this.assemblyView) {
+            this.assemblyView.navigateToAddress(address);
+          }
+          this.switchTab(targetView);
+        }
+      });
+      this.pluginsPanel.updateData(
+        this.state.binaryData,
+        this.state.sections,
+        this.state.symbols,
+        this.state.instructions
+      );
+    }
+  }
+
   private initMetadataPanel() {
     const container = document.getElementById('metadata-panel-container')!;
     if (!container) return;
@@ -1699,7 +1770,8 @@ export class ApplicationCoordinator {
         entryPoint: this.state.entryPoint,
         sectionsCount: this.state.sections.length,
         symbolsCount: this.state.symbols.length,
-        lastModified: this.state.lastModified
+        lastModified: this.state.lastModified,
+        objc: this.state.objc
       });
     } else {
       this.metadataPanel = new MetadataPanel(container);
@@ -1711,7 +1783,8 @@ export class ApplicationCoordinator {
         entryPoint: this.state.entryPoint,
         sectionsCount: this.state.sections.length,
         symbolsCount: this.state.symbols.length,
-        lastModified: this.state.lastModified
+        lastModified: this.state.lastModified,
+        objc: this.state.objc
       });
     }
   }

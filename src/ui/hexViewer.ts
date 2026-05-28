@@ -29,6 +29,8 @@ export class HexViewer {
   private selectedOffset: number | null = null;
 
   // DOM elements
+  private viewportEl!: HTMLDivElement;
+  private gridEl!: HTMLDivElement;
   private offsetCol!: HTMLDivElement;
   private hexCol!: HTMLDivElement;
   private asciiCol!: HTMLDivElement;
@@ -49,6 +51,10 @@ export class HexViewer {
 
     this.initLayout();
     this.render();
+
+    this.container.addEventListener('scroll', () => {
+      this.render();
+    });
   }
 
   /**
@@ -64,9 +70,7 @@ export class HexViewer {
       style.id = 'hex-viewer-styles';
       style.textContent = `
         .hex-viewer-root {
-          display: grid;
-          grid-template-columns: auto 1fr auto;
-          gap: 1.5rem;
+          position: relative;
           font-family: 'Fira Code', 'Courier New', Courier, monospace;
           font-size: 14px;
           line-height: 1.5;
@@ -79,6 +83,19 @@ export class HexViewer {
           user-select: none;
           max-height: 100%;
           box-sizing: border-box;
+        }
+        .hex-viewer-viewport {
+          position: relative;
+          width: 100%;
+        }
+        .hex-viewer-grid {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          gap: 1.5rem;
         }
         .hex-col, .offset-col, .ascii-col {
           display: flex;
@@ -94,7 +111,8 @@ export class HexViewer {
         .hex-line, .ascii-line {
           display: flex;
           align-items: center;
-          height: 1.5rem;
+          height: 22px;
+          box-sizing: border-box;
         }
         .hex-line {
           gap: 0.5rem;
@@ -147,6 +165,12 @@ export class HexViewer {
     if (theme.border)
       this.container.style.setProperty('--hex-border', theme.border);
 
+    this.viewportEl = document.createElement('div');
+    this.viewportEl.className = 'hex-viewer-viewport';
+
+    this.gridEl = document.createElement('div');
+    this.gridEl.className = 'hex-viewer-grid';
+
     this.offsetCol = document.createElement('div');
     this.offsetCol.className = 'offset-col';
 
@@ -156,30 +180,44 @@ export class HexViewer {
     this.asciiCol = document.createElement('div');
     this.asciiCol.className = 'ascii-col';
 
-    this.container.appendChild(this.offsetCol);
-    this.container.appendChild(this.hexCol);
-    this.container.appendChild(this.asciiCol);
+    this.gridEl.appendChild(this.offsetCol);
+    this.gridEl.appendChild(this.hexCol);
+    this.gridEl.appendChild(this.asciiCol);
+    this.viewportEl.appendChild(this.gridEl);
+    this.container.appendChild(this.viewportEl);
+    this.setupEvents();
   }
 
   /**
    * Renders the data buffer to columns.
    */
   private render() {
+    const len = this.data.length;
+    const linesCount = Math.ceil(len / this.bytesPerLine);
+    const lineHeight = 22; // px
+
+    this.viewportEl.style.height = `${linesCount * lineHeight}px`;
+
+    const scrollTop = this.container.scrollTop;
+    const containerHeight = this.container.clientHeight || 400;
+
+    const startIndex = Math.max(0, Math.floor(scrollTop / lineHeight) - 10);
+    const endIndex = Math.min(linesCount, Math.ceil((scrollTop + containerHeight) / lineHeight) + 10);
+
+    this.gridEl.style.transform = `translateY(${startIndex * lineHeight}px)`;
+
     this.offsetCol.innerHTML = '';
     this.hexCol.innerHTML = '';
     this.asciiCol.innerHTML = '';
     this.byteElements.clear();
     this.asciiElements.clear();
 
-    const len = this.data.length;
-    const linesCount = Math.ceil(len / this.bytesPerLine);
-
     // Document fragment for high performance insertion
     const offsetFrag = document.createDocumentFragment();
     const hexFrag = document.createDocumentFragment();
     const asciiFrag = document.createDocumentFragment();
 
-    for (let lineIndex = 0; lineIndex < linesCount; lineIndex++) {
+    for (let lineIndex = startIndex; lineIndex < endIndex; lineIndex++) {
       const lineOffset = lineIndex * this.bytesPerLine;
 
       // 1. Offset column element
@@ -244,7 +282,15 @@ export class HexViewer {
     this.hexCol.appendChild(hexFrag);
     this.asciiCol.appendChild(asciiFrag);
 
-    this.setupEvents();
+    // Apply highlights to visible elements
+    if (this.hoveredOffset !== null) {
+      this.byteElements.get(this.hoveredOffset)?.classList.add('hovered');
+      this.asciiElements.get(this.hoveredOffset)?.classList.add('hovered');
+    }
+    if (this.selectedOffset !== null) {
+      this.byteElements.get(this.selectedOffset)?.classList.add('selected');
+      this.asciiElements.get(this.selectedOffset)?.classList.add('selected');
+    }
   }
 
   /**

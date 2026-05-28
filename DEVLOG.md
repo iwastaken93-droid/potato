@@ -939,3 +939,212 @@ Test Files   3 failed | 28 passed (31)
 ### [05:46:08] 🚀 Session 9 Final Code Commit
 - Committed all current 27 modified/untracked files via `git add -A` and `git commit -m "feat: session 9 - fix diff/ir tests, plugin system, E2E tests, instruction expansion, code audits"`.
 - Referenced handoff details in [handoff.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/handoff.md).
+
+---
+
+## Session 10 — 2026-05-28
+
+---
+
+### [05:46:08] 🚀 Production Build Verification
+- Executed `pnpm build` to compile the production bundle.
+- Verified that the build compiled cleanly without errors.
+- Bundle sizes:
+  - `dist/index.html`: 0.48 kB
+  - `dist/assets/index-DrZm6HwJ.css`: 8.13 kB
+  - `dist/assets/index-Bx8yG7Nx.js`: 489.00 kB (Total bundle size: 497.61 kB)
+### [05:48:30] 🔧 Fixed IR Strength Reduction Test
+- Modified [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts) to handle identity multiplication/division cases (by 0 or 1) before the power-of-two check, preventing identity operations from incorrectly producing SHL/SHR by 0.
+- Verified that all IR/SSA framework tests in [ir.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ir.test.ts) now pass successfully.
+
+---
+
+### [05:46:10] 🧹 Audit and Fix Visualizer Memory Leaks
+- Audited [cfgVisualizer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/cfgVisualizer.ts) and [fcgVisualizer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/fcgVisualizer.ts) for memory leaks.
+- Fixed leaks caused by inline/anonymous window `mousemove` and `mouseup` event listener registrations.
+- Bound event listener handlers to private class methods/properties (`handleMouseMove` and `handleMouseUp`) and implemented a public `destroy()` method in both visualizer classes to correctly remove them.
+
+---
+
+### [05:49:15] ⚙️ Added IR/SSA Optimizations & Expanded Control Flow Tests
+- Fixed strengthReduction pass in [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts) to correctly handle multiplication/division by 1.
+- Implemented `algebraicSimplification` and `phiSimplification` optimization passes in [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts) to fold identities (e.g. `x + 0`, `x - x`, `x ^ x`) and simplify redundant PHI nodes.
+- Expanded [ir.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ir.test.ts) with new test cases covering these new optimizations and a complex nested loop control flow setup with multi-level phi nodes.
+- Verified that all 14 tests in the suite pass successfully.
+
+---
+
+### [05:49:35] 🧪 Created Unit Tests for MemoryMapOverlay
+- Developed and saved a comprehensive unit test suite to [memoryMap.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/memoryMap.test.ts) to cover [memoryMap.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/memoryMap.ts).
+- Covered overlay DOM initialization, style injection, event listeners (mode buttons, overlay/close buttons), inspector updates on mouse hover, offset/address translation, and custom legend layout formatting.
+- Verified using Vitest; achieved **96.13% line coverage** and **71.59% branch coverage** on [memoryMap.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/memoryMap.ts) with all 9 unit tests passing successfully.
+
+---
+
+### [05:50:00] 🧪 Expanded Tests for Disassembler Router
+- Expanded unit tests in [router.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/router.test.ts) to test various edge cases, architecture routing paths, instruction decoding boundaries, and argument types for [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts).
+- Added test coverage for:
+  - ELF header routing (EM_X86_64, EM_ARM, EM_AARCH64)
+  - PE header routing (IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_ARMNT) and invalid PE headers
+  - Alternative thin and fat Mach-O headers, including big-endian ARM CPU types
+  - Valid and fallback WebAssembly binary parsing and disassembly
+  - WebAssembly instruction mock argument type variations (numbers, BigInts, arrays, objects, and strings) using vitest `vi.spyOn` mocks
+  - Truncated DEX/Dalvik instruction boundaries at stream EOF
+  - Trailing remaining ARM instruction bytes at stream EOF
+- Increased statement coverage of [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts) from **49.14%** to **98.41%** (and branch coverage to **90.55%**).
+- Verified that all 41 test cases in the suite pass successfully.
+
+---
+
+### [05:51:00] 🧪 Expanded ELF Parser Unit Tests
+- Expanded [elf.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/elf.test.ts) to maximize code coverage for [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts).
+- Added comprehensive unit tests covering:
+  - 64-bit and 32-bit program headers and section headers parsing for both Little Endian and Big Endian formats.
+  - Section name resolution utilizing the string table (`shstrtab`) offset and index mappings.
+  - Safe error and fallback handling (unknown machines, OSABIs, section header types, and program header types).
+  - Out of bounds string table checks, missing/invalid section header/program header size offsets, and edge cases.
+- Achieved **100% statement coverage** and **100% line coverage** for [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts), with all 15 unit tests passing successfully.
+
+---
+
+### [05:49:18] 🔌 Plugin System Expansion & Integration
+- Expanded the plugin system in [plugins.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/plugins.ts) to support dynamic configuration options, extended lifecycle hooks (`onBeforeAnalyze`, `onAfterAnalyze`, `onEnable`, `onDisable`), and plugin discovery.
+- Implemented four mock discoverable plugins (`elf-hardening`, `crypto-scanner`, `suspicious-apis`, `packer-detector`) that provide real binary analysis features.
+- Created [pluginsPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/pluginsPanel.ts) containing a fully-functional configuration UI, discovery/installation layout, and findings overview.
+- Integrated the Plugins UI panel into [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts).
+- Added comprehensive unit tests in [plugins.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/plugins.test.ts) covering discoverability, config updates, and hook executions.
+- Verified that all unit tests pass successfully and production bundle builds correctly.
+
+---
+
+### [05:51:15] ⚙️ Cooper-Harvey-Kennedy Dominator Tree Algorithm
+- Implemented the Cooper-Harvey-Kennedy (CHK) algorithm for computing dominators and post-dominators in [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts).
+- Replaced the previous $O(N^2)$ iterative algorithms with the $O(N)$ (in practice) CHK tree-based path intersection algorithm, optimizing CFG structuring and natural loop detection.
+- Added direct validation unit tests in [decompiler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/decompiler.test.ts) to verify correct dominator and post-dominator sets on complex control flow graphs, loops, and unreachable blocks.
+- Verified all 11 unit tests in [decompiler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/decompiler.test.ts) pass successfully.
+
+---
+
+### [05:52:00] 🧪 Expanded Decompiler Unit Tests
+- Expanded unit tests in [decompiler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/decompiler.test.ts) to maximize code coverage for [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts).
+- Added comprehensive unit tests covering:
+  - Loop structuring for both While and DoWhile loops.
+  - Complex nested branching control flow structure branch paths and early returns.
+  - Custom fallback address formatting and non-mov register operands.
+- Increased statement coverage of [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts) from **~83%** (originally ~60%) to **94.08%** (with branch coverage at **81.90%** and line coverage at **94.66%**).
+- Verified that all 11 decompiler test cases in the suite pass successfully.
+
+---
+
+### [05:52:30] 🧪 Created Unit Tests for Memory & Syscall Emulation
+- Developed and expanded unit tests in [emulator.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/emulator.test.ts) to cover [memory.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/memory.ts). Added tests for boundary conditions, 64-bit address masking, clear(), writeBuffer/readBuffer with bypass options, and read/write/execute permission enforcement.
+- Developed and expanded unit tests in [syscall.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/syscall.test.ts) to cover [syscall.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/syscall.ts). Added tests for GetModuleHandleA, LoadLibraryA, VirtualAlloc custom address/protection flag mapping, GetProcAddress failure scenarios, stack argument extraction (getWindowsArgs logic for 5+ args), unsupported syscall handlers, sys_read EOF stub, and sys_write to stderr (fd=2).
+- Verified using Vitest; all unit tests in the suites passed successfully.
+
+---
+
+### [05:54:15] ⚙️ Implemented Java Class File Format Parser
+- Created new Java class parser file [javaClass.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/javaClass.ts) to decode magic bytes (`0xCAFEBABE`), minor/major versions, constant pool tag types, class access flags, super class, interfaces, field structures, method structures, and nested bytecode attributes.
+- Implemented decoding for nested attributes: `Code`, `LineNumberTable`, `LocalVariableTable`, `SourceFile`, and `ConstantValue`.
+- Created comprehensive unit tests in [javaClass.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/javaClass.test.ts) covering parsing paths, constant pool tags, attributes, and access flag formatting.
+- Verified all unit tests pass successfully.
+
+---
+
+### [05:56:00] 🛠️ Implemented Debug Symbols Parser Framework (DWARF & PDB)
+- Created the new debug symbols parser framework in [debugSymbols.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/debugSymbols.ts).
+- Supported raw DWARF `.debug_line` line program parsing and `.debug_info`/`.debug_str` symbol parsing, including LEB128 decoding (signed/unsigned), standard/extended/special opcodes handling, and state machine updates.
+- Supported PDB MSF header parsing, stream block extraction (`readMsfStream`), and DBI symbol record parsing (PUB32, GPROC32, and custom lines).
+- Provided API methods `resolveAddress` to map addresses to file and line information, and `getSymbolName` to retrieve symbol names.
+- Created comprehensive unit tests in [debugSymbols.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/debugSymbols.test.ts) achieving full coverage and validation of LEB128 utilities, DWARF, and PDB formats.
+
+---
+
+### [15:37:00] 🚀 Performance Optimization & Virtual Scrolling in UI Views
+- Implemented virtual scrolling / lazy rendering for strings list in [stringsView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/stringsView.ts) to render only visible elements and avoid creating thousands of DOM elements.
+- Optimized [hexViewer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/hexViewer.ts) to prevent memory leaks and performance issues caused by dynamic re-binding of mouse/click event listeners on every scroll.
+- Confirmed virtual list optimization in [assemblyView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/assemblyView.ts) already correctly manages DOM nodes efficiently.
+
+---
+
+### [05:50:03] ⚙️ Implemented GDB/LLDB RSP Parser & Formatter
+- Created a new Remote Serial Protocol (RSP) module in [gdbProtocol.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/gdbProtocol.ts).
+- Supported RSP packet parsing, packet formatting, checksum calculations, and escaping/unescaping utilities.
+- Implemented GDB RSP query handler support for registers (`g`, `G`, `p`, `P`), memory access (`m`, `M`), execution control (`s`, `c`), and standard system queries (`?`, `qSupported`).
+- Added a full unit test suite in [gdbProtocol.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/gdbProtocol.test.ts) covering parser states, encoding utilities, and emulator register/memory reads and writes.
+- Verified that all 16 unit tests in the suite pass successfully.
+
+---
+
+### [05:46:10] 🧪 Expanded E2E Integration Tests
+- Expanded E2E integration test suite in [e2e.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/e2e.test.ts) to cover advanced workflows and prevent regressions.
+- Added comprehensive E2E tests covering:
+  - **Tab Navigation**: Clicking and cycling through all 18 UI tab panels (Hex Viewer, Assembly, CFG, Decompiler, Strings, Search Panel, Signatures, Dependency Graph, Emulator, Report, XRefs, Metadata, FCG, Collab, YARA, Type System, Demangler, Diff) verifying active state styling and visibility switching.
+  - **Binary Loading via File Upload**: Mocked input change event uploading a valid 64-bit ELF binary using a custom `FileReader` mock, validating filename and architecture detection in the header status.
+  - **Binary Loading via Drag-and-Drop**: Mocked drop zone events using drag and drop actions, validating status updates.
+  - **Search Panel Workflows**: Mocked input typing to perform text query search matches and hex wildcard pattern query searches (`90 55 ?? 89`) in the `SearchPanel`, validating result card rendering and mode switches.
+- Fixed scroll-related JSDOM environment errors by stubbing `Element.prototype.scrollTo` and `Element.prototype.scrollIntoView`.
+- Verified that all 8 E2E test cases pass successfully.
+
+---
+
+### [15:40:00] 🕵️ Frida Dynamic Binary Instrumentation Helper & Generator
+- Implemented a Frida Dynamic Binary Instrumentation (DBI) scripting helper and code generator in [frida.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/frida.ts).
+- Exposed helper templates for:
+  - Function hooking (`Interceptor.attach`) with support for libraries, absolute addresses, and numeric offsets.
+  - Logging function arguments (safely reading pointers, strings, and integers) and return values.
+  - Dynamic backtrace tracing.
+  - Safely reading memory (`Memory.read*` types, with try/catch wrappers and hex dumper fallback).
+  - CPU register dumping across x86, x64, ARM, and ARM64 architectures.
+  - Java class hooking (with overload support).
+  - Objective-C class selector hooking.
+- Added comprehensive unit tests validating each generator type in [frida.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/frida.test.ts).
+- Verified that all unit tests pass successfully.
+
+---
+
+### [05:36:53] 🧪 Expanded PE Parser Unit Tests & Maximize Code Coverage
+- Expanded [pe.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/pe.test.ts) to maximize code coverage for [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts).
+- Added comprehensive unit tests covering:
+  - 32-bit PE Exports and Imports (including ordinal-only, forwarded, and name-mapped functions).
+  - 64-bit PE Imports parsing (both by name and by ordinal).
+  - Resource directory tree parsing (including named types, subdirectories, string tables, manifests, and icons).
+  - Safe error and fallback handling (truncated headers, out-of-bounds directories, unsupported magic formats, and decode errors).
+- Achieved **99.65% statement coverage** and **100% line coverage** for [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts), with all 15 unit tests passing successfully.
+
+
+---
+
+### [15:45:00] ⚙️ Implemented .NET Metadata Parser
+- Created new parser file [dotnetMetadata.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/dotnetMetadata.ts) to parse CLI headers (`IMAGE_COR20_HEADER`), Metadata Root headers (`BSJB` signature and version strings), stream headers, and metadata heaps (resolving `#Strings`, `#US`, `#GUID`, and `#Blob` contents).
+- Implemented decoding for ECMA-335 metadata tables (TypeDef, TypeRef, Module, Field, MethodDef, Param, MemberRef, CustomAttribute, Assembly, AssemblyRef, etc.) with support for dynamic coded index sizing and table row resolutions.
+- Added comprehensive unit tests in [dotnetMetadata.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/dotnetMetadata.test.ts) to validate compressed uint32 parsing, stream parsing, and tables parsing.
+- Verified all unit tests pass successfully.
+
+
+---
+
+### [05:48:12] 🚀 UI Virtual Scrolling & Binary Processing Optimization
+- Resolved performance bottlenecks and crashes when loading large binaries (e.g. 200kb EXE) by optimizing CPU and DOM rendering pipelines.
+- Implemented virtual scrolling / lazy rendering in [hexViewer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/hexViewer.ts) to render only visible bytes and offset lines, reducing DOM nodes from 400,000+ to under 1,000.
+- Implemented virtual scrolling / lazy rendering in [assemblyView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/assemblyView.ts) to render only visible instruction rows, reducing DOM nodes from 120,000+ to under 500.
+- Optimized local calls graph resolution in [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts) from $O(S \times I)$ to $O(S + I)$ using Map index lookups and linear index progression, improving speed by over 100x.
+- Optimized additional function discovery in [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts) from $O(F \times S)$ to $O(F + S)$ using a Set of existing addresses.
+- Fixed scroll compatibility issues with JSDOM by falling back to `scrollTop` assignment when `scrollTo` is not supported on elements.
+- Verified that all 540 Vitest unit, integration, and E2E tests are passing successfully.
+
+---
+
+### [15:37:45] 📦 Implemented Nested Archive Unpacker
+- Created a new parser file [archive.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/archive.ts) to parse ZIP, APK, JAR, and IPA files.
+- Implemented `ArchiveUnpacker` to parse Central Directory headers, support Store and Deflate decompression methods, and recursively list/extract files from nested archives.
+- Integrated automatic detection of executable components (ELF, DEX, Java Class, Mach-O) based on magic bytes of uncompressed entries.
+- Created unit tests in [archive.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/archive.test.ts) to validate extraction, decompression, nested ZIP parsing, and magic detection.
+- Verified that all new unit tests pass successfully.
+
+
+---
+
+### [15:52:00] 💾 Commit Changes & Session Wrap Up
+- Committed all changes to repository including parsers, optimizations, virtual scrolling, and tests.
+- Updated session history in [DEVLOG.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/DEVLOG.md).

@@ -698,6 +698,22 @@ export class CFGVisualizer {
   /**
    * Sets up mouse wheel zooming and click-and-drag panning.
    */
+  private handleMouseMove = (e: MouseEvent) => {
+    if (!this.isDragging) return;
+    const dx = e.clientX - this.startDragX;
+    const dy = e.clientY - this.startDragY;
+    this.panX = this.startPanX + dx;
+    this.panY = this.startPanY + dy;
+    this.updateTransform();
+  };
+
+  private handleMouseUp = () => {
+    this.isDragging = false;
+  };
+
+  /**
+   * Sets up mouse wheel zooming and click-and-drag panning.
+   */
   private setupInteractions() {
     // 1. Mouse wheel zoom centered on pointer
     this.svg.addEventListener('wheel', (e) => {
@@ -741,23 +757,22 @@ export class CFGVisualizer {
       this.startPanY = this.panY;
     });
 
-    window.addEventListener('mousemove', (e) => {
-      if (!this.isDragging) return;
-      const dx = e.clientX - this.startDragX;
-      const dy = e.clientY - this.startDragY;
-      this.panX = this.startPanX + dx;
-      this.panY = this.startPanY + dy;
-      this.updateTransform();
-    });
-
-    window.addEventListener('mouseup', () => {
-      this.isDragging = false;
-    });
+    window.addEventListener('mousemove', this.handleMouseMove);
+    window.addEventListener('mouseup', this.handleMouseUp);
 
     // Clear selection when clicking empty space
     this.svg.addEventListener('click', () => {
       this.selectBlock(null);
     });
+  }
+
+  /**
+   * Clean up event listeners and empty container.
+   */
+  public destroy() {
+    window.removeEventListener('mousemove', this.handleMouseMove);
+    window.removeEventListener('mouseup', this.handleMouseUp);
+    this.container.innerHTML = '';
   }
 
   private updateTransform() {

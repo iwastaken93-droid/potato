@@ -19,6 +19,7 @@ export class StringsView {
 
   // DOM elements
   private rootEl!: HTMLDivElement;
+  private tableContainerEl!: HTMLDivElement;
   private searchInput!: HTMLInputElement;
   private tableBody!: HTMLTableSectionElement;
   private totalCountEl!: HTMLSpanElement;
@@ -228,18 +229,22 @@ export class StringsView {
       }
 
       .strings-table td {
-        padding: 0.75rem 1rem;
+        padding: 0 1rem;
+        height: 38px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         vertical-align: middle;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        box-sizing: border-box;
       }
 
       .strings-row {
         cursor: pointer;
         transition: all var(--transition-fast);
         position: relative;
+        height: 38px;
+        box-sizing: border-box;
       }
 
       .strings-row::before {
@@ -409,8 +414,8 @@ export class StringsView {
     statsRow.appendChild(this.tagFiltersContainer);
 
     // 3. Table Container
-    const tableContainer = document.createElement('div');
-    tableContainer.className = 'strings-table-container';
+    this.tableContainerEl = document.createElement('div');
+    this.tableContainerEl.className = 'strings-table-container';
 
     const table = document.createElement('table');
     table.className = 'strings-table';
@@ -429,15 +434,19 @@ export class StringsView {
     this.tableBody = document.createElement('tbody');
     table.appendChild(thead);
     table.appendChild(this.tableBody);
-    tableContainer.appendChild(table);
+    this.tableContainerEl.appendChild(table);
 
     // Append all
     this.rootEl.appendChild(controls);
     this.rootEl.appendChild(statsRow);
-    this.rootEl.appendChild(tableContainer);
+    this.rootEl.appendChild(this.tableContainerEl);
     this.container.appendChild(this.rootEl);
 
     // Event listeners
+    this.tableContainerEl.addEventListener('scroll', () => {
+      this.renderRows();
+    });
+
     this.searchInput.addEventListener('input', () => {
       this.searchQuery = this.searchInput.value.toLowerCase().trim();
       this.applyFiltersAndSort();
@@ -545,19 +554,42 @@ export class StringsView {
   }
 
   private renderRows() {
-    this.tableBody.innerHTML = '';
     this.totalCountEl.innerHTML = `Showing <strong>${this.filteredStrings.length}</strong> of ${this.allStrings.length} strings`;
 
     if (this.filteredStrings.length === 0) {
+      this.tableBody.innerHTML = '';
       const row = document.createElement('tr');
       row.innerHTML = `<td colspan="5" class="no-results">No strings matched the current filters.</td>`;
       this.tableBody.appendChild(row);
       return;
     }
 
-    this.filteredStrings.forEach((str) => {
+    const rowHeight = 38; // px
+    const scrollTop = this.tableContainerEl.scrollTop;
+    const containerHeight = this.tableContainerEl.clientHeight || 400;
+
+    const len = this.filteredStrings.length;
+    const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 10);
+    const endIndex = Math.min(len, Math.ceil((scrollTop + containerHeight) / rowHeight) + 10);
+
+    this.tableBody.innerHTML = '';
+
+    // 1. Top Spacer Row
+    const topSpacerHeight = startIndex * rowHeight;
+    if (topSpacerHeight > 0) {
+      const topSpacer = document.createElement('tr');
+      topSpacer.style.height = `${topSpacerHeight}px`;
+      topSpacer.innerHTML = `<td colspan="5" style="padding: 0; border: none; height: ${topSpacerHeight}px;"></td>`;
+      this.tableBody.appendChild(topSpacer);
+    }
+
+    // 2. Visible Rows
+    const fragment = document.createDocumentFragment();
+    for (let i = startIndex; i < endIndex; i++) {
+      const str = this.filteredStrings[i];
       const row = document.createElement('tr');
       row.className = 'strings-row';
+      row.style.height = `${rowHeight}px`;
 
       const isUnicode = str.encoding.startsWith('utf16');
       const encodingClass = isUnicode ? 'unicode' : 'ascii';
@@ -589,8 +621,18 @@ export class StringsView {
         }
       });
 
-      this.tableBody.appendChild(row);
-    });
+      fragment.appendChild(row);
+    }
+    this.tableBody.appendChild(fragment);
+
+    // 3. Bottom Spacer Row
+    const bottomSpacerHeight = (len - endIndex) * rowHeight;
+    if (bottomSpacerHeight > 0) {
+      const bottomSpacer = document.createElement('tr');
+      bottomSpacer.style.height = `${bottomSpacerHeight}px`;
+      bottomSpacer.innerHTML = `<td colspan="5" style="padding: 0; border: none; height: ${bottomSpacerHeight}px;"></td>`;
+      this.tableBody.appendChild(bottomSpacer);
+    }
   }
 
   private escapeHtml(str: string): string {

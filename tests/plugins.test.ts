@@ -169,4 +169,75 @@ describe('Plugin System Architecture Unit Tests', () => {
     expect(results[0].errors).toContain('Analysis failed unexpectedly');
     expect(results[0].findings).toHaveLength(0);
   });
+
+  it('should support discoverable plugins and toggle status', async () => {
+    const discoverable = manager.getDiscoverablePlugins();
+    expect(discoverable.length).toBeGreaterThan(0);
+    const elfPlugin = discoverable.find(p => p.metadata.id === 'elf-hardening');
+    expect(elfPlugin).toBeDefined();
+
+    // Verify it is not registered initially
+    expect(manager.getPlugin('elf-hardening')).toBeUndefined();
+
+    // Install
+    await manager.installPlugin('elf-hardening');
+    const installed = manager.getPlugin('elf-hardening');
+    expect(installed).toBeDefined();
+    expect(installed?.enabled).toBe(true);
+
+    // Toggle
+    await manager.togglePlugin('elf-hardening', false);
+    expect(installed?.enabled).toBe(false);
+
+    // Skip running if disabled
+    const results = await manager.runAll(mockContext);
+    const elfResult = results.find(r => r.pluginId === 'elf-hardening');
+    expect(elfResult).toBeUndefined();
+
+    // Toggle back
+    await manager.togglePlugin('elf-hardening', true);
+    expect(installed?.enabled).toBe(true);
+  });
+
+  it('should trigger custom lifecycle hooks (onBeforeAnalyze, onAfterAnalyze, onEnable, onDisable)', async () => {
+    const beforeSpy = vi.fn();
+    const afterSpy = vi.fn();
+    const enableSpy = vi.fn();
+    const disableSpy = vi.fn();
+
+    const hookPlugin: AnalyzerPlugin = {
+      metadata: {
+        id: 'hook-plugin',
+        name: 'Hook Plugin',
+        description: 'Test hooks',
+        version: '1.0.0',
+        author: 'Antigravity'
+      },
+      onBeforeAnalyze: beforeSpy,
+      onAfterAnalyze: afterSpy,
+      onEnable: enableSpy,
+      onDisable: disableSpy,
+      analyze: () => ({ pluginId: 'hook-plugin', success: true, findings: [] })
+    };
+
+    await manager.register(hookPlugin);
+    expect(enableSpy).toHaveBeenCalledTimes(1);
+
+    await manager.runAll(mockContext);
+    expect(beforeSpy).toHaveBeenCalledTimes(1);
+    expect(afterSpy).toHaveBeenCalledTimes(1);
+
+    await manager.togglePlugin('hook-plugin', false);
+    expect(disableSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should get and set plugin configuration options dynamically', async () => {
+    await manager.installPlugin('elf-hardening');
+    const installed = manager.getPlugin('elf-hardening')!;
+    
+    expect(installed.config?.checkCanary).toBe(true);
+
+    manager.setPluginConfig('elf-hardening', { checkCanary: false });
+    expect(installed.config?.checkCanary).toBe(false);
+  });
 });

@@ -115,6 +115,75 @@ describe('CollabEngine & CollabPanel Sync Tests', () => {
     expect(engine.getPeers().length).toBe(0);
     expect(engine.getComments().size).toBe(0);
   });
+
+  it('should resolve conflicts from simultaneous edits on highlights using LWW-Register', async () => {
+    const peerA = new CollabEngine();
+    const peerB = new CollabEngine();
+
+    peerA.connect('sync-room', 'Alice');
+    peerB.connect('sync-room', 'Bob');
+
+    // Simulate latency of 50ms
+    peerA.setLatency(50);
+    peerB.setLatency(50);
+
+    // Concurrent highlights on the same address
+    peerA.sendHighlight(0x3000, '#3B82F6'); // Blue
+    peerB.sendHighlight(0x3000, '#EF4444'); // Red
+
+    // Wait for latency delivery (50ms + margin)
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const colorA = peerA.getHighlights().get(0x3000)?.color;
+    const colorB = peerB.getHighlights().get(0x3000)?.color;
+
+    // Both must have converged on the exact same color
+    expect(colorA).toBe(colorB);
+
+    peerA.disconnect();
+    peerB.disconnect();
+  });
+
+  it('should resolve concurrent text insertions in comments using Yjs-like sequence CRDT', async () => {
+    const peerA = new CollabEngine();
+    const peerB = new CollabEngine();
+
+    peerA.connect('text-room', 'Alice');
+    peerB.connect('text-room', 'Bob');
+
+    // Sync initial comment
+    peerA.sendComment(0x4000, 'BaseText');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Ensure peerB has the initial state
+    expect(peerB.getComments().get(0x4000)?.comment).toBe('BaseText');
+
+    // Set latency
+    peerA.setLatency(100);
+    peerB.setLatency(100);
+
+    // Alice inserts 'A' at index 0 ('ABaseText')
+    peerA.sendComment(0x4000, 'ABaseText');
+
+    // Bob inserts 'B' at index 0 ('BBaseText') concurrently
+    peerB.sendComment(0x4000, 'BBaseText');
+
+    // Wait for sync (100ms latency + margin)
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    const commentA = peerA.getComments().get(0x4000)?.comment;
+    const commentB = peerB.getComments().get(0x4000)?.comment;
+
+    // Both must converge to the same merged string (either 'ABBaseText' or 'BABaseText')
+    expect(commentA).toBe(commentB);
+    expect(commentA).toContain('A');
+    expect(commentA).toContain('B');
+    expect(commentA).toContain('BaseText');
+    expect(commentA?.length).toBe(10); // 'BaseText' (8) + 'A' (1) + 'B' (1)
+
+    peerA.disconnect();
+    peerB.disconnect();
+  });
 });
 
 describe('CollabPanel DOM Tests', () => {

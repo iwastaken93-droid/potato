@@ -417,5 +417,69 @@ describe('Additional Emulator & Memory Edge Cases', () => {
     expect(res.success).toBe(false);
     expect(res.error).toContain('Unsupported emulator instruction');
   });
+
+  it('should clear all mappings and regions using clear()', () => {
+    const mem = new Memory();
+    mem.map(0x1000n, 0x100, '.text');
+    expect(mem.getMemoryMap().length).toBe(1);
+    mem.clear();
+    expect(mem.getMemoryMap().length).toBe(0);
+    expect(mem.getRegionAt(0x1000n)).toBeNull();
+  });
+
+  it('should mask 64-bit addresses in read/write functions', () => {
+    const mem = new Memory();
+    mem.map(0n, 0x100, '.zero');
+    // passing an address that overflows 64-bit space (e.g. 2^64 + 5)
+    // it should mask it to 5 and write/read successfully
+    const overflowAddr = (1n << 64n) + 5n;
+    mem.write8(overflowAddr, 0x55);
+    expect(mem.read8(overflowAddr)).toBe(0x55);
+    expect(mem.read8(5n)).toBe(0x55);
+  });
+
+  it('should enforce read permissions and bypass write permissions when requested', () => {
+    const mem = new Memory();
+    // Map a region that has write: true but read: false
+    mem.map(0x1000n, 0x100, '.writeonly', { read: false, write: true, execute: false });
+
+    // Write should succeed
+    mem.write8(0x1000n, 0xAA);
+    // Read should throw MemoryAccessError
+    expect(() => mem.read8(0x1000n)).toThrow(MemoryAccessError);
+
+    // Map a region that has read: true but write: false
+    mem.map(0x2000n, 0x100, '.readonly', { read: true, write: false, execute: false });
+    // Write without bypass should throw
+    expect(() => mem.write8(0x2000n, 0xBB)).toThrow(MemoryAccessError);
+    // Write with bypass should succeed
+    mem.write8(0x2000n, 0xBB, true);
+    expect(mem.read8(0x2000n)).toBe(0xBB);
+  });
+
+  it('should verify execute permissions using checkPermission', () => {
+    const mem = new Memory();
+    mem.map(0x1000n, 0x100, '.noexec', { read: true, write: true, execute: false });
+    // Accessing internal private checkPermission method using casting
+    expect(() => (mem as any).checkPermission(0x1000n, 'execute')).toThrow(MemoryAccessError);
+
+    // Map executable region
+    mem.map(0x2000n, 0x100, '.exec', { read: true, write: true, execute: true });
+    expect(() => (mem as any).checkPermission(0x2000n, 'execute')).not.toThrow();
+  });
+
+  it('should support writeBuffer and readBuffer with bypass permissions', () => {
+    const mem = new Memory();
+    mem.map(0x1000n, 0x100, '.readonly', { read: true, write: false, execute: false });
+
+    const data = new Uint8Array([1, 2, 3, 4]);
+    // Normal writeBuffer on readonly region should throw
+    expect(() => mem.writeBuffer(0x1000n, data, false)).toThrow(MemoryAccessError);
+
+    // Write with bypass should succeed
+    mem.writeBuffer(0x1000n, data, true);
+    expect(mem.readBuffer(0x1000n, 4)).toEqual(data);
+  });
 });
+
 

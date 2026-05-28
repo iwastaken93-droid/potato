@@ -312,6 +312,20 @@ export class FCGVisualizer {
     return marker;
   }
 
+  private handleMouseMove = (e: MouseEvent) => {
+    if (this.isDragging) {
+      const dx = e.clientX - this.startDragX;
+      const dy = e.clientY - this.startDragY;
+      this.panX = this.startPanX + dx;
+      this.panY = this.startPanY + dy;
+      this.updateTransform();
+    }
+  };
+
+  private handleMouseUp = () => {
+    this.isDragging = false;
+  };
+
   private setupEventListeners() {
     this.svg.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
@@ -323,19 +337,9 @@ export class FCGVisualizer {
       }
     });
 
-    window.addEventListener('mousemove', (e) => {
-      if (this.isDragging) {
-        const dx = e.clientX - this.startDragX;
-        const dy = e.clientY - this.startDragY;
-        this.panX = this.startPanX + dx;
-        this.panY = this.startPanY + dy;
-        this.updateTransform();
-      }
-    });
+    window.addEventListener('mousemove', this.handleMouseMove);
 
-    window.addEventListener('mouseup', () => {
-      this.isDragging = false;
-    });
+    window.addEventListener('mouseup', this.handleMouseUp);
 
     this.svg.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -356,6 +360,15 @@ export class FCGVisualizer {
 
       this.updateTransform();
     }, { passive: false });
+  }
+
+  /**
+   * Clean up event listeners and empty container.
+   */
+  public destroy() {
+    window.removeEventListener('mousemove', this.handleMouseMove);
+    window.removeEventListener('mouseup', this.handleMouseUp);
+    this.container.innerHTML = '';
   }
 
   private zoom(factor: number) {

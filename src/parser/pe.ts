@@ -101,6 +101,16 @@ export interface ImportTable {
   imports: ImportEntry[];
 }
 
+export interface ParsedResource {
+  type: string | number;
+  typeName: string;
+  name: string | number;
+  language: number;
+  offset: number; // File offset
+  size: number;
+  data: Uint8Array;
+}
+
 export interface ParsedPE {
   is32Bit: boolean;
   dosHeader: DosHeader;
@@ -109,6 +119,12 @@ export interface ParsedPE {
   sections: SectionHeader[];
   imports: ImportTable[];
   exports?: ExportTable;
+  resources?: {
+    manifests: string[];
+    strings: Record<number, string>;
+    icons: { type: number | string; size: number; offset: number }[];
+    all: ParsedResource[];
+  };
 }
 
 export class PEParser {
@@ -540,6 +556,185 @@ export class PEParser {
       }
     }
 
+    // 8. Parse Resources (Directory 2)
+    const RESOURCE_TYPES: Record<number, string> = {
+      1: 'Cursor',
+      2: 'Bitmap',
+      3: 'Icon',
+      4: 'Menu',
+      5: 'Dialog',
+      6: 'String Table',
+      7: 'Font Directory',
+      8: 'Font',
+      9: 'Accelerator Table',
+      10: 'Raw Data (RCDATA)',
+      11: 'Message Table',
+      12: 'Group Cursor',
+      14: 'Group Icon',
+      16: 'Version Info',
+      19: 'Plug and Play',
+      20: 'VXD',
+      21: 'Animated Cursor',
+      22: 'Animated Icon',
+      23: 'HTML',
+      24: 'Manifest'
+    };
+
+    const getResourceTypeName = (type: number | string): string => {
+      if (typeof type === 'number') {
+        return RESOURCE_TYPES[type] || `Unknown (${type})`;
+      }
+      return type;
+    };
+
+    let resources: ParsedPE['resources'];
+
+    if (dataDirectories.length > 2 && dataDirectories[2].virtualAddress !== 0) {
+      const resourceDirRva = dataDirectories[2].virtualAddress;
+      const resourceStartOffset = rvaToOffset(resourceDirRva);
+
+      if (resourceStartOffset !== 0) {
+        const parseDirectory = (dirOffset: number, level: number, path: (string | number)[]): ParsedResource[] => {
+          const absoluteDirOffset = resourceStartOffset + dirOffset;
+          if (absoluteDirOffset + 16 > this.view.byteLength) {
+            return [];
+          }
+
+          const numberOfNamedEntries = this.view.getUint16(absoluteDirOffset + 12, true);
+          const numberOfIdEntries = this.view.getUint16(absoluteDirOffset + 14, true);
+          const totalEntries = numberOfNamedEntries + numberOfIdEntries;
+
+          const results: ParsedResource[] = [];
+          let entryOffset = dirOffset + 16;
+
+          for (let i = 0; i < totalEntries; i++) {
+            const absoluteEntryOffset = resourceStartOffset + entryOffset;
+            if (absoluteEntryOffset + 8 > this.view.byteLength) {
+              break;
+            }
+
+            const nameOffsetOrId = this.view.getUint32(absoluteEntryOffset, true);
+            const offsetToDataOrDirectory = this.view.getUint32(absoluteEntryOffset + 4, true);
+
+            // Parse Name/ID
+            let nameOrId: string | number;
+            if ((nameOffsetOrId & 0x80000000) !== 0) {
+              const stringOffset = nameOffsetOrId & 0x7fffffff;
+              const absoluteStrOffset = resourceStartOffset + stringOffset;
+              if (absoluteStrOffset + 2 <= this.view.byteLength) {
+                const length = this.view.getUint16(absoluteStrOffset, true);
+                const chars: string[] = [];
+                for (let j = 0; j < length; j++) {
+                  const charOffset = absoluteStrOffset + 2 + j * 2;
+                  if (charOffset + 2 <= this.view.byteLength) {
+                    chars.push(String.fromCharCode(this.view.getUint16(charOffset, true)));
+                  }
+                }
+                nameOrId = chars.join('');
+              } else {
+                nameOrId = `Offset_0x${stringOffset.toString(16)}`;
+              }
+            } else {
+              nameOrId = nameOffsetOrId;
+            }
+
+            const isSubdir = (offsetToDataOrDirectory & 0x80000000) !== 0;
+            const subOffset = offsetToDataOrDirectory & 0x7fffffff;
+
+            if (isSubdir) {
+              results.push(...parseDirectory(subOffset, level + 1, [...path, nameOrId]));
+            } else {
+              const absoluteDataEntryOffset = resourceStartOffset + subOffset;
+              if (absoluteDataEntryOffset + 16 <= this.view.byteLength) {
+                const dataRva = this.view.getUint32(absoluteDataEntryOffset, true);
+                const size = this.view.getUint32(absoluteDataEntryOffset + 4, true);
+                
+                const fileOffset = rvaToOffset(dataRva);
+                if (fileOffset !== 0 && fileOffset + size <= this.view.byteLength) {
+                  const dataBytes = new Uint8Array(this.buffer, fileOffset, size);
+                  const type = path[0] !== undefined ? path[0] : 'Unknown';
+                  const name = path[1] !== undefined ? path[1] : nameOrId;
+                  const language = path[2] !== undefined ? Number(nameOrId) : 0;
+                  results.push({
+                    type,
+                    typeName: getResourceTypeName(type),
+                    name,
+                    language,
+                    offset: fileOffset,
+                    size,
+                    data: dataBytes
+                  });
+                }
+              }
+            }
+
+            entryOffset += 8;
+          }
+
+          return results;
+        };
+
+        const allResources = parseDirectory(0, 1, []);
+
+        // Manifests (Type 24)
+        const manifests: string[] = [];
+        const manifestResources = allResources.filter(r => r.type === 24);
+        for (const r of manifestResources) {
+          try {
+            const text = new TextDecoder('utf-8').decode(r.data);
+            manifests.push(text);
+          } catch (e) {
+            const text = String.fromCharCode(...Array.from(r.data));
+            manifests.push(text);
+          }
+        }
+
+        // String Tables (Type 6)
+        const strings: Record<number, string> = {};
+        const stringResources = allResources.filter(r => r.type === 6);
+        for (const r of stringResources) {
+          if (typeof r.name === 'number') {
+            const blockId = r.name;
+            const stringIdBase = (blockId - 1) * 16;
+            let offset = 0;
+            for (let i = 0; i < 16; i++) {
+              if (offset + 2 > r.data.length) break;
+              const len = r.data[offset] | (r.data[offset + 1] << 8);
+              offset += 2;
+              if (len > 0) {
+                if (offset + len * 2 > r.data.length) break;
+                const chars: string[] = [];
+                for (let j = 0; j < len; j++) {
+                  const charVal = r.data[offset + j * 2] | (r.data[offset + j * 2 + 1] << 8);
+                  chars.push(String.fromCharCode(charVal));
+                }
+                strings[stringIdBase + i] = chars.join('');
+                offset += len * 2;
+              }
+            }
+          }
+        }
+
+        // Icons (Type 3) and Group Icons (Type 14)
+        const icons: { type: number | string; size: number; offset: number }[] = [];
+        const iconResources = allResources.filter(r => r.type === 3 || r.type === 14);
+        for (const r of iconResources) {
+          icons.push({
+            type: r.type === 3 ? 'Icon' : 'Group Icon',
+            size: r.size,
+            offset: r.offset
+          });
+        }
+
+        resources = {
+          manifests,
+          strings,
+          icons,
+          all: allResources
+        };
+      }
+    }
+
     return {
       is32Bit,
       dosHeader,
@@ -548,6 +743,7 @@ export class PEParser {
       sections,
       imports,
       exports,
+      resources
     };
   }
 }

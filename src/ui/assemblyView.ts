@@ -41,6 +41,7 @@ export class AssemblyView {
   private contentEl!: HTMLDivElement;
   private canvasContainerEl!: HTMLDivElement;
   private canvasEl!: HTMLCanvasElement;
+  private listViewportEl!: HTMLDivElement;
   private listEl!: HTMLDivElement;
   private backBtn!: HTMLButtonElement;
   private forwardBtn!: HTMLButtonElement;
@@ -307,12 +308,19 @@ export class AssemblyView {
           cursor: pointer;
         }
 
+        .instructions-list-viewport {
+          position: relative;
+          flex: 1;
+          min-width: 500px;
+        }
+
         .instructions-list {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
           display: flex;
           flex-direction: column;
-          flex: 1;
-          padding: 8px 0;
-          min-width: 500px;
         }
 
         .instruction-row {
@@ -322,7 +330,8 @@ export class AssemblyView {
           border-left: 3px solid transparent;
           transition: background-color 0.15s ease;
           cursor: pointer;
-          min-height: 24px;
+          height: 24px;
+          box-sizing: border-box;
         }
 
         .instruction-row:hover {
@@ -511,11 +520,16 @@ export class AssemblyView {
     this.canvasEl.className = 'jump-canvas';
     this.canvasContainerEl.appendChild(this.canvasEl);
 
+    this.listViewportEl = document.createElement('div');
+    this.listViewportEl.className = 'instructions-list-viewport';
+
     this.listEl = document.createElement('div');
     this.listEl.className = 'instructions-list';
 
+    this.listViewportEl.appendChild(this.listEl);
+
     this.contentEl.appendChild(this.canvasContainerEl);
-    this.contentEl.appendChild(this.listEl);
+    this.contentEl.appendChild(this.listViewportEl);
 
     this.rootEl.appendChild(this.headerEl);
     this.rootEl.appendChild(this.contentEl);
@@ -529,12 +543,26 @@ export class AssemblyView {
    * Renders the Instruction rows in the list column.
    */
   private renderInstructions() {
+    const len = this.instructions.length;
+    const rowHeight = 24; // px
+
+    this.listViewportEl.style.height = `${len * rowHeight}px`;
+
+    const scrollTop = this.contentEl.scrollTop;
+    const containerHeight = this.contentEl.clientHeight || 500;
+
+    const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 10);
+    const endIndex = Math.min(len, Math.ceil((scrollTop + containerHeight) / rowHeight) + 10);
+
+    this.listEl.style.transform = `translateY(${startIndex * rowHeight}px)`;
+
     this.listEl.innerHTML = '';
     this.rowElements.clear();
 
     const fragment = document.createDocumentFragment();
 
-    this.instructions.forEach((inst) => {
+    for (let i = startIndex; i < endIndex; i++) {
+      const inst = this.instructions[i];
       const row = document.createElement('div');
       row.className = 'instruction-row';
       row.dataset.address = inst.address.toString();
@@ -589,7 +617,7 @@ export class AssemblyView {
 
       fragment.appendChild(row);
       this.rowElements.set(inst.address, row);
-    });
+    }
 
     this.listEl.appendChild(fragment);
   }
@@ -753,6 +781,7 @@ export class AssemblyView {
     this.resizeObserver.observe(this.canvasContainerEl);
 
     this.contentEl.addEventListener('scroll', () => {
+      this.renderInstructions();
       this.drawJumpArrows();
     });
 
@@ -929,17 +958,27 @@ export class AssemblyView {
    * Scrolls target address to center of viewport with pulse animation.
    */
   private scrollToAddress(address: number) {
-    const row = this.rowElements.get(address);
-    if (!row) return;
+    const idx = this.instructionIndices.get(address);
+    if (idx === undefined) return;
+    const rowHeight = 24;
+    const targetScrollTop = idx * rowHeight - this.contentEl.clientHeight / 2 + rowHeight / 2;
 
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (typeof this.contentEl.scrollTo === 'function') {
+      this.contentEl.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+    } else {
+      this.contentEl.scrollTop = targetScrollTop;
+    }
 
-    // Add brief pulse highlight effect
-    row.style.transition = 'none';
-    row.style.backgroundColor = 'rgba(56, 189, 248, 0.4)';
     setTimeout(() => {
-      row.style.transition = 'background-color 0.8s ease';
-      row.style.backgroundColor = '';
+      const row = this.rowElements.get(address);
+      if (row) {
+        row.style.transition = 'none';
+        row.style.backgroundColor = 'rgba(56, 189, 248, 0.4)';
+        setTimeout(() => {
+          row.style.transition = 'background-color 0.8s ease';
+          row.style.backgroundColor = '';
+        }, 150);
+      }
     }, 150);
   }
 

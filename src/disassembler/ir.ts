@@ -606,16 +606,16 @@ export class IROptimizer {
 
           if (immVal !== null && valOp !== null) {
             const numVal = Number(immVal);
-            if (numVal > 0 && (numVal & (numVal - 1)) === 0) {
-              const shift = Math.log2(numVal);
-              inst.op = IROp.SHL;
-              inst.args = [valOp, { type: 'imm', value: shift }];
-            } else if (numVal === 0) {
+            if (numVal === 0) {
               inst.op = IROp.MOV;
               inst.args = [{ type: 'imm', value: 0 }];
             } else if (numVal === 1) {
               inst.op = IROp.MOV;
               inst.args = [valOp];
+            } else if (numVal > 0 && (numVal & (numVal - 1)) === 0) {
+              const shift = Math.log2(numVal);
+              inst.op = IROp.SHL;
+              inst.args = [valOp, { type: 'imm', value: shift }];
             }
           }
         } else if (inst.op === IROp.DIV && inst.args.length === 2) {
@@ -624,14 +624,92 @@ export class IROptimizer {
           const valOp = inst.args[0];
           if (divisor.type === 'imm' && divisor.value !== undefined) {
             const numVal = Number(divisor.value);
-            if (numVal > 0 && (numVal & (numVal - 1)) === 0) {
+            if (numVal === 1) {
+              inst.op = IROp.MOV;
+              inst.args = [valOp];
+            } else if (numVal > 0 && (numVal & (numVal - 1)) === 0) {
               const shift = Math.log2(numVal);
               inst.op = IROp.SHR;
               inst.args = [valOp, { type: 'imm', value: shift }];
-            } else if (numVal === 1) {
-              inst.op = IROp.MOV;
-              inst.args = [valOp];
             }
+          }
+        }
+      }
+    }
+    return cfg;
+  }
+
+  /**
+   * Algebraic Simplification: Simplifies identity operations like ADD x, 0 or SUB x, x.
+   * 
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph.
+   */
+  public algebraicSimplification(cfg: IRCFG): IRCFG {
+    for (const block of cfg.blocks.values()) {
+      for (const inst of block.instructions) {
+        if (inst.op === IROp.ADD && inst.args.length === 2) {
+          // x + 0 => x, 0 + x => x
+          if (inst.args[1].type === 'imm' && Number(inst.args[1].value) === 0) {
+            inst.op = IROp.MOV;
+            inst.args = [inst.args[0]];
+          } else if (inst.args[0].type === 'imm' && Number(inst.args[0].value) === 0) {
+            inst.op = IROp.MOV;
+            inst.args = [inst.args[1]];
+          }
+        } else if (inst.op === IROp.SUB && inst.args.length === 2) {
+          // x - 0 => x
+          if (inst.args[1].type === 'imm' && Number(inst.args[1].value) === 0) {
+            inst.op = IROp.MOV;
+            inst.args = [inst.args[0]];
+          }
+          // x - x => 0
+          else if (
+            inst.args[0].type === 'var' &&
+            inst.args[1].type === 'var' &&
+            inst.args[0].name === inst.args[1].name &&
+            inst.args[0].version === inst.args[1].version
+          ) {
+            inst.op = IROp.MOV;
+            inst.args = [{ type: 'imm', value: 0 }];
+          }
+        } else if (inst.op === IROp.XOR && inst.args.length === 2) {
+          // x ^ x => 0
+          if (
+            inst.args[0].type === 'var' &&
+            inst.args[1].type === 'var' &&
+            inst.args[0].name === inst.args[1].name &&
+            inst.args[0].version === inst.args[1].version
+          ) {
+            inst.op = IROp.MOV;
+            inst.args = [{ type: 'imm', value: 0 }];
+          }
+        }
+      }
+    }
+    return cfg;
+  }
+
+  /**
+   * Phi Node Simplification: Simplifies PHI nodes where all inputs are identical.
+   * 
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph.
+   */
+  public phiSimplification(cfg: IRCFG): IRCFG {
+    for (const block of cfg.blocks.values()) {
+      for (const inst of block.instructions) {
+        if (inst.op === IROp.PHI && inst.args.length > 0) {
+          const first = inst.args[0];
+          const allIdentical = inst.args.every(arg => 
+            arg.type === first.type &&
+            arg.name === first.name &&
+            arg.value === first.value &&
+            arg.version === first.version
+          );
+          if (allIdentical) {
+            inst.op = IROp.MOV;
+            inst.args = [first];
           }
         }
       }

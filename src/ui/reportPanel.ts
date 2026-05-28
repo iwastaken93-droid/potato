@@ -60,6 +60,7 @@ export class ReportPanel {
         highEntropyBlocks,
       },
       strings: extractedStrings,
+      binaryData,
     };
 
     // 5. Update Preview UI

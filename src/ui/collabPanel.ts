@@ -497,6 +497,24 @@ export class CollabPanel {
     // Comments syncing
     this.unsubscribes.push(
       this.engine.subscribeComment(data => {
+        // Real-time update of typing area if we are currently looking at the same address,
+        // but only if the change came from a remote peer, preserving selection range.
+        const addrStr = this.actionCommentAddrInput.value.trim();
+        const currentAddr = parseInt(addrStr, 16) || parseInt(addrStr, 10);
+        if (data.address === currentAddr && data.peerName !== this.engine.getUsername()) {
+          const input = this.actionCommentTextInput;
+          const selectionStart = input.selectionStart;
+          const selectionEnd = input.selectionEnd;
+          const oldLen = input.value.length;
+
+          input.value = data.comment;
+
+          const diff = data.comment.length - oldLen;
+          if (selectionStart !== null && selectionEnd !== null) {
+            input.setSelectionRange(selectionStart + diff, selectionEnd + diff);
+          }
+        }
+
         this.appendActivity('comment', `Added comment at <a class="collab-address-link" data-addr="${data.address}">0x${data.address.toString(16)}</a>: "${data.comment}"`, data.peerName);
         if (this.options.onCommentSynced) {
           this.options.onCommentSynced(data.address, data.comment);
@@ -538,6 +556,20 @@ export class CollabPanel {
             this.options.onNavigate('assembly', addr);
           }
         }
+      });
+    }
+
+    // Real-time input synchronizer
+    const commentTextInput = this.rootEl.querySelector('#collab-comment-text') as HTMLInputElement;
+    if (commentTextInput) {
+      commentTextInput.addEventListener('input', () => {
+        if (!this.engine.isConnected()) return;
+        const addrStr = this.actionCommentAddrInput.value.trim();
+        const comment = commentTextInput.value;
+        if (!addrStr) return;
+        const addr = parseInt(addrStr, 16) || parseInt(addrStr, 10);
+        if (isNaN(addr)) return;
+        this.engine.sendComment(addr, comment);
       });
     }
 

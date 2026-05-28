@@ -433,55 +433,103 @@ export class Decompiler {
     blockMap: Map<string, BasicBlock>,
     entryBlockId: string
   ): Map<string, Set<string>> {
-    const dominators = new Map<string, Set<string>>();
-    const allBlockIds = Array.from(blockMap.keys());
+    const visited = new Set<string>();
+    const postOrder: string[] = [];
 
-    for (const id of allBlockIds) {
-      if (id === entryBlockId) {
-        dominators.set(id, new Set([entryBlockId]));
-      } else {
-        dominators.set(id, new Set(allBlockIds));
+    function dfs(nodeId: string) {
+      visited.add(nodeId);
+      const block = blockMap.get(nodeId);
+      if (block) {
+        for (const succ of block.successors) {
+          if (blockMap.has(succ) && !visited.has(succ)) {
+            dfs(succ);
+          }
+        }
+      }
+      postOrder.push(nodeId);
+    }
+
+    dfs(entryBlockId);
+
+    for (const id of blockMap.keys()) {
+      if (!visited.has(id)) {
+        dfs(id);
       }
     }
+
+    const rpo = [...postOrder].reverse();
+    const rpoRank = new Map<string, number>();
+    rpo.forEach((id, index) => {
+      rpoRank.set(id, index);
+    });
+
+    const predecessors = new Map<string, string[]>();
+    for (const id of blockMap.keys()) {
+      predecessors.set(id, []);
+    }
+    for (const [id, block] of blockMap) {
+      for (const succ of block.successors) {
+        if (predecessors.has(succ)) {
+          predecessors.get(succ)!.push(id);
+        }
+      }
+    }
+
+    const idom = new Map<string, string>();
+    idom.set(entryBlockId, entryBlockId);
+
+    const intersect = (b1: string, b2: string): string => {
+      let finger1 = b1;
+      let finger2 = b2;
+      while (finger1 !== finger2) {
+        while (rpoRank.get(finger1)! > rpoRank.get(finger2)!) {
+          finger1 = idom.get(finger1)!;
+        }
+        while (rpoRank.get(finger2)! > rpoRank.get(finger1)!) {
+          finger2 = idom.get(finger2)!;
+        }
+      }
+      return finger1;
+    };
 
     let changed = true;
     while (changed) {
       changed = false;
-      for (const id of allBlockIds) {
-        if (id === entryBlockId) continue;
+      for (const node of rpo) {
+        if (node === entryBlockId) continue;
 
-        const predecessors = allBlockIds.filter((pId) =>
-          blockMap.get(pId)!.successors.includes(id)
-        );
+        const preds = predecessors.get(node) || [];
+        const processedPreds = preds.filter((p) => idom.has(p));
 
-        if (predecessors.length === 0) continue;
+        if (processedPreds.length === 0) continue;
 
-        const firstPredDom = dominators.get(predecessors[0])!;
-        const intersection = new Set<string>();
-        for (const domId of firstPredDom) {
-          let isDom = true;
-          for (let i = 1; i < predecessors.length; i++) {
-            if (!dominators.get(predecessors[i])!.has(domId)) {
-              isDom = false;
-              break;
-            }
-          }
-          if (isDom) {
-            intersection.add(domId);
-          }
+        let newIdom = processedPreds[0];
+        for (let i = 1; i < processedPreds.length; i++) {
+          newIdom = intersect(newIdom, processedPreds[i]);
         }
 
-        intersection.add(id);
-
-        const currentDom = dominators.get(id)!;
-        if (
-          currentDom.size !== intersection.size ||
-          ![...currentDom].every((x) => intersection.has(x))
-        ) {
-          dominators.set(id, intersection);
+        if (idom.get(node) !== newIdom) {
+          idom.set(node, newIdom);
           changed = true;
         }
       }
+    }
+
+    const dominators = new Map<string, Set<string>>();
+    for (const id of blockMap.keys()) {
+      const domSet = new Set<string>();
+      if (idom.has(id)) {
+        let curr = id;
+        while (true) {
+          domSet.add(curr);
+          const next = idom.get(curr)!;
+          if (next === curr) break;
+          curr = next;
+        }
+      } else {
+        domSet.add(id);
+      }
+      dominators.set(id, domSet);
     }
 
     return dominators;
@@ -493,92 +541,128 @@ export class Decompiler {
   private computePostDominators(
     blockMap: Map<string, BasicBlock>
   ): Map<string, Set<string>> {
-    const postDominators = new Map<string, Set<string>>();
     const allBlockIds = Array.from(blockMap.keys());
-
-    // Exit blocks are blocks with 0 successors or instructions containing RET
     const exitBlocks = allBlockIds.filter((id) => {
       const b = blockMap.get(id)!;
       return b.successors.length === 0 || b.instructions.some((i) => i.op === 'RET');
     });
 
-    // Create a reverse graph mapping successors to predecessors
-    const predMap = new Map<string, string[]>();
+    const predecessors = new Map<string, string[]>();
     for (const id of allBlockIds) {
-      predMap.set(id, []);
+      predecessors.set(id, []);
     }
     for (const [id, block] of blockMap) {
       for (const succ of block.successors) {
-        if (predMap.has(succ)) {
-          predMap.get(succ)!.push(id);
+        if (predecessors.has(succ)) {
+          predecessors.get(succ)!.push(id);
         }
       }
     }
 
-    // If multiple exits, use a virtual single exit
     const virtualExit = 'VIRTUAL_EXIT';
-    const extendedBlocks = [...allBlockIds, virtualExit];
 
-    for (const id of extendedBlocks) {
-      if (id === virtualExit) {
-        postDominators.set(id, new Set([virtualExit]));
-      } else {
-        postDominators.set(id, new Set(extendedBlocks));
+    const getReverseSuccessors = (nodeId: string): string[] => {
+      if (nodeId === virtualExit) {
+        return exitBlocks;
+      }
+      return predecessors.get(nodeId) || [];
+    };
+
+    const getReversePredecessors = (nodeId: string): string[] => {
+      if (nodeId === virtualExit) {
+        return [];
+      }
+      const preds = [...(blockMap.get(nodeId)?.successors || [])];
+      if (exitBlocks.includes(nodeId)) {
+        preds.push(virtualExit);
+      }
+      return preds;
+    };
+
+    const visited = new Set<string>();
+    const postOrder: string[] = [];
+
+    function dfsReverse(nodeId: string) {
+      visited.add(nodeId);
+      const succs = getReverseSuccessors(nodeId);
+      for (const succ of succs) {
+        if (!visited.has(succ)) {
+          dfsReverse(succ);
+        }
+      }
+      postOrder.push(nodeId);
+    }
+
+    dfsReverse(virtualExit);
+
+    for (const id of allBlockIds) {
+      if (!visited.has(id)) {
+        dfsReverse(id);
       }
     }
+
+    const rpo = [...postOrder].reverse();
+    const rpoRank = new Map<string, number>();
+    rpo.forEach((id, index) => {
+      rpoRank.set(id, index);
+    });
+
+    const idomReverse = new Map<string, string>();
+    idomReverse.set(virtualExit, virtualExit);
+
+    const intersect = (b1: string, b2: string): string => {
+      let finger1 = b1;
+      let finger2 = b2;
+      while (finger1 !== finger2) {
+        while (rpoRank.get(finger1)! > rpoRank.get(finger2)!) {
+          finger1 = idomReverse.get(finger1)!;
+        }
+        while (rpoRank.get(finger2)! > rpoRank.get(finger1)!) {
+          finger2 = idomReverse.get(finger2)!;
+        }
+      }
+      return finger1;
+    };
 
     let changed = true;
     while (changed) {
       changed = false;
-      for (const id of extendedBlocks) {
-        if (id === virtualExit) continue;
+      for (const node of rpo) {
+        if (node === virtualExit) continue;
 
-        // In reverse graph, the "predecessors" of node id are its original successors.
-        // If it's an exit block, it has a virtual edge to VIRTUAL_EXIT.
-        const originalBlock = blockMap.get(id);
-        const revPredecessors = originalBlock
-          ? [...originalBlock.successors]
-          : [];
-        if (exitBlocks.includes(id)) {
-          revPredecessors.push(virtualExit);
+        const preds = getReversePredecessors(node);
+        const processedPreds = preds.filter((p) => idomReverse.has(p));
+
+        if (processedPreds.length === 0) continue;
+
+        let newIdom = processedPreds[0];
+        for (let i = 1; i < processedPreds.length; i++) {
+          newIdom = intersect(newIdom, processedPreds[i]);
         }
 
-        if (revPredecessors.length === 0) continue;
-
-        const firstPredDom = postDominators.get(revPredecessors[0])!;
-        const intersection = new Set<string>();
-        for (const domId of firstPredDom) {
-          let isDom = true;
-          for (let i = 1; i < revPredecessors.length; i++) {
-            if (!postDominators.get(revPredecessors[i])!.has(domId)) {
-              isDom = false;
-              break;
-            }
-          }
-          if (isDom) {
-            intersection.add(domId);
-          }
-        }
-
-        intersection.add(id);
-
-        const currentDom = postDominators.get(id)!;
-        if (
-          currentDom.size !== intersection.size ||
-          ![...currentDom].every((x) => intersection.has(x))
-        ) {
-          postDominators.set(id, intersection);
+        if (idomReverse.get(node) !== newIdom) {
+          idomReverse.set(node, newIdom);
           changed = true;
         }
       }
     }
 
-    // Cleanup virtual exit from the sets
-    for (const [id, set] of postDominators) {
-      set.delete(virtualExit);
-      if (id === virtualExit) {
-        postDominators.delete(id);
+    const postDominators = new Map<string, Set<string>>();
+    for (const id of allBlockIds) {
+      const domSet = new Set<string>();
+      if (idomReverse.has(id)) {
+        let curr = id;
+        while (true) {
+          domSet.add(curr);
+          const next = idomReverse.get(curr)!;
+          if (next === curr) break;
+          curr = next;
+        }
+      } else {
+        domSet.add(id);
       }
+      domSet.delete(virtualExit);
+      postDominators.set(id, domSet);
     }
 
     return postDominators;

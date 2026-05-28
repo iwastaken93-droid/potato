@@ -94,6 +94,13 @@ export interface FunctionBody {
   rawBytes: Uint8Array;
 }
 
+export interface WasmNames {
+  module?: string;
+  functions?: Record<number, string>;
+  locals?: Record<number, Record<number, string>>;
+  types?: Record<number, string>;
+}
+
 export interface WasmModule {
   magic: number[];
   version: number;
@@ -102,7 +109,9 @@ export interface WasmModule {
   functions: number[]; // indices into types
   exports: ExportEntry[];
   code: FunctionBody[];
-  customSections: { name: string; size: number }[];
+  customSections: { name: string; size: number; payload?: Uint8Array }[];
+  names?: WasmNames;
+  metadata?: Record<string, any>;
 }
 
 export class WasmReader {
@@ -683,10 +692,26 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
 
       case SectionId.Custom: {
         const name = reader.readString();
+        const customPayloadSize = sectionEnd - reader.pos;
+        const payload = reader.readBytes(customPayloadSize);
         module.customSections.push({
           name,
-          size: sectionSize - (reader.pos - (sectionEnd - sectionSize)),
+          size: customPayloadSize,
+          payload,
         });
+
+        if (name === 'name') {
+          module.names = parseNameSection(payload);
+        } else {
+          if (!module.metadata) {
+            module.metadata = {};
+          }
+          const parsed = parseMetadataSection(name, payload);
+          if (parsed !== undefined) {
+            module.metadata[name] = parsed;
+          }
+        }
+
         reader.pos = sectionEnd; // Skip the rest of the custom section
         break;
       }
@@ -709,3 +734,117 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
 
   return module;
 }
+
+/**
+ * Parses the 'name' custom section payload.
+ */
+export function parseNameSection(payload: Uint8Array): WasmNames {
+  const reader = new WasmReader(payload);
+  const names: WasmNames = {};
+
+  while (reader.remaining > 0) {
+    try {
+      const subId = reader.readByte();
+      const subSize = reader.readVarUint();
+      const subEnd = reader.pos + subSize;
+
+      if (subId === 0) {
+        // Module name
+        names.module = reader.readString();
+      } else if (subId === 1) {
+        // Function names
+        names.functions = {};
+        const count = reader.readVarUint();
+        for (let i = 0; i < count; i++) {
+          const idx = reader.readVarUint();
+          const name = reader.readString();
+          names.functions[idx] = name;
+        }
+      } else if (subId === 2) {
+        // Local names
+        names.locals = {};
+        const funcCount = reader.readVarUint();
+        for (let i = 0; i < funcCount; i++) {
+          const funcIdx = reader.readVarUint();
+          const localMap: Record<number, string> = {};
+          const localCount = reader.readVarUint();
+          for (let j = 0; j < localCount; j++) {
+            const localIdx = reader.readVarUint();
+            const name = reader.readString();
+            localMap[localIdx] = name;
+          }
+          names.locals[funcIdx] = localMap;
+        }
+      } else if (subId === 4) {
+        // Type names
+        names.types = {};
+        const count = reader.readVarUint();
+        for (let i = 0; i < count; i++) {
+          const idx = reader.readVarUint();
+          const name = reader.readString();
+          names.types[idx] = name;
+        }
+      }
+
+      reader.pos = subEnd;
+    } catch (e) {
+      console.warn(`Error parsing name subsection:`, e);
+      break;
+    }
+  }
+
+  return names;
+}
+
+/**
+ * Parses other custom metadata sections (e.g., 'producers', 'target_features', etc.).
+ */
+export function parseMetadataSection(name: string, payload: Uint8Array): any {
+  const reader = new WasmReader(payload);
+  try {
+    if (name === 'producers') {
+      const fields: Record<string, Record<string, string>> = {};
+      const fieldCount = reader.readVarUint();
+      for (let i = 0; i < fieldCount; i++) {
+        const fieldName = reader.readString();
+        const values: Record<string, string> = {};
+        const valueCount = reader.readVarUint();
+        for (let j = 0; j < valueCount; j++) {
+          const valName = reader.readString();
+          const valVersion = reader.readString();
+          values[valName] = valVersion;
+        }
+        fields[fieldName] = values;
+      }
+      return fields;
+    }
+
+    if (name === 'target_features') {
+      const features: string[] = [];
+      const count = reader.readVarUint();
+      for (let i = 0; i < count; i++) {
+        const prefixByte = reader.readByte();
+        const prefix = prefixByte === 0x2b ? '+' : prefixByte === 0x2d ? '-' : '';
+        const featureName = reader.readString();
+        features.push(`${prefix}${featureName}`);
+      }
+      return features;
+    }
+
+    if (name === 'sourceMappingURL') {
+      return new TextDecoder('utf-8').decode(payload);
+    }
+
+    // Attempt text decode; if invalid UTF-8, fall back to number array
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    try {
+      return decoder.decode(payload);
+    } catch {
+      return Array.from(payload);
+    }
+  } catch (e) {
+    console.warn(`Error parsing custom section ${name}:`, e);
+    return Array.from(payload);
+  }
+}
+

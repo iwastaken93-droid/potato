@@ -309,4 +309,117 @@ describe('CFGVisualizer Unit Tests', () => {
     layoutBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(layoutBtn.textContent).toContain('Stack');
   });
+
+  describe('Coverage Overlay', () => {
+    it('should parse various coverage table formats using parseCoverageTable', async () => {
+      const { parseCoverageTable } = await import('../src/ui/cfgVisualizer.js');
+      
+      // Markdown table
+      const mdTable = `
+| Block ID    | Hits |
+|-------------|------|
+| block_0x1000| 150  |
+| block_0x1005| 0    |
+`;
+      const resMd = parseCoverageTable(mdTable);
+      expect(resMd['block_0x1000']).toBe(150);
+      expect(resMd['block_0x1005']).toBe(0);
+
+      // CSV format
+      const csvData = `
+block_0x1000, 200
+block_0x1005, 5
+`;
+      const resCsv = parseCoverageTable(csvData);
+      expect(resCsv['block_0x1000']).toBe(200);
+      expect(resCsv['block_0x1005']).toBe(5);
+
+      // Colon-separated
+      const colonData = `
+block_0x1000: 300
+block_0x1005: 12
+`;
+      const resColon = parseCoverageTable(colonData);
+      expect(resColon['block_0x1000']).toBe(300);
+      expect(resColon['block_0x1005']).toBe(12);
+
+      // Space separated
+      const spaceData = `
+block_0x1000 450
+block_0x1005 0
+`;
+      const resSpace = parseCoverageTable(spaceData);
+      expect(resSpace['block_0x1000']).toBe(450);
+      expect(resSpace['block_0x1005']).toBe(0);
+    });
+
+    it('should apply and style basic blocks based on coverage data', () => {
+      const coverage = {
+        'block_0x1000': 100,
+        'block_0x1005': 0
+      };
+      
+      const visualizer = new CFGVisualizer(container, blocks, {
+        coverageData: coverage
+      });
+
+      const cards = container.querySelectorAll('.cfg-block-card') as NodeListOf<HTMLElement>;
+      expect(cards.length).toBe(2);
+
+      // First card has 100 hits -> should have HSL green/blue/red background
+      const firstCard = cards[0];
+      expect(firstCard.style.background).toContain('hsl');
+
+      // Second card has 0 hits -> should have transparent red background
+      const secondCard = cards[1];
+      expect(secondCard.style.background).toContain('rgba(239, 68, 68, 0.05)');
+
+      // Header on first card should have hits in sizeSpan
+      const firstHeaderSpans = firstCard.querySelectorAll('.cfg-block-header span');
+      expect(firstHeaderSpans[1].textContent).toContain('100 hits');
+    });
+
+    it('should dynamically apply coverage via applyCoverage method', () => {
+      const visualizer = new CFGVisualizer(container, blocks);
+      
+      // Before applying, no hits info in spans
+      let sizeSpans = container.querySelectorAll('.cfg-block-header span');
+      expect(sizeSpans[1].textContent).not.toContain('hits');
+
+      visualizer.applyCoverage('block_0x1000: 50\nblock_0x1005: 10');
+
+      sizeSpans = container.querySelectorAll('.cfg-block-header span');
+      expect(sizeSpans[1].textContent).toContain('50 hits');
+    });
+
+    it('should resolve and map hexadecimal/decimal address keys to block IDs', () => {
+      const visualizer = new CFGVisualizer(container, blocks);
+      
+      // 0x1000 matches block_0x1000 startAddress, 4101 (0x1005) matches block_0x1005 startAddress
+      visualizer.applyCoverage('0x1000: 500\n4101: 250');
+      
+      const sizeSpans = container.querySelectorAll('.cfg-block-header span');
+      expect(sizeSpans[1].textContent).toContain('500 hits');
+      expect(sizeSpans[3].textContent).toContain('250 hits');
+    });
+
+    it('should color and style edges with custom stroke-width and dasharray based on coverage', () => {
+      const coverage = {
+        'block_0x1000': 10,
+        'block_0x1005': 0
+      };
+
+      const visualizer = new CFGVisualizer(container, blocks, {
+        coverageData: coverage
+      });
+
+      const edges = container.querySelectorAll('.cfg-edge') as NodeListOf<SVGPathElement>;
+      expect(edges.length).toBeGreaterThan(0);
+      const edge = edges[0];
+      
+      // The edge coverage should be Math.min(10, 0) = 0, so it's unexecuted -> dashed
+      expect(edge.getAttribute('stroke-dasharray')).toBe('4,4');
+      expect(edge.getAttribute('stroke-width')).toBe('1.5px');
+    });
+  });
 });

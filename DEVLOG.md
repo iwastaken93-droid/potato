@@ -1148,3 +1148,12 @@ Test Files   3 failed | 28 passed (31)
 ### [15:52:00] 💾 Commit Changes & Session Wrap Up
 - Committed all changes to repository including parsers, optimizations, virtual scrolling, and tests.
 - Updated session history in [DEVLOG.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/DEVLOG.md).
+
+---
+
+### [05:58:30] 📦 PE Resource Parsing & UI Integration
+- Implemented PE Resource (.rsrc) section directory tree parser in [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts).
+- Supported extracting manifests, string table resources, and icons.
+- Created unit tests in [peResources.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/peResources.test.ts) and verified that resource extraction executes correctly.
+- Integrated resources display card into [metadataPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/metadataPanel.ts) with detailed resource grids, string lists, and XML manifest view.
+- Integrated PE resources into the generated reports of [reportGenerator.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/reportGenerator.ts) and [reportPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/reportPanel.ts).

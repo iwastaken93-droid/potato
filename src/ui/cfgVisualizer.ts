@@ -1,6 +1,54 @@
 import { BasicBlock } from '../disassembler/cfg.js';
 import { Instruction } from '../disassembler/types.js';
 
+export function parseCoverageTable(tableData: string): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (!tableData) return result;
+
+  const lines = tableData.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.includes('---')) {
+      continue;
+    }
+
+    let parts: string[] = [];
+    if (trimmed.includes('|')) {
+      parts = trimmed.split('|');
+    } else if (trimmed.includes(',')) {
+      parts = trimmed.split(',');
+    } else if (trimmed.includes(':')) {
+      parts = trimmed.split(':');
+    } else {
+      const wsParts = trimmed.split(/\s+/);
+      if (wsParts.length >= 2) {
+        parts = wsParts;
+      }
+    }
+
+    if (parts.length >= 2) {
+      const key = parts[0].trim();
+      const valStr = parts[1].trim();
+
+      if (
+        key.toLowerCase() === 'block' ||
+        key.toLowerCase() === 'block id' ||
+        key.toLowerCase() === 'address' ||
+        valStr.toLowerCase() === 'count' ||
+        valStr.toLowerCase() === 'hits'
+      ) {
+        continue;
+      }
+
+      const count = parseInt(valStr, 10);
+      if (!isNaN(count)) {
+        result[key] = count;
+      }
+    }
+  }
+  return result;
+}
+
 export interface CFGVisualizerOptions {
   layout?: 'layered' | 'sequential';
   theme?: {
@@ -16,6 +64,7 @@ export interface CFGVisualizerOptions {
     selectedColor?: string;
   };
   onBlockSelect?: (blockId: string | null) => void;
+  coverageData?: Record<string, number> | string;
 }
 
 export class CFGVisualizer {
@@ -23,6 +72,7 @@ export class CFGVisualizer {
   private blocks: BasicBlock[];
   private options: CFGVisualizerOptions;
   private currentLayout: 'layered' | 'sequential';
+  private coverage: Map<string, number> = new Map();
 
   // SVG Elements
   private svg!: SVGSVGElement;
@@ -67,7 +117,11 @@ export class CFGVisualizer {
 
     this.initStyles();
     this.initDOM();
-    this.render();
+    if (options.coverageData) {
+      this.applyCoverage(options.coverageData);
+    } else {
+      this.render();
+    }
   }
 
   /**
@@ -288,6 +342,7 @@ export class CFGVisualizer {
     defs.appendChild(this.createArrowMarker('arrow-false', falseColor));
     defs.appendChild(this.createArrowMarker('arrow-neutral', neutralColor));
     defs.appendChild(this.createArrowMarker('arrow-selected', selectedColor));
+    defs.appendChild(this.createArrowMarker('arrow-unexecuted', '#475569'));
     this.svg.appendChild(defs);
 
     // Create layers group
@@ -524,6 +579,11 @@ export class CFGVisualizer {
   }
 
   private renderNodes() {
+    let maxCount = 0;
+    for (const val of this.coverage.values()) {
+      if (val > maxCount) maxCount = val;
+    }
+
     for (const block of this.blocks) {
       const pos = this.blockPositions.get(block.id);
       if (!pos) continue;
@@ -547,16 +607,46 @@ export class CFGVisualizer {
         this.selectBlock(block.id);
       };
 
+      const hasCoverageInfo = this.coverage.size > 0;
+      const count = this.coverage.get(block.id);
+
+      if (hasCoverageInfo && count !== undefined) {
+        if (count === 0) {
+          card.style.background = 'rgba(239, 68, 68, 0.05)';
+          card.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        } else {
+          const ratio = maxCount > 1 ? Math.log(count + 1) / Math.log(maxCount + 1) : 1;
+          const hue = Math.round(120 - ratio * 120);
+          card.style.background = `hsla(${hue}, 75%, 25%, 0.35)`;
+          card.style.borderColor = `hsla(${hue}, 85%, 45%, 0.8)`;
+        }
+      }
+
       // Header
       const header = document.createElement('div');
       header.className = 'cfg-block-header';
+
+      if (hasCoverageInfo && count !== undefined) {
+        if (count > 0) {
+          const ratio = maxCount > 1 ? Math.log(count + 1) / Math.log(maxCount + 1) : 1;
+          const hue = Math.round(120 - ratio * 120);
+          header.style.background = `hsla(${hue}, 75%, 20%, 0.7)`;
+          header.style.borderBottomColor = `hsla(${hue}, 85%, 40%, 0.8)`;
+        } else {
+          header.style.background = 'rgba(239, 68, 68, 0.1)';
+        }
+      }
 
       const titleSpan = document.createElement('span');
       titleSpan.textContent = block.id;
       header.appendChild(titleSpan);
 
       const sizeSpan = document.createElement('span');
-      sizeSpan.textContent = `${block.instructions.length} insts`;
+      if (hasCoverageInfo && count !== undefined) {
+        sizeSpan.textContent = `${count} hits | ${block.instructions.length} insts`;
+      } else {
+        sizeSpan.textContent = `${block.instructions.length} insts`;
+      }
       sizeSpan.style.opacity = '0.6';
       header.appendChild(sizeSpan);
       card.appendChild(header);
@@ -593,11 +683,74 @@ export class CFGVisualizer {
     }
   }
 
+  private getEdgeCoverage(fromBlock: BasicBlock, toBlock: BasicBlock): number | null {
+    if (this.coverage.size === 0) return null;
+
+    const key1 = `${fromBlock.id}->${toBlock.id}`;
+    if (this.coverage.has(key1)) return this.coverage.get(key1)!;
+
+    const key2 = `0x${fromBlock.startAddress.toString(16)}->0x${toBlock.startAddress.toString(16)}`;
+    if (this.coverage.has(key2)) return this.coverage.get(key2)!;
+
+    const key3 = `${fromBlock.startAddress}->${toBlock.startAddress}`;
+    if (this.coverage.has(key3)) return this.coverage.get(key3)!;
+
+    const fromCount = this.coverage.get(fromBlock.id);
+    const toCount = this.coverage.get(toBlock.id);
+
+    if (fromCount === undefined && toCount === undefined) return null;
+
+    const sCount = fromCount || 0;
+    const tCount = toCount || 0;
+    return Math.min(sCount, tCount);
+  }
+
+  public applyCoverage(coverageData: Record<string, number> | string | null) {
+    this.coverage.clear();
+    if (coverageData) {
+      const parsed = typeof coverageData === 'string' ? parseCoverageTable(coverageData) : coverageData;
+      
+      const blockMap = new Map<string, BasicBlock>();
+      for (const b of this.blocks) {
+        blockMap.set(b.id, b);
+      }
+
+      for (const [key, val] of Object.entries(parsed)) {
+        if (blockMap.has(key)) {
+          this.coverage.set(key, val);
+          continue;
+        }
+
+        const addr = parseInt(key, key.toLowerCase().startsWith('0x') ? 16 : 10);
+        if (!isNaN(addr)) {
+          const match = this.blocks.find(b => b.startAddress === addr);
+          if (match) {
+            this.coverage.set(match.id, val);
+            continue;
+          }
+        }
+
+        this.coverage.set(key, val);
+      }
+    }
+    this.render();
+  }
+
   private renderEdges() {
     const theme = this.options.theme || {};
     const trueColor = theme.trueBranchColor || '#10b981';
     const falseColor = theme.falseBranchColor || '#ef4444';
     const neutralColor = theme.neutralBranchColor || '#64748b';
+
+    let maxCount = 0;
+    for (const val of this.coverage.values()) {
+      if (val > maxCount) maxCount = val;
+    }
+
+    const blockMap = new Map<string, BasicBlock>();
+    for (const b of this.blocks) {
+      blockMap.set(b.id, b);
+    }
 
     for (const block of this.blocks) {
       const fromPos = this.blockPositions.get(block.id);
@@ -609,17 +762,45 @@ export class CFGVisualizer {
         const toPos = this.blockPositions.get(succId);
         if (!toPos) return;
 
-        // Color and Marker type based on branch logic
+        const succBlock = blockMap.get(succId);
         let color = neutralColor;
         let markerId = 'arrow-neutral';
+        let strokeDash: string | null = null;
+        let strokeWidth = '2px';
 
-        if (isConditional) {
-          if (index === 0) {
-            color = trueColor;
-            markerId = 'arrow-true';
+        const hasCoverageInfo = this.coverage.size > 0 && succBlock !== undefined;
+        let edgeCount: number | null = null;
+        if (hasCoverageInfo) {
+          edgeCount = this.getEdgeCoverage(block, succBlock!);
+        }
+
+        if (hasCoverageInfo && edgeCount !== null) {
+          if (edgeCount === 0) {
+            color = '#475569';
+            markerId = 'arrow-unexecuted';
+            strokeDash = '4,4';
+            strokeWidth = '1.5px';
           } else {
-            color = falseColor;
-            markerId = 'arrow-false';
+            const edgeRatio = maxCount > 1 ? Math.log(edgeCount + 1) / Math.log(maxCount + 1) : 1;
+            const edgeHue = Math.round(120 - edgeRatio * 120);
+            color = `hsla(${edgeHue}, 85%, 45%, 0.85)`;
+            markerId = `arrow-cov-${edgeHue}`;
+
+            const defs = this.svg.querySelector('defs');
+            if (defs && !document.getElementById(markerId)) {
+              defs.appendChild(this.createArrowMarker(markerId, color));
+            }
+            strokeWidth = `${2 + edgeRatio * 3}px`;
+          }
+        } else {
+          if (isConditional) {
+            if (index === 0) {
+              color = trueColor;
+              markerId = 'arrow-true';
+            } else {
+              color = falseColor;
+              markerId = 'arrow-false';
+            }
           }
         }
 
@@ -634,6 +815,10 @@ export class CFGVisualizer {
         );
         path.setAttribute('stroke', color);
         path.setAttribute('marker-end', `url(#${markerId})`);
+        path.setAttribute('stroke-width', strokeWidth);
+        if (strokeDash) {
+          path.setAttribute('stroke-dasharray', strokeDash);
+        }
 
         // Calculate curve path
         const d = this.calculateEdgePath(

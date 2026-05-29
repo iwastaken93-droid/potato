@@ -146,7 +146,8 @@ describe('ArchiveUnpacker Unit Tests', () => {
   });
 
   it('should list and extract a deflated (compressed) file', () => {
-    const fileContent = 'Deflated compression works beautifully and reduces byte count!';
+    const fileContent =
+      'Deflated compression works beautifully and reduces byte count!';
     const zipBytes = createMockZip([
       { path: 'compressed.txt', content: fileContent, compress: true },
     ]);
@@ -164,7 +165,9 @@ describe('ArchiveUnpacker Unit Tests', () => {
 
   it('should detect executable types (ELF, DEX, Java Class, Mach-O)', () => {
     const elfMagic = new Uint8Array([0x7f, 0x45, 0x4c, 0x46, 0x01, 0x02]);
-    const dexMagic = new Uint8Array([0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x35, 0x00]);
+    const dexMagic = new Uint8Array([
+      0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x35, 0x00,
+    ]);
     const classMagic = new Uint8Array([0xca, 0xfe, 0xba, 0xbe, 0x00, 0x00]);
     const machoMagic = new Uint8Array([0xfe, 0xed, 0xfa, 0xce, 0x00, 0x00]);
 
@@ -210,7 +213,9 @@ describe('ArchiveUnpacker Unit Tests', () => {
     expect(entries.some((e) => e.path === 'nested.zip')).toBe(true);
     expect(entries.some((e) => e.path === 'nested.zip/inner.txt')).toBe(true);
 
-    const innerTxtEntry = entries.find((e) => e.path === 'nested.zip/inner.txt');
+    const innerTxtEntry = entries.find(
+      (e) => e.path === 'nested.zip/inner.txt'
+    );
     expect(innerTxtEntry?.size).toBe(innerContent.length);
 
     // Extract nested file

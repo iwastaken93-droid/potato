@@ -91,12 +91,7 @@ describe('DEX Parser Core', () => {
     // Index 1: "Ljava/lang/Object;" (Superclass descriptor)
     // Index 2: "myMethod" (Method name)
     // Index 3: "V" (Void type descriptor)
-    const stringsData = [
-      'LMyClass;',
-      'Ljava/lang/Object;',
-      'myMethod',
-      'V',
-    ];
+    const stringsData = ['LMyClass;', 'Ljava/lang/Object;', 'myMethod', 'V'];
 
     const stringIdsOff = currentOffset;
     const stringIdsSize = stringsData.length;
@@ -345,7 +340,9 @@ import { DisassemblerRouter } from '../src/disassembler/router.js';
 
 describe('DEX Router Integration', () => {
   it('should detect DEX magic bytes correctly', () => {
-    const bytes = new Uint8Array([0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x35, 0x00]);
+    const bytes = new Uint8Array([
+      0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x35, 0x00,
+    ]);
     const arch = DisassemblerRouter.detectArchitecture(bytes);
     expect(arch).toBe('dex');
   });
@@ -357,6 +354,6 @@ describe('DEX Router Integration', () => {
     expect(insts).toBeDefined();
     expect(insts.length).toBeGreaterThan(0);
     // Address 0,1,2,3 are the magic bytes, 4 is 0x0e (return-void)
-    expect(insts.some(i => i.mnemonic === 'return-void')).toBe(true);
+    expect(insts.some((i) => i.mnemonic === 'return-void')).toBe(true);
   });
 });

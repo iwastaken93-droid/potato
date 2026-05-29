@@ -268,16 +268,24 @@ export class ScriptingConsole {
     this.container.appendChild(this.rootEl);
 
     // Cache elements
-    this.inputEl = this.rootEl.querySelector('#console-input-field') as HTMLInputElement;
-    this.runBtn = this.rootEl.querySelector('#console-run-btn') as HTMLButtonElement;
-    this.clearBtn = this.rootEl.querySelector('#console-clear-btn') as HTMLButtonElement;
+    this.inputEl = this.rootEl.querySelector(
+      '#console-input-field'
+    ) as HTMLInputElement;
+    this.runBtn = this.rootEl.querySelector(
+      '#console-run-btn'
+    ) as HTMLButtonElement;
+    this.clearBtn = this.rootEl.querySelector(
+      '#console-clear-btn'
+    ) as HTMLButtonElement;
 
     // Event listeners
     this.runBtn.addEventListener('click', () => this.handleRun());
     this.clearBtn.addEventListener('click', () => this.clearLogs());
-    this.rootEl.querySelector('#console-help-btn')?.addEventListener('click', () => {
-      this.executeCommand('help()');
-    });
+    this.rootEl
+      .querySelector('#console-help-btn')
+      ?.addEventListener('click', () => {
+        this.executeCommand('help()');
+      });
 
     this.inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -312,14 +320,17 @@ export class ScriptingConsole {
   }
 
   private showWelcomeMessage() {
-    this.appendLog(`Welcome to Universal Disassembler Scripting Console.
+    this.appendLog(
+      `Welcome to Universal Disassembler Scripting Console.
 Type JavaScript commands to inspect and query the current binary.
 Examples:
   - help() (Get standard guide)
   - data.length (Total binary size in bytes)
   - getFunctions().map(f => f.name) (Get names of all functions)
   - searchInstructions("mov") (Filter instructions containing "mov")
-  - findStrings("flag") (Find extracted strings containing "flag")`, 'output-log');
+  - findStrings("flag") (Find extracted strings containing "flag")`,
+      'output-log'
+    );
   }
 
   private handleRun() {
@@ -345,7 +356,7 @@ Examples:
 
     // 3. Log console.log messages if any
     if (response.logs && response.logs.length > 0) {
-      response.logs.forEach(log => {
+      response.logs.forEach((log) => {
         this.appendLog(log, 'output-log');
       });
     }
@@ -374,7 +385,11 @@ Examples:
     if (typeof result === 'object') {
       try {
         if (result instanceof Uint8Array) {
-          return `Uint8Array(len=${result.length}) [ ${Array.from(result.slice(0, 10)).map(x => x.toString(16).padStart(2, '0')).join(' ')} ... ]`;
+          return `Uint8Array(len=${result.length}) [ ${Array.from(
+            result.slice(0, 10)
+          )
+            .map((x) => x.toString(16).padStart(2, '0'))
+            .join(' ')} ... ]`;
         }
         return JSON.stringify(result, null, 2);
       } catch (e) {

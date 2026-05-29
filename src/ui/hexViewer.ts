@@ -202,7 +202,10 @@ export class HexViewer {
     const containerHeight = this.container.clientHeight || 400;
 
     const startIndex = Math.max(0, Math.floor(scrollTop / lineHeight) - 10);
-    const endIndex = Math.min(linesCount, Math.ceil((scrollTop + containerHeight) / lineHeight) + 10);
+    const endIndex = Math.min(
+      linesCount,
+      Math.ceil((scrollTop + containerHeight) / lineHeight) + 10
+    );
 
     this.gridEl.style.transform = `translateY(${startIndex * lineHeight}px)`;
 

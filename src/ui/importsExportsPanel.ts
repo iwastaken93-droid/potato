@@ -389,17 +389,35 @@ export class ImportsExportsPanel {
     `;
 
     // Cache elements
-    this.searchInput = this.rootEl.querySelector('#imp-exp-search-input') as HTMLInputElement;
-    this.tableBody = this.rootEl.querySelector('#table-body') as HTMLTableSectionElement;
-    this.importsTabBtn = this.rootEl.querySelector('#btn-tab-imports') as HTMLButtonElement;
-    this.exportsTabBtn = this.rootEl.querySelector('#btn-tab-exports') as HTMLButtonElement;
-    this.statsImportsCount = this.rootEl.querySelector('#stats-imports-count') as HTMLSpanElement;
-    this.statsExportsCount = this.rootEl.querySelector('#stats-exports-count') as HTMLSpanElement;
-    this.statsLibraryCount = this.rootEl.querySelector('#stats-library-count') as HTMLSpanElement;
+    this.searchInput = this.rootEl.querySelector(
+      '#imp-exp-search-input'
+    ) as HTMLInputElement;
+    this.tableBody = this.rootEl.querySelector(
+      '#table-body'
+    ) as HTMLTableSectionElement;
+    this.importsTabBtn = this.rootEl.querySelector(
+      '#btn-tab-imports'
+    ) as HTMLButtonElement;
+    this.exportsTabBtn = this.rootEl.querySelector(
+      '#btn-tab-exports'
+    ) as HTMLButtonElement;
+    this.statsImportsCount = this.rootEl.querySelector(
+      '#stats-imports-count'
+    ) as HTMLSpanElement;
+    this.statsExportsCount = this.rootEl.querySelector(
+      '#stats-exports-count'
+    ) as HTMLSpanElement;
+    this.statsLibraryCount = this.rootEl.querySelector(
+      '#stats-library-count'
+    ) as HTMLSpanElement;
 
     // Attach listeners
-    this.importsTabBtn.addEventListener('click', () => this.switchSubTab('imports'));
-    this.exportsTabBtn.addEventListener('click', () => this.switchSubTab('exports'));
+    this.importsTabBtn.addEventListener('click', () =>
+      this.switchSubTab('imports')
+    );
+    this.exportsTabBtn.addEventListener('click', () =>
+      this.switchSubTab('exports')
+    );
     this.searchInput.addEventListener('input', (e) => {
       this.searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
       this.render();
@@ -424,7 +442,9 @@ export class ImportsExportsPanel {
     const exports = this.dependencies?.exports || [];
 
     // Unique library count
-    const uniqueLibs = new Set(imports.map((imp: any) => imp.library.toLowerCase()));
+    const uniqueLibs = new Set(
+      imports.map((imp: any) => imp.library.toLowerCase())
+    );
 
     this.statsImportsCount.textContent = imports.length.toString();
     this.statsExportsCount.textContent = exports.length.toString();
@@ -440,8 +460,10 @@ export class ImportsExportsPanel {
   private getLibraryBadgeClass(libName: string): string {
     const lower = libName.toLowerCase();
     if (lower.endsWith('.dll')) return 'library-badge dll';
-    if (lower.includes('.so') || lower.endsWith('.so')) return 'library-badge so';
-    if (lower.endsWith('.dylib') || lower.includes('libmacho')) return 'library-badge dylib';
+    if (lower.includes('.so') || lower.endsWith('.so'))
+      return 'library-badge so';
+    if (lower.endsWith('.dylib') || lower.includes('libmacho'))
+      return 'library-badge dylib';
     return 'library-badge';
   }
 
@@ -478,7 +500,9 @@ export class ImportsExportsPanel {
 
       filteredImports.forEach((imp: any) => {
         const tr = document.createElement('tr');
-        const addrHex = imp.address ? `0x${imp.address.toString(16).toUpperCase()}` : 'N/A';
+        const addrHex = imp.address
+          ? `0x${imp.address.toString(16).toUpperCase()}`
+          : 'N/A';
         const badgeClass = this.getLibraryBadgeClass(imp.library);
 
         tr.innerHTML = `
@@ -496,10 +520,11 @@ export class ImportsExportsPanel {
           };
           tr.addEventListener('dblclick', navigate);
           const btn = tr.querySelector('.action-btn');
-          if (btn) btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            navigate();
-          });
+          if (btn)
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              navigate();
+            });
         }
 
         this.tableBody.appendChild(tr);
@@ -527,7 +552,9 @@ export class ImportsExportsPanel {
 
       filteredExports.forEach((exp: any) => {
         const tr = document.createElement('tr');
-        const addrHex = exp.address ? `0x${exp.address.toString(16).toUpperCase()}` : 'N/A';
+        const addrHex = exp.address
+          ? `0x${exp.address.toString(16).toUpperCase()}`
+          : 'N/A';
 
         tr.innerHTML = `
           <td class="mono-text" style="font-weight: 500;">${this.highlight(exp.name, query)}</td>
@@ -543,10 +570,11 @@ export class ImportsExportsPanel {
           };
           tr.addEventListener('dblclick', navigate);
           const btn = tr.querySelector('.action-btn');
-          if (btn) btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            navigate();
-          });
+          if (btn)
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              navigate();
+            });
         }
 
         this.tableBody.appendChild(tr);
@@ -569,7 +597,13 @@ export class ImportsExportsPanel {
 
   private highlight(text: string, query: string): string {
     if (!query) return text;
-    const regex = new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, '<mark style="background: rgba(99, 102, 241, 0.4); color: inherit; border-radius: 2px; padding: 0 2px;">$1</mark>');
+    const regex = new RegExp(
+      `(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`,
+      'gi'
+    );
+    return text.replace(
+      regex,
+      '<mark style="background: rgba(99, 102, 241, 0.4); color: inherit; border-radius: 2px; padding: 0 2px;">$1</mark>'
+    );
   }
 }

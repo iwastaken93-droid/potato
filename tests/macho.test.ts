@@ -225,7 +225,7 @@ describe('Mach-O Parser Unit Tests', () => {
       const view = new DataView(data.buffer);
       view.setUint32(0, 0xfeedfacf, true); // magic LE 64
       view.setInt32(4, 0x01000007, true); // cputype x86_64
-      
+
       const arch = DisassemblerRouter.detectArchitecture(data);
       expect(arch).toBe('x86_64');
     });
@@ -235,7 +235,7 @@ describe('Mach-O Parser Unit Tests', () => {
       const view = new DataView(data.buffer);
       view.setUint32(0, 0xfeedface, false); // magic BE 32
       view.setInt32(4, 12, false); // cputype arm
-      
+
       const arch = DisassemblerRouter.detectArchitecture(data);
       expect(arch).toBe('arm');
     });
@@ -247,7 +247,7 @@ describe('Mach-O Parser Unit Tests', () => {
       view.setUint32(0, 0xcafebabe, false); // fat magic BE
       view.setUint32(4, 1, false); // 1 arch
       view.setInt32(8, 0x0100000c, false); // cputype arm64
-      
+
       const arch = DisassemblerRouter.detectArchitecture(data);
       expect(arch).toBe('arm');
     });

@@ -23,7 +23,10 @@ export interface StructDefinition {
 }
 
 export interface TypeSystemPanelOptions {
-  onNavigate?: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate?: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export class TypeSystemPanel {
@@ -54,7 +57,7 @@ export class TypeSystemPanel {
    * Updates pointer size based on architecture
    */
   public updateArchitecture(arch: string) {
-    if (arch.includes('32') || arch.includes('86') && !arch.includes('64')) {
+    if (arch.includes('32') || (arch.includes('86') && !arch.includes('64'))) {
       this.pointerSize = 4;
     } else {
       this.pointerSize = 8;
@@ -70,30 +73,78 @@ export class TypeSystemPanel {
         size: 8,
         description: 'Simple 2D coordinate representation',
         fields: [
-          { name: 'x', type: 'int32_t', offset: 0, size: 4, description: 'X coordinate' },
-          { name: 'y', type: 'int32_t', offset: 4, size: 4, description: 'Y coordinate' }
-        ]
+          {
+            name: 'x',
+            type: 'int32_t',
+            offset: 0,
+            size: 4,
+            description: 'X coordinate',
+          },
+          {
+            name: 'y',
+            type: 'int32_t',
+            offset: 4,
+            size: 4,
+            description: 'Y coordinate',
+          },
+        ],
       },
       {
         name: 'Rect',
         size: 16,
         description: 'Rectangle definition using 2D points and dimensions',
         fields: [
-          { name: 'origin', type: 'Point2D', offset: 0, size: 8, description: 'Top-left origin corner' },
-          { name: 'width', type: 'int32_t', offset: 8, size: 4, description: 'Width dimension' },
-          { name: 'height', type: 'int32_t', offset: 12, size: 4, description: 'Height dimension' }
-        ]
+          {
+            name: 'origin',
+            type: 'Point2D',
+            offset: 0,
+            size: 8,
+            description: 'Top-left origin corner',
+          },
+          {
+            name: 'width',
+            type: 'int32_t',
+            offset: 8,
+            size: 4,
+            description: 'Width dimension',
+          },
+          {
+            name: 'height',
+            type: 'int32_t',
+            offset: 12,
+            size: 4,
+            description: 'Height dimension',
+          },
+        ],
       },
       {
         name: 'Node',
         size: 16,
         description: 'Single node element in a linked list structure',
         fields: [
-          { name: 'value', type: 'int32_t', offset: 0, size: 4, description: 'Payload value' },
-          { name: 'padding', type: 'uint8_t[4]', offset: 4, size: 4, description: 'Structure padding alignment' },
-          { name: 'next', type: 'Node*', offset: 8, size: 8, description: 'Pointer to the next Node element' }
-        ]
-      }
+          {
+            name: 'value',
+            type: 'int32_t',
+            offset: 0,
+            size: 4,
+            description: 'Payload value',
+          },
+          {
+            name: 'padding',
+            type: 'uint8_t[4]',
+            offset: 4,
+            size: 4,
+            description: 'Structure padding alignment',
+          },
+          {
+            name: 'next',
+            type: 'Node*',
+            offset: 8,
+            size: 8,
+            description: 'Pointer to the next Node element',
+          },
+        ],
+      },
     ];
 
     if (this.structs.length > 0) {
@@ -244,7 +295,7 @@ export class TypeSystemPanel {
   }
 
   private getSelectedStruct(): StructDefinition | undefined {
-    return this.structs.find(s => s.name === this.selectedStructName);
+    return this.structs.find((s) => s.name === this.selectedStructName);
   }
 
   private recalculateAllStructSizes() {
@@ -281,17 +332,37 @@ export class TypeSystemPanel {
     const lower = baseType.toLowerCase();
     let unitSize = 4; // default
 
-    if (lower === 'char' || lower === 'uint8_t' || lower === 'int8_t' || lower === 'byte') {
+    if (
+      lower === 'char' ||
+      lower === 'uint8_t' ||
+      lower === 'int8_t' ||
+      lower === 'byte'
+    ) {
       unitSize = 1;
-    } else if (lower === 'short' || lower === 'uint16_t' || lower === 'int16_t') {
+    } else if (
+      lower === 'short' ||
+      lower === 'uint16_t' ||
+      lower === 'int16_t'
+    ) {
       unitSize = 2;
-    } else if (lower === 'int' || lower === 'uint32_t' || lower === 'int32_t' || lower === 'float') {
+    } else if (
+      lower === 'int' ||
+      lower === 'uint32_t' ||
+      lower === 'int32_t' ||
+      lower === 'float'
+    ) {
       unitSize = 4;
-    } else if (lower === 'long' || lower === 'uint64_t' || lower === 'int64_t' || lower === 'double' || lower === 'long long') {
+    } else if (
+      lower === 'long' ||
+      lower === 'uint64_t' ||
+      lower === 'int64_t' ||
+      lower === 'double' ||
+      lower === 'long long'
+    ) {
       unitSize = 8;
     } else {
       // Custom struct check (avoid infinite recursion by not resolving self)
-      const found = this.structs.find(s => s.name === baseType);
+      const found = this.structs.find((s) => s.name === baseType);
       if (found) {
         unitSize = found.size;
       }
@@ -335,16 +406,20 @@ export class TypeSystemPanel {
     this.renderStructDetails();
 
     // Setup input event for search
-    const searchInput = sidebar.querySelector('#type-search') as HTMLInputElement;
+    const searchInput = sidebar.querySelector(
+      '#type-search'
+    ) as HTMLInputElement;
     searchInput.addEventListener('input', (e) => {
       this.searchQuery = (e.target as HTMLInputElement).value;
       this.renderSidebarItems();
     });
 
     // Create struct event
-    sidebar.querySelector('#btn-create-struct')!.addEventListener('click', () => {
-      this.createNewStructPrompt();
-    });
+    sidebar
+      .querySelector('#btn-create-struct')!
+      .addEventListener('click', () => {
+        this.createNewStructPrompt();
+      });
 
     // Import C struct event
     sidebar.querySelector('#btn-import-c')!.addEventListener('click', () => {
@@ -356,7 +431,7 @@ export class TypeSystemPanel {
     const listContainer = this.rootEl.querySelector('#type-list-items')!;
     listContainer.innerHTML = '';
 
-    const filtered = this.structs.filter(s =>
+    const filtered = this.structs.filter((s) =>
       s.name.toLowerCase().includes(this.searchQuery.toLowerCase())
     );
 
@@ -369,7 +444,7 @@ export class TypeSystemPanel {
       return;
     }
 
-    filtered.forEach(s => {
+    filtered.forEach((s) => {
       const item = document.createElement('div');
       item.className = `type-item ${s.name === this.selectedStructName ? 'active' : ''}`;
       item.innerHTML = `
@@ -422,9 +497,11 @@ export class TypeSystemPanel {
         <button class="btn btn-secondary" id="btn-delete-struct" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Delete Struct</button>
       </div>
     `;
-    header.querySelector('#btn-delete-struct')!.addEventListener('click', () => {
-      this.deleteStruct(struct.name);
-    });
+    header
+      .querySelector('#btn-delete-struct')!
+      .addEventListener('click', () => {
+        this.deleteStruct(struct.name);
+      });
 
     // Code Preview section & Visualizer section container
     const layoutContainer = document.createElement('div');
@@ -440,7 +517,7 @@ export class TypeSystemPanel {
     // Render cells in Visualizer
     const visualizer = document.createElement('div');
     visualizer.className = 'layout-visualizer-grid';
-    
+
     if (struct.fields.length === 0) {
       visualizer.innerHTML = `
         <div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem;">
@@ -449,7 +526,7 @@ export class TypeSystemPanel {
       `;
     } else {
       let currentOffset = 0;
-      struct.fields.forEach(field => {
+      struct.fields.forEach((field) => {
         // If there's padding before this field
         if (field.offset > currentOffset) {
           const padSize = field.offset - currentOffset;
@@ -526,9 +603,11 @@ export class TypeSystemPanel {
             <button class="btn btn-secondary btn-delete-field" data-index="${index}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Remove</button>
           </td>
         `;
-        row.querySelector('.btn-delete-field')!.addEventListener('click', () => {
-          this.removeField(struct.name, index);
-        });
+        row
+          .querySelector('.btn-delete-field')!
+          .addEventListener('click', () => {
+            this.removeField(struct.name, index);
+          });
         tableBody.appendChild(row);
       });
     }
@@ -563,8 +642,11 @@ export class TypeSystemPanel {
             <option value="char">char (1B)</option>
             <option value="void*">void* (Pointer)</option>
             ${this.structs
-              .filter(s => s.name !== struct.name)
-              .map(s => `<option value="${s.name}">${s.name} (struct, ${s.size}B)</option>`)
+              .filter((s) => s.name !== struct.name)
+              .map(
+                (s) =>
+                  `<option value="${s.name}">${s.name} (struct, ${s.size}B)</option>`
+              )
               .join('')}
           </select>
         </div>
@@ -580,35 +662,47 @@ export class TypeSystemPanel {
       <button class="btn btn-primary" id="btn-add-field" style="padding: 0.5rem; font-size: 0.85rem; align-self: flex-start;">Add Field</button>
     `;
 
-    addFieldForm.querySelector('#btn-add-field')!.addEventListener('click', () => {
-      const nameEl = addFieldForm.querySelector('#new-field-name') as HTMLInputElement;
-      const typeEl = addFieldForm.querySelector('#new-field-type') as HTMLSelectElement;
-      const arrayEl = addFieldForm.querySelector('#new-field-array') as HTMLInputElement;
-      const descEl = addFieldForm.querySelector('#new-field-desc') as HTMLInputElement;
+    addFieldForm
+      .querySelector('#btn-add-field')!
+      .addEventListener('click', () => {
+        const nameEl = addFieldForm.querySelector(
+          '#new-field-name'
+        ) as HTMLInputElement;
+        const typeEl = addFieldForm.querySelector(
+          '#new-field-type'
+        ) as HTMLSelectElement;
+        const arrayEl = addFieldForm.querySelector(
+          '#new-field-array'
+        ) as HTMLInputElement;
+        const descEl = addFieldForm.querySelector(
+          '#new-field-desc'
+        ) as HTMLInputElement;
 
-      const fieldName = nameEl.value.trim();
-      let fieldType = typeEl.value;
-      const arrayLen = arrayEl.value ? parseInt(arrayEl.value, 10) : undefined;
-      const description = descEl.value.trim();
+        const fieldName = nameEl.value.trim();
+        let fieldType = typeEl.value;
+        const arrayLen = arrayEl.value
+          ? parseInt(arrayEl.value, 10)
+          : undefined;
+        const description = descEl.value.trim();
 
-      if (!fieldName) {
-        alert('Field name is required.');
-        return;
-      }
+        if (!fieldName) {
+          alert('Field name is required.');
+          return;
+        }
 
-      if (arrayLen && arrayLen > 1) {
-        fieldType = `${fieldType}[${arrayLen}]`;
-      }
+        if (arrayLen && arrayLen > 1) {
+          fieldType = `${fieldType}[${arrayLen}]`;
+        }
 
-      this.addFieldToStruct(struct.name, {
-        name: fieldName,
-        type: fieldType,
-        offset: 0, // will be auto-calculated
-        size: 0, // will be auto-calculated
-        arrayLength: arrayLen,
-        description
+        this.addFieldToStruct(struct.name, {
+          name: fieldName,
+          type: fieldType,
+          offset: 0, // will be auto-calculated
+          size: 0, // will be auto-calculated
+          arrayLength: arrayLen,
+          description,
+        });
       });
-    });
 
     // Relationship visualizer
     const relationshipsSection = document.createElement('div');
@@ -631,25 +725,31 @@ export class TypeSystemPanel {
     // Compute relationships
     const embeds: string[] = [];
     const pointers: string[] = [];
-    struct.fields.forEach(f => {
+    struct.fields.forEach((f) => {
       let base = f.type.trim();
       const match = base.match(/^([^\[]+)\[(\d+)\]$/);
       if (match) base = match[1].trim();
 
       if (base.endsWith('*')) {
         const ptrTarget = base.slice(0, -1);
-        if (this.structs.some(s => s.name === ptrTarget) && !pointers.includes(ptrTarget)) {
+        if (
+          this.structs.some((s) => s.name === ptrTarget) &&
+          !pointers.includes(ptrTarget)
+        ) {
           pointers.push(ptrTarget);
         }
-      } else if (this.structs.some(s => s.name === base) && !embeds.includes(base)) {
+      } else if (
+        this.structs.some((s) => s.name === base) &&
+        !embeds.includes(base)
+      ) {
         embeds.push(base);
       }
     });
 
     const dependents: string[] = [];
-    this.structs.forEach(s => {
+    this.structs.forEach((s) => {
       if (s.name === struct.name) return;
-      s.fields.forEach(f => {
+      s.fields.forEach((f) => {
         let base = f.type.trim();
         const match = base.match(/^([^\[]+)\[(\d+)\]$/);
         if (match) base = match[1].trim();
@@ -664,36 +764,42 @@ export class TypeSystemPanel {
 
     if (embeds.length > 0) {
       relationshipsSection.querySelector('#relations-embedded')!.innerHTML = `
-        <strong>Directly embeds:</strong> ${embeds.map(e => `<span class="type-badge" style="cursor: pointer; border-color: var(--accent-start);">${e}</span>`).join(' ')}
+        <strong>Directly embeds:</strong> ${embeds.map((e) => `<span class="type-badge" style="cursor: pointer; border-color: var(--accent-start);">${e}</span>`).join(' ')}
       `;
-      relationshipsSection.querySelectorAll('#relations-embedded span').forEach(el => {
-        el.addEventListener('click', () => {
-          this.selectedStructName = el.textContent || '';
-          this.render();
+      relationshipsSection
+        .querySelectorAll('#relations-embedded span')
+        .forEach((el) => {
+          el.addEventListener('click', () => {
+            this.selectedStructName = el.textContent || '';
+            this.render();
+          });
         });
-      });
     }
     if (pointers.length > 0) {
       relationshipsSection.querySelector('#relations-pointers')!.innerHTML = `
-        <strong>References via pointer:</strong> ${pointers.map(p => `<span class="type-badge" style="cursor: pointer; border-color: var(--accent-start);">${p}*</span>`).join(' ')}
+        <strong>References via pointer:</strong> ${pointers.map((p) => `<span class="type-badge" style="cursor: pointer; border-color: var(--accent-start);">${p}*</span>`).join(' ')}
       `;
-      relationshipsSection.querySelectorAll('#relations-pointers span').forEach(el => {
-        el.addEventListener('click', () => {
-          this.selectedStructName = (el.textContent || '').replace('*', '');
-          this.render();
+      relationshipsSection
+        .querySelectorAll('#relations-pointers span')
+        .forEach((el) => {
+          el.addEventListener('click', () => {
+            this.selectedStructName = (el.textContent || '').replace('*', '');
+            this.render();
+          });
         });
-      });
     }
     if (dependents.length > 0) {
       relationshipsSection.querySelector('#relations-dependents')!.innerHTML = `
-        <strong>Structures depending on this type:</strong> ${dependents.map(d => `<span class="type-badge" style="cursor: pointer; border-color: var(--accent-start);">${d}</span>`).join(' ')}
+        <strong>Structures depending on this type:</strong> ${dependents.map((d) => `<span class="type-badge" style="cursor: pointer; border-color: var(--accent-start);">${d}</span>`).join(' ')}
       `;
-      relationshipsSection.querySelectorAll('#relations-dependents span').forEach(el => {
-        el.addEventListener('click', () => {
-          this.selectedStructName = el.textContent || '';
-          this.render();
+      relationshipsSection
+        .querySelectorAll('#relations-dependents span')
+        .forEach((el) => {
+          el.addEventListener('click', () => {
+            this.selectedStructName = el.textContent || '';
+            this.render();
+          });
         });
-      });
     }
 
     // Append all blocks to detailArea
@@ -713,7 +819,9 @@ export class TypeSystemPanel {
       return;
     }
 
-    if (this.structs.some(s => s.name.toLowerCase() === cleanName.toLowerCase())) {
+    if (
+      this.structs.some((s) => s.name.toLowerCase() === cleanName.toLowerCase())
+    ) {
       alert('A structure with this name already exists.');
       return;
     }
@@ -722,7 +830,7 @@ export class TypeSystemPanel {
       name: cleanName,
       size: 0,
       fields: [],
-      description: 'Custom user defined structure'
+      description: 'Custom user defined structure',
     };
 
     this.structs.push(newStruct);
@@ -732,7 +840,7 @@ export class TypeSystemPanel {
 
   private deleteStruct(name: string) {
     if (confirm(`Are you sure you want to delete structure '${name}'?`)) {
-      this.structs = this.structs.filter(s => s.name !== name);
+      this.structs = this.structs.filter((s) => s.name !== name);
       if (this.structs.length > 0) {
         this.selectedStructName = this.structs[0].name;
       } else {
@@ -743,11 +851,11 @@ export class TypeSystemPanel {
   }
 
   private addFieldToStruct(structName: string, field: StructField) {
-    const s = this.structs.find(st => st.name === structName);
+    const s = this.structs.find((st) => st.name === structName);
     if (!s) return;
 
     // Check duplicate name
-    if (s.fields.some(f => f.name === field.name)) {
+    if (s.fields.some((f) => f.name === field.name)) {
       alert(`A field with name '${field.name}' already exists in this struct.`);
       return;
     }
@@ -758,7 +866,7 @@ export class TypeSystemPanel {
   }
 
   private removeField(structName: string, fieldIndex: number) {
-    const s = this.structs.find(st => st.name === structName);
+    const s = this.structs.find((st) => st.name === structName);
     if (!s) return;
 
     s.fields.splice(fieldIndex, 1);
@@ -820,18 +928,22 @@ struct PlayerInfo {
     backdrop.appendChild(dialog);
     document.body.appendChild(backdrop);
 
-    dialog.querySelector('#btn-import-cancel')!.addEventListener('click', () => {
-      document.body.removeChild(backdrop);
-    });
+    dialog
+      .querySelector('#btn-import-cancel')!
+      .addEventListener('click', () => {
+        document.body.removeChild(backdrop);
+      });
 
     dialog.querySelector('#btn-import-parse')!.addEventListener('click', () => {
-      const source = (dialog.querySelector('#import-c-source') as HTMLTextAreaElement).value;
+      const source = (
+        dialog.querySelector('#import-c-source') as HTMLTextAreaElement
+      ).value;
       const parsed = this.parseCStructs(source);
       if (parsed.length > 0) {
         // Add parsed structs
-        parsed.forEach(p => {
+        parsed.forEach((p) => {
           // Remove existing with same name if any
-          this.structs = this.structs.filter(s => s.name !== p.name);
+          this.structs = this.structs.filter((s) => s.name !== p.name);
           this.structs.push(p);
         });
         this.selectedStructName = parsed[0].name;
@@ -849,90 +961,116 @@ struct PlayerInfo {
    */
   public parseCStructs(source: string): StructDefinition[] {
     const structs: StructDefinition[] = [];
-    
+
     // Strip comments
     let cleanSource = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
-    
+
     // Find struct definitions
     const structRegex = /struct\s+(\w+)\s*\{([^}]+)\}/g;
     let match;
-    
+
     while ((match = structRegex.exec(cleanSource)) !== null) {
       const structName = match[1];
       const fieldsBody = match[2];
       const fields: StructField[] = [];
-      
+
       const fieldLines = fieldsBody.split(';');
       let currentOffset = 0;
-      
+
       for (let line of fieldLines) {
         line = line.trim();
         if (!line) continue;
-        
+
         // Match type, pointer indicator, field name, array brackets
         // e.g. "unsigned int flags" or "struct Vector3 pos" or "char name[32]" or "struct Player* target"
-        const fieldRegex = /^(struct\s+\w+|\w+)\s*(\*+)?\s*(\w+)(?:\[(\d+)\])?$/;
+        const fieldRegex =
+          /^(struct\s+\w+|\w+)\s*(\*+)?\s*(\w+)(?:\[(\d+)\])?$/;
         const fieldMatch = line.match(fieldRegex);
-        
+
         if (fieldMatch) {
           let typeName = fieldMatch[1].replace(/^struct\s+/, '').trim();
           const isPointer = !!fieldMatch[2];
           const fieldName = fieldMatch[3];
           const arraySizeStr = fieldMatch[4];
-          
+
           let size = 0;
-          let arrayLength = arraySizeStr ? parseInt(arraySizeStr, 10) : undefined;
-          
+          let arrayLength = arraySizeStr
+            ? parseInt(arraySizeStr, 10)
+            : undefined;
+
           if (isPointer) {
             size = this.pointerSize;
             typeName = typeName + '*';
           } else {
             // Find base size
             const lower = typeName.toLowerCase();
-            if (lower === 'char' || lower === 'uint8_t' || lower === 'int8_t' || lower === 'byte') {
+            if (
+              lower === 'char' ||
+              lower === 'uint8_t' ||
+              lower === 'int8_t' ||
+              lower === 'byte'
+            ) {
               size = 1;
-            } else if (lower === 'short' || lower === 'uint16_t' || lower === 'int16_t') {
+            } else if (
+              lower === 'short' ||
+              lower === 'uint16_t' ||
+              lower === 'int16_t'
+            ) {
               size = 2;
-            } else if (lower === 'int' || lower === 'uint32_t' || lower === 'int32_t' || lower === 'float') {
+            } else if (
+              lower === 'int' ||
+              lower === 'uint32_t' ||
+              lower === 'int32_t' ||
+              lower === 'float'
+            ) {
               size = 4;
-            } else if (lower === 'long' || lower === 'uint64_t' || lower === 'int64_t' || lower === 'double' || lower === 'long long') {
+            } else if (
+              lower === 'long' ||
+              lower === 'uint64_t' ||
+              lower === 'int64_t' ||
+              lower === 'double' ||
+              lower === 'long long'
+            ) {
               size = 8;
             } else {
               // check parsed or existing structs
-              const found = [...structs, ...this.structs].find(s => s.name === typeName);
+              const found = [...structs, ...this.structs].find(
+                (s) => s.name === typeName
+              );
               if (found) {
                 size = found.size;
               } else {
                 size = 4; // fallback
               }
             }
-            
+
             if (arrayLength !== undefined) {
               size *= arrayLength;
             }
           }
-          
+
           fields.push({
             name: fieldName,
-            type: typeName + (arrayLength !== undefined ? `[${arrayLength}]` : ''),
+            type:
+              typeName + (arrayLength !== undefined ? `[${arrayLength}]` : ''),
             offset: currentOffset,
             size: size,
             arrayLength: arrayLength,
-            description: `Parsed field of type ${typeName}`
+            description: `Parsed field of type ${typeName}`,
           });
-          
+
           currentOffset += size;
         }
       }
-      
+
       structs.push({
         name: structName,
         size: currentOffset,
         fields: fields,
-        description: `Parsed from C struct definition`
+        description: `Parsed from C struct definition`,
       });
     }
-    
+
     return structs;
   }
 

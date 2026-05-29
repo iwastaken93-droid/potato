@@ -4,13 +4,26 @@
  * Supports connecting to room, viewing peers, syncing and displaying comments, highlights, and renames.
  */
 
-import { CollabEngine, Peer, SyncComment, SyncHighlight, SyncRename } from '../network/collab.js';
+import {
+  CollabEngine,
+  Peer,
+  SyncComment,
+  SyncHighlight,
+  SyncRename,
+} from '../network/collab.js';
 
 export interface CollabPanelOptions {
-  onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
   onCommentSynced?: (address: number, comment: string) => void;
   onHighlightSynced?: (address: number, color: string) => void;
-  onRenameSynced?: (oldName: string, newName: string, type: 'function' | 'variable') => void;
+  onRenameSynced?: (
+    oldName: string,
+    newName: string,
+    type: 'function' | 'variable'
+  ) => void;
 }
 
 export class CollabPanel {
@@ -24,12 +37,12 @@ export class CollabPanel {
   private activeRoomDetails!: HTMLDivElement;
   private peersListEl!: HTMLDivElement;
   private activityLogEl!: HTMLDivElement;
-  
+
   // Connect Form Inputs
   private usernameInput!: HTMLInputElement;
   private roomInput!: HTMLInputElement;
   private connectBtn!: HTMLButtonElement;
-  
+
   // Interactive Simulator Elements
   private actionCommentAddrInput!: HTMLInputElement;
   private actionCommentTextInput!: HTMLInputElement;
@@ -56,7 +69,7 @@ export class CollabPanel {
    * Cleans up listeners when panel is destroyed
    */
   public destroy(): void {
-    this.unsubscribes.forEach(unsub => unsub());
+    this.unsubscribes.forEach((unsub) => unsub());
     this.unsubscribes = [];
     this.engine.disconnect();
   }
@@ -383,7 +396,8 @@ export class CollabPanel {
     peersCard.className = 'collab-card';
     peersCard.innerHTML = `<div class="collab-card-title">Connected Peers</div>`;
     this.peersListEl = document.createElement('div');
-    this.peersListEl.style.cssText = 'display: flex; flex-direction: column; gap: 0.5rem;';
+    this.peersListEl.style.cssText =
+      'display: flex; flex-direction: column; gap: 0.5rem;';
     peersCard.appendChild(this.peersListEl);
     sidebar.appendChild(peersCard);
 
@@ -460,21 +474,37 @@ export class CollabPanel {
     this.container.appendChild(this.rootEl);
 
     // Form inputs resolution
-    this.actionCommentAddrInput = this.rootEl.querySelector('#collab-comment-addr') as HTMLInputElement;
-    this.actionCommentTextInput = this.rootEl.querySelector('#collab-comment-text') as HTMLInputElement;
-    this.actionHighlightAddrInput = this.rootEl.querySelector('#collab-highlight-addr') as HTMLInputElement;
-    this.actionHighlightColorSelect = this.rootEl.querySelector('#collab-highlight-color') as HTMLSelectElement;
-    this.actionRenameOldInput = this.rootEl.querySelector('#collab-rename-old') as HTMLInputElement;
-    this.actionRenameNewInput = this.rootEl.querySelector('#collab-rename-new') as HTMLInputElement;
-    this.actionRenameTypeSelect = this.rootEl.querySelector('#collab-rename-type') as HTMLSelectElement;
+    this.actionCommentAddrInput = this.rootEl.querySelector(
+      '#collab-comment-addr'
+    ) as HTMLInputElement;
+    this.actionCommentTextInput = this.rootEl.querySelector(
+      '#collab-comment-text'
+    ) as HTMLInputElement;
+    this.actionHighlightAddrInput = this.rootEl.querySelector(
+      '#collab-highlight-addr'
+    ) as HTMLInputElement;
+    this.actionHighlightColorSelect = this.rootEl.querySelector(
+      '#collab-highlight-color'
+    ) as HTMLSelectElement;
+    this.actionRenameOldInput = this.rootEl.querySelector(
+      '#collab-rename-old'
+    ) as HTMLInputElement;
+    this.actionRenameNewInput = this.rootEl.querySelector(
+      '#collab-rename-new'
+    ) as HTMLInputElement;
+    this.actionRenameTypeSelect = this.rootEl.querySelector(
+      '#collab-rename-type'
+    ) as HTMLSelectElement;
   }
 
   private setupSubscriptions(): void {
     // Connection state
     this.unsubscribes.push(
-      this.engine.subscribeConnectionState(connected => {
+      this.engine.subscribeConnectionState((connected) => {
         this.updateUIState();
-        const badge = this.rootEl.querySelector('#collab-status-badge') as HTMLElement;
+        const badge = this.rootEl.querySelector(
+          '#collab-status-badge'
+        ) as HTMLElement;
         if (badge) {
           if (connected) {
             badge.style.color = '#10B981';
@@ -489,19 +519,22 @@ export class CollabPanel {
 
     // Peer updates
     this.unsubscribes.push(
-      this.engine.subscribePeers(peers => {
+      this.engine.subscribePeers((peers) => {
         this.renderPeers(peers);
       })
     );
 
     // Comments syncing
     this.unsubscribes.push(
-      this.engine.subscribeComment(data => {
+      this.engine.subscribeComment((data) => {
         // Real-time update of typing area if we are currently looking at the same address,
         // but only if the change came from a remote peer, preserving selection range.
         const addrStr = this.actionCommentAddrInput.value.trim();
         const currentAddr = parseInt(addrStr, 16) || parseInt(addrStr, 10);
-        if (data.address === currentAddr && data.peerName !== this.engine.getUsername()) {
+        if (
+          data.address === currentAddr &&
+          data.peerName !== this.engine.getUsername()
+        ) {
           const input = this.actionCommentTextInput;
           const selectionStart = input.selectionStart;
           const selectionEnd = input.selectionEnd;
@@ -515,7 +548,11 @@ export class CollabPanel {
           }
         }
 
-        this.appendActivity('comment', `Added comment at <a class="collab-address-link" data-addr="${data.address}">0x${data.address.toString(16)}</a>: "${data.comment}"`, data.peerName);
+        this.appendActivity(
+          'comment',
+          `Added comment at <a class="collab-address-link" data-addr="${data.address}">0x${data.address.toString(16)}</a>: "${data.comment}"`,
+          data.peerName
+        );
         if (this.options.onCommentSynced) {
           this.options.onCommentSynced(data.address, data.comment);
         }
@@ -524,8 +561,12 @@ export class CollabPanel {
 
     // Highlights syncing
     this.unsubscribes.push(
-      this.engine.subscribeHighlight(data => {
-        this.appendActivity('highlight', `Highlighted address <a class="collab-address-link" data-addr="${data.address}">0x${data.address.toString(16)}</a> with color <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${data.color};"></span>`, data.peerName);
+      this.engine.subscribeHighlight((data) => {
+        this.appendActivity(
+          'highlight',
+          `Highlighted address <a class="collab-address-link" data-addr="${data.address}">0x${data.address.toString(16)}</a> with color <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${data.color};"></span>`,
+          data.peerName
+        );
         if (this.options.onHighlightSynced) {
           this.options.onHighlightSynced(data.address, data.color);
         }
@@ -534,11 +575,19 @@ export class CollabPanel {
 
     // Renames syncing
     this.unsubscribes.push(
-      this.engine.subscribeRename(data => {
+      this.engine.subscribeRename((data) => {
         const itemType = data.type === 'function' ? 'function' : 'variable';
-        this.appendActivity('rename', `Renamed ${itemType} <span style="font-family:monospace;color:#F59E0B;">${data.originalName}</span> to <span style="font-family:monospace;color:#10B981;font-weight:bold;">${data.renamedName}</span>`, data.peerName);
+        this.appendActivity(
+          'rename',
+          `Renamed ${itemType} <span style="font-family:monospace;color:#F59E0B;">${data.originalName}</span> to <span style="font-family:monospace;color:#10B981;font-weight:bold;">${data.renamedName}</span>`,
+          data.peerName
+        );
         if (this.options.onRenameSynced) {
-          this.options.onRenameSynced(data.originalName, data.renamedName, data.type);
+          this.options.onRenameSynced(
+            data.originalName,
+            data.renamedName,
+            data.type
+          );
         }
       })
     );
@@ -546,7 +595,9 @@ export class CollabPanel {
 
   private setupEvents(): void {
     // Address link clicks in Activity Log
-    const listEl = this.rootEl.querySelector('#collab-activity-list') as HTMLDivElement;
+    const listEl = this.rootEl.querySelector(
+      '#collab-activity-list'
+    ) as HTMLDivElement;
     if (listEl) {
       listEl.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
@@ -560,7 +611,9 @@ export class CollabPanel {
     }
 
     // Real-time input synchronizer
-    const commentTextInput = this.rootEl.querySelector('#collab-comment-text') as HTMLInputElement;
+    const commentTextInput = this.rootEl.querySelector(
+      '#collab-comment-text'
+    ) as HTMLInputElement;
     if (commentTextInput) {
       commentTextInput.addEventListener('input', () => {
         if (!this.engine.isConnected()) return;
@@ -574,7 +627,9 @@ export class CollabPanel {
     }
 
     // Local action button: Comment
-    const sendCommentBtn = this.rootEl.querySelector('#collab-btn-send-comment') as HTMLButtonElement;
+    const sendCommentBtn = this.rootEl.querySelector(
+      '#collab-btn-send-comment'
+    ) as HTMLButtonElement;
     if (sendCommentBtn) {
       sendCommentBtn.addEventListener('click', () => {
         if (!this.engine.isConnected()) {
@@ -596,7 +651,9 @@ export class CollabPanel {
     }
 
     // Local action button: Highlight
-    const sendHighlightBtn = this.rootEl.querySelector('#collab-btn-send-highlight') as HTMLButtonElement;
+    const sendHighlightBtn = this.rootEl.querySelector(
+      '#collab-btn-send-highlight'
+    ) as HTMLButtonElement;
     if (sendHighlightBtn) {
       sendHighlightBtn.addEventListener('click', () => {
         if (!this.engine.isConnected()) {
@@ -617,7 +674,9 @@ export class CollabPanel {
     }
 
     // Local action button: Rename
-    const sendRenameBtn = this.rootEl.querySelector('#collab-btn-send-rename') as HTMLButtonElement;
+    const sendRenameBtn = this.rootEl.querySelector(
+      '#collab-btn-send-rename'
+    ) as HTMLButtonElement;
     if (sendRenameBtn) {
       sendRenameBtn.addEventListener('click', () => {
         if (!this.engine.isConnected()) {
@@ -626,7 +685,9 @@ export class CollabPanel {
         }
         const oldName = this.actionRenameOldInput.value.trim();
         const newName = this.actionRenameNewInput.value.trim();
-        const type = this.actionRenameTypeSelect.value as 'function' | 'variable';
+        const type = this.actionRenameTypeSelect.value as
+          | 'function'
+          | 'variable';
         if (!oldName || !newName) return;
         this.engine.sendRename(oldName, newName, type);
         this.actionRenameOldInput.value = '';
@@ -635,7 +696,9 @@ export class CollabPanel {
     }
 
     // Action button: Simulate Peer Action
-    const simulateBtn = this.rootEl.querySelector('#collab-btn-simulate') as HTMLButtonElement;
+    const simulateBtn = this.rootEl.querySelector(
+      '#collab-btn-simulate'
+    ) as HTMLButtonElement;
     if (simulateBtn) {
       simulateBtn.addEventListener('click', () => {
         if (!this.engine.isConnected()) {
@@ -664,9 +727,15 @@ export class CollabPanel {
       `;
 
       // Setup connects events
-      this.usernameInput = this.connectionContainer.querySelector('#collab-username') as HTMLInputElement;
-      this.roomInput = this.connectionContainer.querySelector('#collab-room') as HTMLInputElement;
-      this.connectBtn = this.connectionContainer.querySelector('#collab-btn-connect') as HTMLButtonElement;
+      this.usernameInput = this.connectionContainer.querySelector(
+        '#collab-username'
+      ) as HTMLInputElement;
+      this.roomInput = this.connectionContainer.querySelector(
+        '#collab-room'
+      ) as HTMLInputElement;
+      this.connectBtn = this.connectionContainer.querySelector(
+        '#collab-btn-connect'
+      ) as HTMLButtonElement;
 
       this.connectBtn.addEventListener('click', () => {
         const username = this.usernameInput.value.trim();
@@ -693,7 +762,9 @@ export class CollabPanel {
         <button id="collab-btn-disconnect" class="collab-btn collab-btn-secondary" style="margin-top: 0.5rem;">🔌 Leave Room</button>
       `;
 
-      const disconnectBtn = this.connectionContainer.querySelector('#collab-btn-disconnect') as HTMLButtonElement;
+      const disconnectBtn = this.connectionContainer.querySelector(
+        '#collab-btn-disconnect'
+      ) as HTMLButtonElement;
       disconnectBtn.addEventListener('click', () => {
         this.engine.disconnect();
       });
@@ -703,7 +774,7 @@ export class CollabPanel {
   private renderPeers(peers: Peer[]): void {
     if (!this.engine.isConnected()) return;
     this.peersListEl.innerHTML = '';
-    
+
     if (peers.length === 0) {
       this.peersListEl.innerHTML = `
         <div style="font-size: 0.8rem; color: var(--text-muted, #94a3b8); text-align: center; padding: 0.5rem 0;">
@@ -713,7 +784,7 @@ export class CollabPanel {
       return;
     }
 
-    peers.forEach(peer => {
+    peers.forEach((peer) => {
       const row = document.createElement('div');
       row.className = 'collab-peer-row';
       row.innerHTML = `
@@ -727,8 +798,14 @@ export class CollabPanel {
     });
   }
 
-  private appendActivity(type: 'comment' | 'highlight' | 'rename', content: string, peerName: string): void {
-    const list = this.rootEl.querySelector('#collab-activity-list') as HTMLDivElement;
+  private appendActivity(
+    type: 'comment' | 'highlight' | 'rename',
+    content: string,
+    peerName: string
+  ): void {
+    const list = this.rootEl.querySelector(
+      '#collab-activity-list'
+    ) as HTMLDivElement;
     if (!list) return;
 
     const item = document.createElement('div');

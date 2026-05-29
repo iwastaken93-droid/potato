@@ -12,9 +12,13 @@ describe('AI Code Explanation Engine Tests', () => {
         swap(&s[i], &s[j]);
       }
     `;
-    const result = AIExplanationEngine.analyze(rc4Code, { functionName: 'rc4_decrypt' });
+    const result = AIExplanationEngine.analyze(rc4Code, {
+      functionName: 'rc4_decrypt',
+    });
     expect(result.summary).toContain('RC4');
-    expect(result.patterns.map(p => p.name)).toContain('RC4 Cryptographic Cipher');
+    expect(result.patterns.map((p) => p.name)).toContain(
+      'RC4 Cryptographic Cipher'
+    );
     expect(result.complexity.time).toContain('O(N)');
     expect(result.pseudocode).toContain('rc4_crypt');
     expect(result.suggestions.length).toBeGreaterThan(0);
@@ -29,7 +33,9 @@ describe('AI Code Explanation Engine Tests', () => {
     `;
     const result = AIExplanationEngine.analyze(teaCode);
     expect(result.summary).toContain('Tiny Encryption Algorithm');
-    expect(result.patterns.map(p => p.name)).toContain('TEA/XTEA Block Cipher');
+    expect(result.patterns.map((p) => p.name)).toContain(
+      'TEA/XTEA Block Cipher'
+    );
     expect(result.complexity.time).toContain('O(R)');
   });
 
@@ -38,9 +44,13 @@ describe('AI Code Explanation Engine Tests', () => {
       const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
       encoded[j++] = alphabet[(triple >> 18) & 0x3F];
     `;
-    const result = AIExplanationEngine.analyze(b64Code, { functionName: 'base64_decode' });
+    const result = AIExplanationEngine.analyze(b64Code, {
+      functionName: 'base64_decode',
+    });
     expect(result.summary).toContain('Base64');
-    expect(result.patterns.map(p => p.name)).toContain('Base64 Text Conversion');
+    expect(result.patterns.map((p) => p.name)).toContain(
+      'Base64 Text Conversion'
+    );
   });
 
   it('should detect PEB lookup anti-debugging signatures', () => {
@@ -50,9 +60,13 @@ describe('AI Code Explanation Engine Tests', () => {
       cmp ebx, 0
       jne debug_detected
     `;
-    const result = AIExplanationEngine.analyze(pebCode, { functionName: 'anti_debug_check' });
+    const result = AIExplanationEngine.analyze(pebCode, {
+      functionName: 'anti_debug_check',
+    });
     expect(result.summary).toContain('debugger');
-    expect(result.patterns.map(p => p.name)).toContain('Anti-Debugging & Evasion');
+    expect(result.patterns.map((p) => p.name)).toContain(
+      'Anti-Debugging & Evasion'
+    );
   });
 
   it('should fallback gracefully to standard control flow analysis if no patterns match', () => {
@@ -63,8 +77,12 @@ describe('AI Code Explanation Engine Tests', () => {
       }
       return sum;
     `;
-    const result = AIExplanationEngine.analyze(regularCode, { functionName: 'process_data' });
+    const result = AIExplanationEngine.analyze(regularCode, {
+      functionName: 'process_data',
+    });
     expect(result.summary).toContain('process_data');
-    expect(result.patterns.map(p => p.name)).toContain('Looping Iterative Routine');
+    expect(result.patterns.map((p) => p.name)).toContain(
+      'Looping Iterative Routine'
+    );
   });
 });

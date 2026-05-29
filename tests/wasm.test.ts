@@ -248,7 +248,7 @@ describe('WASM Parser Unit Tests', () => {
     const sub0 = [
       0x00, // Sub ID 0
       ...encodeVarUint(encodeString('MyModule').length),
-      ...encodeString('MyModule')
+      ...encodeString('MyModule'),
     ];
 
     // Subsection 1: Function Names (index 0 -> "func_zero", index 1 -> "func_one")
@@ -257,12 +257,12 @@ describe('WASM Parser Unit Tests', () => {
       ...encodeVarUint(0),
       ...encodeString('func_zero'),
       ...encodeVarUint(1),
-      ...encodeString('func_one')
+      ...encodeString('func_one'),
     ];
     const sub1 = [
       0x01, // Sub ID 1
       ...encodeVarUint(funcNamesMap.length),
-      ...funcNamesMap
+      ...funcNamesMap,
     ];
 
     // Subsection 2: Local Names (func 1 -> local 0 -> "loc_zero", local 1 -> "loc_one")
@@ -270,42 +270,137 @@ describe('WASM Parser Unit Tests', () => {
       ...encodeVarUint(0), // local 0
       ...encodeString('loc_zero'),
       ...encodeVarUint(1),
-      ...encodeString('loc_one')
+      ...encodeString('loc_one'),
     ];
     const localFuncs = [
       ...encodeVarUint(1), // func count
       ...encodeVarUint(1), // func index 1
       ...encodeVarUint(2), // local count
-      ...localMap
+      ...localMap,
     ];
     const sub2 = [
       0x02, // Sub ID 2
       ...encodeVarUint(localFuncs.length),
-      ...localFuncs
+      ...localFuncs,
+    ];
+
+    // Subsection 3: Label Names (func 1 -> label 0 -> "lbl_zero")
+    const labelMap = [
+      ...encodeVarUint(0), // label 0
+      ...encodeString('lbl_zero'),
+    ];
+    const labelFuncs = [
+      ...encodeVarUint(1), // func count
+      ...encodeVarUint(1), // func index 1
+      ...encodeVarUint(1), // label count
+      ...labelMap,
+    ];
+    const sub3 = [
+      0x03, // Sub ID 3
+      ...encodeVarUint(labelFuncs.length),
+      ...labelFuncs,
     ];
 
     // Subsection 4: Type Names (index 0 -> "type_zero")
     const typeNamesMap = [
       ...encodeVarUint(1), // count
       ...encodeVarUint(0),
-      ...encodeString('type_zero')
+      ...encodeString('type_zero'),
     ];
     const sub4 = [
       0x04, // Sub ID 4
       ...encodeVarUint(typeNamesMap.length),
-      ...typeNamesMap
+      ...typeNamesMap,
     ];
 
-    const namePayload = [...sub0, ...sub1, ...sub2, ...sub4];
+    // Subsection 5: Table Names (index 0 -> "tab_zero")
+    const tableNamesMap = [
+      ...encodeVarUint(1), // count
+      ...encodeVarUint(0),
+      ...encodeString('tab_zero'),
+    ];
+    const sub5 = [
+      0x05, // Sub ID 5
+      ...encodeVarUint(tableNamesMap.length),
+      ...tableNamesMap,
+    ];
+
+    // Subsection 6: Memory Names (index 0 -> "mem_zero")
+    const memoryNamesMap = [
+      ...encodeVarUint(1), // count
+      ...encodeVarUint(0),
+      ...encodeString('mem_zero'),
+    ];
+    const sub6 = [
+      0x06, // Sub ID 6
+      ...encodeVarUint(memoryNamesMap.length),
+      ...memoryNamesMap,
+    ];
+
+    // Subsection 7: Global Names (index 0 -> "glob_zero")
+    const globalNamesMap = [
+      ...encodeVarUint(1), // count
+      ...encodeVarUint(0),
+      ...encodeString('glob_zero'),
+    ];
+    const sub7 = [
+      0x07, // Sub ID 7
+      ...encodeVarUint(globalNamesMap.length),
+      ...globalNamesMap,
+    ];
+
+    // Subsection 8: Element Names (index 0 -> "elem_zero")
+    const elemNamesMap = [
+      ...encodeVarUint(1), // count
+      ...encodeVarUint(0),
+      ...encodeString('elem_zero'),
+    ];
+    const sub8 = [
+      0x08, // Sub ID 8
+      ...encodeVarUint(elemNamesMap.length),
+      ...elemNamesMap,
+    ];
+
+    // Subsection 9: Data Names (index 0 -> "dat_zero")
+    const dataNamesMap = [
+      ...encodeVarUint(1), // count
+      ...encodeVarUint(0),
+      ...encodeString('dat_zero'),
+    ];
+    const sub9 = [
+      0x09, // Sub ID 9
+      ...encodeVarUint(dataNamesMap.length),
+      ...dataNamesMap,
+    ];
+
+    const namePayload = [
+      ...sub0,
+      ...sub1,
+      ...sub2,
+      ...sub3,
+      ...sub4,
+      ...sub5,
+      ...sub6,
+      ...sub7,
+      ...sub8,
+      ...sub9,
+    ];
     const nameSectionBytes = encodeString('name');
     const customSectionLength = nameSectionBytes.length + namePayload.length;
 
     const wasmBytes = new Uint8Array([
-      0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // Header
+      0x00,
+      0x61,
+      0x73,
+      0x6d,
+      0x01,
+      0x00,
+      0x00,
+      0x00, // Header
       SectionId.Custom,
       ...encodeVarUint(customSectionLength),
       ...nameSectionBytes,
-      ...namePayload
+      ...namePayload,
     ]);
 
     const module = parseWasm(wasmBytes);
@@ -315,7 +410,13 @@ describe('WASM Parser Unit Tests', () => {
     expect(module.names?.functions?.[1]).toBe('func_one');
     expect(module.names?.locals?.[1]?.[0]).toBe('loc_zero');
     expect(module.names?.locals?.[1]?.[1]).toBe('loc_one');
+    expect(module.names?.labels?.[1]?.[0]).toBe('lbl_zero');
     expect(module.names?.types?.[0]).toBe('type_zero');
+    expect(module.names?.tables?.[0]).toBe('tab_zero');
+    expect(module.names?.memories?.[0]).toBe('mem_zero');
+    expect(module.names?.globals?.[0]).toBe('glob_zero');
+    expect(module.names?.elements?.[0]).toBe('elem_zero');
+    expect(module.names?.data?.[0]).toBe('dat_zero');
   });
 
   it('should parse other custom metadata sections (producers, target_features, sourceMappingURL)', () => {
@@ -329,10 +430,11 @@ describe('WASM Parser Unit Tests', () => {
       ...encodeString('processed-by'),
       ...encodeVarUint(1), // 1 value
       ...encodeString('rustc'),
-      ...encodeString('1.60.0')
+      ...encodeString('1.60.0'),
     ];
     const producersSectionBytes = encodeString('producers');
-    const producersLength = producersSectionBytes.length + producersPayload.length;
+    const producersLength =
+      producersSectionBytes.length + producersPayload.length;
 
     // 2. target_features section
     const featuresPayload = [
@@ -340,18 +442,28 @@ describe('WASM Parser Unit Tests', () => {
       0x2b, // '+'
       ...encodeString('atomics'),
       0x2d, // '-'
-      ...encodeString('bulk-memory')
+      ...encodeString('bulk-memory'),
     ];
     const featuresSectionBytes = encodeString('target_features');
     const featuresLength = featuresSectionBytes.length + featuresPayload.length;
 
     // 3. sourceMappingURL section
-    const sourceMapPayload = [...new TextEncoder().encode('http://example.com/map')];
+    const sourceMapPayload = [
+      ...new TextEncoder().encode('http://example.com/map'),
+    ];
     const sourceMapSectionBytes = encodeString('sourceMappingURL');
-    const sourceMapLength = sourceMapSectionBytes.length + sourceMapPayload.length;
+    const sourceMapLength =
+      sourceMapSectionBytes.length + sourceMapPayload.length;
 
     const wasmBytes = new Uint8Array([
-      0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // Header
+      0x00,
+      0x61,
+      0x73,
+      0x6d,
+      0x01,
+      0x00,
+      0x00,
+      0x00, // Header
       SectionId.Custom,
       ...encodeVarUint(producersLength),
       ...producersSectionBytes,
@@ -363,20 +475,19 @@ describe('WASM Parser Unit Tests', () => {
       SectionId.Custom,
       ...encodeVarUint(sourceMapLength),
       ...sourceMapSectionBytes,
-      ...sourceMapPayload
+      ...sourceMapPayload,
     ]);
 
     const module = parseWasm(wasmBytes);
     expect(module.metadata).toBeDefined();
     expect(module.metadata?.producers).toEqual({
       language: { Rust: '1.60.0' },
-      'processed-by': { rustc: '1.60.0' }
+      'processed-by': { rustc: '1.60.0' },
     });
     expect(module.metadata?.target_features).toEqual([
       '+atomics',
-      '-bulk-memory'
+      '-bulk-memory',
     ]);
     expect(module.metadata?.sourceMappingURL).toBe('http://example.com/map');
   });
 });
-

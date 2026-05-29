@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { calculateEntropy, findHighEntropyBlocks, mapSectionEntropy } from '../src/analyzer/entropy.js';
+import {
+  calculateEntropy,
+  findHighEntropyBlocks,
+  mapSectionEntropy,
+} from '../src/analyzer/entropy.js';
 import { Section } from '../src/disassembler/types.js';
 
 describe('Shannon Entropy Analyzer Unit Tests', () => {
@@ -10,7 +14,7 @@ describe('Shannon Entropy Analyzer Unit Tests', () => {
     });
 
     it('should return 0.0 for a buffer with identical bytes', () => {
-      const buffer = new Uint8Array(100).fill(0xAA);
+      const buffer = new Uint8Array(100).fill(0xaa);
       expect(calculateEntropy(buffer)).toBe(0.0);
     });
 

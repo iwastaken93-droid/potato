@@ -115,7 +115,7 @@ export interface IRCFG {
 export class IRTranslator {
   /**
    * Translates a list of target-dependent machine instructions into target-independent IR instructions.
-   * 
+   *
    * @param instructions Array of disassembled machine instructions.
    * @returns An array of translated IR instructions.
    */
@@ -136,13 +136,23 @@ export class IRTranslator {
         case 'add': {
           const dest = this.parseOperand(inst.operands[0]);
           const src = this.parseOperand(inst.operands[1]);
-          irInsts.push({ op: IROp.ADD, dest, args: dest && src ? [dest, src] : [], address });
+          irInsts.push({
+            op: IROp.ADD,
+            dest,
+            args: dest && src ? [dest, src] : [],
+            address,
+          });
           break;
         }
         case 'sub': {
           const dest = this.parseOperand(inst.operands[0]);
           const src = this.parseOperand(inst.operands[1]);
-          irInsts.push({ op: IROp.SUB, dest, args: dest && src ? [dest, src] : [], address });
+          irInsts.push({
+            op: IROp.SUB,
+            dest,
+            args: dest && src ? [dest, src] : [],
+            address,
+          });
           break;
         }
         case 'push': {
@@ -150,7 +160,12 @@ export class IRTranslator {
           // push src => rsp = rsp - 8; store [rsp], src
           const rspOperand: IROperand = { type: 'reg', name: 'rsp' };
           const eightOperand: IROperand = { type: 'imm', value: 8 };
-          irInsts.push({ op: IROp.SUB, dest: rspOperand, args: [rspOperand, eightOperand], address });
+          irInsts.push({
+            op: IROp.SUB,
+            dest: rspOperand,
+            args: [rspOperand, eightOperand],
+            address,
+          });
           irInsts.push({
             op: IROp.STORE,
             args: [{ type: 'mem', name: 'rsp', offset: 0 }, src],
@@ -169,13 +184,22 @@ export class IRTranslator {
             args: [{ type: 'mem', name: 'rsp', offset: 0 }],
             address,
           });
-          irInsts.push({ op: IROp.ADD, dest: rspOperand, args: [rspOperand, eightOperand], address });
+          irInsts.push({
+            op: IROp.ADD,
+            dest: rspOperand,
+            args: [rspOperand, eightOperand],
+            address,
+          });
           break;
         }
         case 'cmp': {
           const src1 = this.parseOperand(inst.operands[0]);
           const src2 = this.parseOperand(inst.operands[1]);
-          irInsts.push({ op: IROp.CMP, args: src1 && src2 ? [src1, src2] : [], address });
+          irInsts.push({
+            op: IROp.CMP,
+            args: src1 && src2 ? [src1, src2] : [],
+            address,
+          });
           break;
         }
         case 'jmp': {
@@ -192,7 +216,9 @@ export class IRTranslator {
           // General fallback mapping using generic operations or MOV
           if (inst.operands.length > 0) {
             const dest = this.parseOperand(inst.operands[0]);
-            const args = inst.operands.slice(1).map(op => this.parseOperand(op));
+            const args = inst.operands
+              .slice(1)
+              .map((op) => this.parseOperand(op));
             irInsts.push({
               op: IROp.MOV,
               dest,
@@ -216,7 +242,7 @@ export class IRTranslator {
 
   /**
    * Translates CFG basic blocks to an IR Control Flow Graph.
-   * 
+   *
    * @param cfgBlocks Array of basic blocks from the disassembler's CFG.
    * @returns The generated target-independent IR Control Flow Graph.
    */
@@ -273,7 +299,7 @@ export class SSABuilder {
 
   /**
    * Converts an IR CFG into SSA form by versioning registers/variables and inserting PHI nodes.
-   * 
+   *
    * @param cfg The IR Control Flow Graph to transform into SSA form.
    * @returns The modified IR Control Flow Graph in SSA form.
    */
@@ -321,9 +347,11 @@ export class SSABuilder {
         for (const inst of block.instructions) {
           if (inst.op === IROp.PHI && inst.dest && inst.dest.name) {
             const varName = inst.dest.name;
-            inst.args = block.predecessors.map(predId => {
+            inst.args = block.predecessors.map((predId) => {
               const predBlock = cfg.blocks.get(predId);
-              const lastVer = predBlock ? this.findLastWrite(predBlock, varName) : 0;
+              const lastVer = predBlock
+                ? this.findLastWrite(predBlock, varName)
+                : 0;
               return {
                 type: 'var',
                 name: varName,
@@ -338,7 +366,10 @@ export class SSABuilder {
     return cfg;
   }
 
-  private collectWrittenVariables(cfg: IRCFG, startBlock: IRBlock): Set<string> {
+  private collectWrittenVariables(
+    cfg: IRCFG,
+    startBlock: IRBlock
+  ): Set<string> {
     const vars = new Set<string>();
     const visited = new Set<string>();
     const queue = [...startBlock.predecessors];
@@ -352,7 +383,11 @@ export class SSABuilder {
       if (!block) continue;
 
       for (const inst of block.instructions) {
-        if (inst.dest && (inst.dest.type === 'reg' || inst.dest.type === 'var') && inst.dest.name) {
+        if (
+          inst.dest &&
+          (inst.dest.type === 'reg' || inst.dest.type === 'var') &&
+          inst.dest.name
+        ) {
           vars.add(inst.dest.name);
         }
       }
@@ -366,7 +401,7 @@ export class SSABuilder {
   private versionBlock(block: IRBlock): void {
     for (const inst of block.instructions) {
       // 1. Version the input arguments first (read accesses)
-      inst.args = inst.args.map(arg => {
+      inst.args = inst.args.map((arg) => {
         if ((arg.type === 'reg' || arg.type === 'var') && arg.name) {
           const currentVer = this.varVersions.get(arg.name) ?? 0;
           return {
@@ -379,7 +414,11 @@ export class SSABuilder {
       });
 
       // 2. Version the destination operand (write access)
-      if (inst.dest && (inst.dest.type === 'reg' || inst.dest.type === 'var') && inst.dest.name) {
+      if (
+        inst.dest &&
+        (inst.dest.type === 'reg' || inst.dest.type === 'var') &&
+        inst.dest.name
+      ) {
         const varName = inst.dest.name;
         inst.dest = {
           ...inst.dest,
@@ -393,7 +432,11 @@ export class SSABuilder {
   private findLastWrite(block: IRBlock, varName: string): number {
     for (let i = block.instructions.length - 1; i >= 0; i--) {
       const inst = block.instructions[i];
-      if (inst.dest && inst.dest.name === varName && inst.dest.version !== undefined) {
+      if (
+        inst.dest &&
+        inst.dest.name === varName &&
+        inst.dest.version !== undefined
+      ) {
         return inst.dest.version;
       }
     }
@@ -414,14 +457,17 @@ export class SSABuilder {
 export class IROptimizer {
   /**
    * Constant folding: Simplifies arithmetic operations on constant arguments.
-   * 
+   *
    * @param cfg The IR Control Flow Graph to optimize.
    * @returns The optimized IR Control Flow Graph.
    */
   public constantFolding(cfg: IRCFG): IRCFG {
     for (const block of cfg.blocks.values()) {
       for (const inst of block.instructions) {
-        if (inst.args.length === 2 && inst.args.every(arg => arg.type === 'imm')) {
+        if (
+          inst.args.length === 2 &&
+          inst.args.every((arg) => arg.type === 'imm')
+        ) {
           const val1 = Number(inst.args[0].value ?? 0);
           const val2 = Number(inst.args[1].value ?? 0);
           let foldedValue: number | null = null;
@@ -462,7 +508,7 @@ export class IROptimizer {
 
   /**
    * Dead Code Elimination (DCE): Removes instructions whose outputs are never read.
-   * 
+   *
    * @param cfg The IR Control Flow Graph to optimize.
    * @returns The optimized IR Control Flow Graph with dead code removed.
    */
@@ -483,13 +529,22 @@ export class IROptimizer {
 
     // Remove instructions writing to variables that are never read
     for (const block of cfg.blocks.values()) {
-      block.instructions = block.instructions.filter(inst => {
+      block.instructions = block.instructions.filter((inst) => {
         // Do not eliminate memory stores, jumps, branches, rets, calls, or volatile ops
-        if ([IROp.STORE, IROp.JMP, IROp.BRANCH, IROp.RET, IROp.CALL].includes(inst.op)) {
+        if (
+          [IROp.STORE, IROp.JMP, IROp.BRANCH, IROp.RET, IROp.CALL].includes(
+            inst.op
+          )
+        ) {
           return true;
         }
 
-        if (inst.dest && inst.dest.type === 'var' && inst.dest.name && inst.dest.version !== undefined) {
+        if (
+          inst.dest &&
+          inst.dest.type === 'var' &&
+          inst.dest.name &&
+          inst.dest.version !== undefined
+        ) {
           const key = `${inst.dest.name}_${inst.dest.version}`;
           return (readCount.get(key) ?? 0) > 0;
         }
@@ -503,7 +558,7 @@ export class IROptimizer {
 
   /**
    * Copy propagation: Replaces uses of variables that are copies of other variables or constants.
-   * 
+   *
    * @param cfg The IR Control Flow Graph to optimize.
    * @returns The optimized IR Control Flow Graph with copy propagation applied.
    */
@@ -563,12 +618,15 @@ export class IROptimizer {
             const key = `${inst.dest.name}_${inst.dest.version}`;
             const src = inst.args[0];
             const resolvedSrc = resolve(src);
-            
+
             // Check if we already have this copy mapped, or if we should map it
             const existing = copyMap.get(key);
             if (!existing || !operandsEqual(existing, resolvedSrc)) {
               // Avoid self-reference loop
-              if (resolvedSrc.type !== 'var' || `${resolvedSrc.name}_${resolvedSrc.version}` !== key) {
+              if (
+                resolvedSrc.type !== 'var' ||
+                `${resolvedSrc.name}_${resolvedSrc.version}` !== key
+              ) {
                 copyMap.set(key, resolvedSrc);
                 changed = true;
               }
@@ -584,7 +642,7 @@ export class IROptimizer {
   /**
    * Strength Reduction: Replaces expensive operations (like MUL/DIV by powers of two)
    * with cheaper operations (like SHL/SHR).
-   * 
+   *
    * @param cfg The IR Control Flow Graph to optimize.
    * @returns The optimized IR Control Flow Graph with strength reductions applied.
    */
@@ -599,7 +657,10 @@ export class IROptimizer {
           if (inst.args[1].type === 'imm' && inst.args[1].value !== undefined) {
             valOp = inst.args[0];
             immVal = inst.args[1].value;
-          } else if (inst.args[0].type === 'imm' && inst.args[0].value !== undefined) {
+          } else if (
+            inst.args[0].type === 'imm' &&
+            inst.args[0].value !== undefined
+          ) {
             valOp = inst.args[1];
             immVal = inst.args[0].value;
           }
@@ -641,7 +702,7 @@ export class IROptimizer {
 
   /**
    * Algebraic Simplification: Simplifies identity operations like ADD x, 0 or SUB x, x.
-   * 
+   *
    * @param cfg The IR Control Flow Graph to optimize.
    * @returns The optimized IR Control Flow Graph.
    */
@@ -653,7 +714,10 @@ export class IROptimizer {
           if (inst.args[1].type === 'imm' && Number(inst.args[1].value) === 0) {
             inst.op = IROp.MOV;
             inst.args = [inst.args[0]];
-          } else if (inst.args[0].type === 'imm' && Number(inst.args[0].value) === 0) {
+          } else if (
+            inst.args[0].type === 'imm' &&
+            Number(inst.args[0].value) === 0
+          ) {
             inst.op = IROp.MOV;
             inst.args = [inst.args[1]];
           }
@@ -692,7 +756,7 @@ export class IROptimizer {
 
   /**
    * Phi Node Simplification: Simplifies PHI nodes where all inputs are identical.
-   * 
+   *
    * @param cfg The IR Control Flow Graph to optimize.
    * @returns The optimized IR Control Flow Graph.
    */
@@ -701,11 +765,12 @@ export class IROptimizer {
       for (const inst of block.instructions) {
         if (inst.op === IROp.PHI && inst.args.length > 0) {
           const first = inst.args[0];
-          const allIdentical = inst.args.every(arg => 
-            arg.type === first.type &&
-            arg.name === first.name &&
-            arg.value === first.value &&
-            arg.version === first.version
+          const allIdentical = inst.args.every(
+            (arg) =>
+              arg.type === first.type &&
+              arg.name === first.name &&
+              arg.value === first.value &&
+              arg.version === first.version
           );
           if (allIdentical) {
             inst.op = IROp.MOV;

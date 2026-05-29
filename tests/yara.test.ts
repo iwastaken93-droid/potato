@@ -4,7 +4,7 @@ import {
   parseYaraRules,
   matchPattern,
   evaluateCondition,
-  YaraEngine
+  YaraEngine,
 } from '../src/analyzer/yara.js';
 
 describe('YARA-like Signature Engine Unit Tests', () => {
@@ -39,13 +39,13 @@ describe('YARA-like Signature Engine Unit Tests', () => {
 
       const rules = parseYaraRules(source);
       expect(rules).toHaveLength(1);
-      
+
       const rule = rules[0];
       expect(rule.name).toBe('TestRule');
       expect(rule.meta).toEqual({
         author: 'Antigravity',
         version: 1.2,
-        is_active: true
+        is_active: true,
       });
 
       expect(rule.strings).toHaveLength(3);
@@ -53,19 +53,19 @@ describe('YARA-like Signature Engine Unit Tests', () => {
         id: '$text_str',
         type: 'text',
         value: 'hello',
-        modifiers: { ascii: true, wide: false, nocase: true }
+        modifiers: { ascii: true, wide: false, nocase: true },
       });
       expect(rule.strings[1]).toEqual({
         id: '$wide_str',
         type: 'text',
         value: 'world',
-        modifiers: { ascii: false, wide: true, nocase: false }
+        modifiers: { ascii: false, wide: true, nocase: false },
       });
       expect(rule.strings[2]).toEqual({
         id: '$hex_str',
         type: 'hex',
         value: '48 8d ?? 55',
-        modifiers: { ascii: true, wide: false, nocase: false }
+        modifiers: { ascii: true, wide: false, nocase: false },
       });
 
       expect(rule.condition).toBe('$text_str and ($wide_str or not $hex_str)');
@@ -74,11 +74,13 @@ describe('YARA-like Signature Engine Unit Tests', () => {
 
   describe('matchPattern', () => {
     it('should match hex pattern with wildcards', () => {
-      const buffer = new Uint8Array([0x55, 0x89, 0xe5, 0x90, 0x48, 0x8d, 0x05, 0x55]);
+      const buffer = new Uint8Array([
+        0x55, 0x89, 0xe5, 0x90, 0x48, 0x8d, 0x05, 0x55,
+      ]);
       const pattern = {
         id: '$hex',
         type: 'hex' as const,
-        value: '48 8d ?? 55'
+        value: '48 8d ?? 55',
       };
 
       const matches = matchPattern(buffer, pattern);
@@ -86,7 +88,7 @@ describe('YARA-like Signature Engine Unit Tests', () => {
       expect(matches[0]).toEqual({
         stringId: '$hex',
         offset: 4,
-        matchedValue: '48 8d 05 55'
+        matchedValue: '48 8d 05 55',
       });
     });
 
@@ -96,7 +98,7 @@ describe('YARA-like Signature Engine Unit Tests', () => {
         id: '$abc',
         type: 'text' as const,
         value: 'abc',
-        modifiers: { nocase: true, ascii: true }
+        modifiers: { nocase: true, ascii: true },
       };
 
       const matches = matchPattern(buffer, pattern);
@@ -110,14 +112,14 @@ describe('YARA-like Signature Engine Unit Tests', () => {
     it('should match wide text pattern', () => {
       // "hello" encoded in wide (UTF-16LE)
       const buffer = new Uint8Array([
-        0x68, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x6c, 0x00, 0x6f, 0x00
+        0x68, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x6c, 0x00, 0x6f, 0x00,
       ]);
 
       const pattern = {
         id: '$hello',
         type: 'text' as const,
         value: 'hello',
-        modifiers: { wide: true }
+        modifiers: { wide: true },
       };
 
       const matches = matchPattern(buffer, pattern);
@@ -132,7 +134,7 @@ describe('YARA-like Signature Engine Unit Tests', () => {
       const values = {
         $a: true,
         $b: false,
-        $c: true
+        $c: true,
       };
 
       expect(evaluateCondition('$a and $b', values)).toBe(false);
@@ -145,7 +147,7 @@ describe('YARA-like Signature Engine Unit Tests', () => {
     it('should support any of them and all of them', () => {
       const values = {
         'any of them': true,
-        'all of them': false
+        'all of them': false,
       };
 
       expect(evaluateCondition('any of them', values)).toBe(true);
@@ -181,17 +183,21 @@ describe('YARA-like Signature Engine Unit Tests', () => {
 
       // Create a dummy PE buffer
       const peBuffer = new Uint8Array([
-        0x4d, 0x5a, // MZ
-        0x00, 0x00,
-        0x50, 0x45, // PE
-        0x00, 0x00
+        0x4d,
+        0x5a, // MZ
+        0x00,
+        0x00,
+        0x50,
+        0x45, // PE
+        0x00,
+        0x00,
       ]);
 
       const results = engine.scan(peBuffer);
       expect(results).toHaveLength(2);
 
-      const peResult = results.find(r => r.ruleName === 'PE_Magic');
-      const elfResult = results.find(r => r.ruleName === 'ELF_Magic');
+      const peResult = results.find((r) => r.ruleName === 'PE_Magic');
+      const elfResult = results.find((r) => r.ruleName === 'ELF_Magic');
 
       expect(peResult?.matched).toBe(true);
       expect(peResult?.matches).toHaveLength(2);

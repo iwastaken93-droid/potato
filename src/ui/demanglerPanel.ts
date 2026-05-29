@@ -28,10 +28,13 @@ export class DemanglerPanel {
 
   private sampleSymbols = [
     { name: '_ZN3foo3bar3bazEib', desc: 'GCC Nested Name with Args' },
-    { name: '_ZNK3std6vectorIiSaIiEE9push_backERKi', desc: 'GCC std::vector Template' },
+    {
+      name: '_ZNK3std6vectorIiSaIiEE9push_backERKi',
+      desc: 'GCC std::vector Template',
+    },
     { name: '?add@Math@@YAHHH@Z', desc: 'MSVC Method returning Int' },
     { name: '?func@Class@Namespace@@YAXXZ', desc: 'MSVC Namespace + Class' },
-    { name: '_ZN3foo6helperEPiRKc', desc: 'GCC Pointer & Const Ref Args' }
+    { name: '_ZN3foo6helperEPiRKc', desc: 'GCC Pointer & Const Ref Args' },
   ];
 
   constructor(
@@ -432,13 +435,27 @@ export class DemanglerPanel {
     this.container.appendChild(this.rootEl);
 
     // Cache elements
-    this.inputEl = this.rootEl.querySelector('#playground-sym-input') as HTMLInputElement;
-    this.demangleBtn = this.rootEl.querySelector('#playground-demangle-btn') as HTMLButtonElement;
-    this.playgroundResultEl = this.rootEl.querySelector('#playground-result-container') as HTMLDivElement;
-    this.symbolsTableBody = this.rootEl.querySelector('#symbols-table-body') as HTMLTableSectionElement;
-    this.symbolsSearchInput = this.rootEl.querySelector('#symbols-search-input') as HTMLInputElement;
-    this.statsMangledCountEl = this.rootEl.querySelector('#demangler-stats-mangled') as HTMLSpanElement;
-    this.statsDemangledCountEl = this.rootEl.querySelector('#demangler-stats-demangled') as HTMLSpanElement;
+    this.inputEl = this.rootEl.querySelector(
+      '#playground-sym-input'
+    ) as HTMLInputElement;
+    this.demangleBtn = this.rootEl.querySelector(
+      '#playground-demangle-btn'
+    ) as HTMLButtonElement;
+    this.playgroundResultEl = this.rootEl.querySelector(
+      '#playground-result-container'
+    ) as HTMLDivElement;
+    this.symbolsTableBody = this.rootEl.querySelector(
+      '#symbols-table-body'
+    ) as HTMLTableSectionElement;
+    this.symbolsSearchInput = this.rootEl.querySelector(
+      '#symbols-search-input'
+    ) as HTMLInputElement;
+    this.statsMangledCountEl = this.rootEl.querySelector(
+      '#demangler-stats-mangled'
+    ) as HTMLSpanElement;
+    this.statsDemangledCountEl = this.rootEl.querySelector(
+      '#demangler-stats-demangled'
+    ) as HTMLSpanElement;
   }
 
   private setupEvents() {
@@ -472,7 +489,7 @@ export class DemanglerPanel {
 
   private updateStats() {
     if (!this.statsMangledCountEl || !this.statsDemangledCountEl) return;
-    
+
     let mangledCount = 0;
     let demangledCount = 0;
 
@@ -518,10 +535,12 @@ export class DemanglerPanel {
     `;
 
     const titleRow = document.createElement('div');
-    titleRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
-    
+    titleRow.style.cssText =
+      'display: flex; justify-content: space-between; align-items: center;';
+
     const titleVal = document.createElement('div');
-    titleVal.style.cssText = 'font-weight: 700; font-size: 0.9rem; color: #818cf8; font-family: var(--font-mono); word-break: break-all;';
+    titleVal.style.cssText =
+      'font-weight: 700; font-size: 0.9rem; color: #818cf8; font-family: var(--font-mono); word-break: break-all;';
     titleVal.textContent = res.demangled;
     titleRow.appendChild(titleVal);
 
@@ -545,7 +564,8 @@ export class DemanglerPanel {
     } else {
       const plainBadge = document.createElement('span');
       plainBadge.className = 'detail-badge';
-      plainBadge.style.cssText = 'background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: var(--text-muted);';
+      plainBadge.style.cssText =
+        'background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: var(--text-muted);';
       plainBadge.textContent = 'Unmangled';
       badgeRow.appendChild(plainBadge);
     }
@@ -555,7 +575,7 @@ export class DemanglerPanel {
     if (res.isMangled) {
       const grid = document.createElement('div');
       grid.className = 'detail-grid';
-      
+
       let html = '';
       if (res.name) {
         html += `<span class="detail-label">Base Name:</span><span class="detail-value">${res.name}</span>`;
@@ -585,14 +605,17 @@ export class DemanglerPanel {
 
   private renderSymbolsList() {
     if (!this.symbolsTableBody) return;
-    
+
     this.symbolsTableBody.innerHTML = '';
     const query = this.symbolsSearchInput.value.toLowerCase().trim();
 
     const filtered = this.symbols.filter((s) => {
       if (!query) return true;
       const demangledName = demangle(s.name).demangled;
-      return s.name.toLowerCase().includes(query) || demangledName.toLowerCase().includes(query);
+      return (
+        s.name.toLowerCase().includes(query) ||
+        demangledName.toLowerCase().includes(query)
+      );
     });
 
     if (filtered.length === 0) {
@@ -626,7 +649,7 @@ export class DemanglerPanel {
       }
 
       const actionsCell = document.createElement('td');
-      
+
       const loadBtn = document.createElement('button');
       loadBtn.className = 'table-action-btn';
       loadBtn.textContent = 'Inspect';

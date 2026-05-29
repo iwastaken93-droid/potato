@@ -6,11 +6,15 @@
  * - Integer overflows (arithmetic operations on untrusted sizes or near potential bounds)
  */
 
-import { Section, Symbol } from '../disassembler/types.js';
+import { Section, Symbol, Instruction } from '../disassembler/types.js';
 
 export interface VulnMatch {
   /** Vulnerability type: 'unsafe_api' | 'buffer_overflow' | 'integer_overflow' | 'format_string' */
-  category: 'unsafe_api' | 'buffer_overflow' | 'integer_overflow' | 'format_string';
+  category:
+    | 'unsafe_api'
+    | 'buffer_overflow'
+    | 'integer_overflow'
+    | 'format_string';
   /** Severity: 'high' | 'medium' | 'low' */
   severity: 'high' | 'medium' | 'low';
   /** Human readable description */
@@ -34,22 +38,115 @@ export class VulnScanner {
   /**
    * Set of unsafe C standard library APIs.
    */
-  private static UNSAFE_APIS = new Map<string, { severity: 'high' | 'medium', desc: string }>([
-    ['strcpy', { severity: 'high', desc: 'Unsafe copy function (strcpy) does not validate destination buffer bounds. Use strncpy or strlcpy instead.' }],
-    ['strcat', { severity: 'high', desc: 'Unsafe string concatenation (strcat) does not validate bounds. Use strncat or strlcat instead.' }],
-    ['sprintf', { severity: 'high', desc: 'Unsafe formatted string generation (sprintf) does not check bounds. Use snprintf instead.' }],
-    ['gets', { severity: 'high', desc: 'gets() is completely obsolete and highly dangerous as it lacks buffer length validation.' }],
-    ['vsprintf', { severity: 'high', desc: 'Unsafe format string output function (vsprintf) can lead to buffer overflow. Use vsnprintf.' }],
-    ['scanf', { severity: 'medium', desc: 'scanf() can lead to buffer overflows when reading strings if width limiters are omitted.' }],
-    ['sscanf', { severity: 'medium', desc: 'sscanf() can lead to buffer overflows if width limiters are omitted.' }],
-    ['fscanf', { severity: 'medium', desc: 'fscanf() can lead to buffer overflows if width limiters are omitted.' }],
-    ['wcscpy', { severity: 'high', desc: 'Unsafe wide character copy (wcscpy). Use wcsncpy instead.' }],
-    ['wcscat', { severity: 'high', desc: 'Unsafe wide character concatenation (wcscat). Use wcsncat instead.' }],
-    ['realpath', { severity: 'medium', desc: 'realpath() can overflow the destination buffer if it is smaller than PATH_MAX.' }],
-    ['tempnam', { severity: 'medium', desc: 'tempnam() creates temporary files insecurely. Use mkstemp instead.' }],
-    ['tmpnam', { severity: 'medium', desc: 'tmpnam() creates temporary files insecurely. Use mkstemp instead.' }],
-    ['getwd', { severity: 'high', desc: 'getwd() does not prevent overflow of buffer. Use getcwd instead.' }],
-    ['system', { severity: 'high', desc: 'Potential command injection vulnerability on system() calls. Ensure argument inputs are strictly sanitized.' }]
+  private static UNSAFE_APIS = new Map<
+    string,
+    { severity: 'high' | 'medium'; desc: string }
+  >([
+    [
+      'strcpy',
+      {
+        severity: 'high',
+        desc: 'Unsafe copy function (strcpy) does not validate destination buffer bounds. Use strncpy or strlcpy instead.',
+      },
+    ],
+    [
+      'strcat',
+      {
+        severity: 'high',
+        desc: 'Unsafe string concatenation (strcat) does not validate bounds. Use strncat or strlcat instead.',
+      },
+    ],
+    [
+      'sprintf',
+      {
+        severity: 'high',
+        desc: 'Unsafe formatted string generation (sprintf) does not check bounds. Use snprintf instead.',
+      },
+    ],
+    [
+      'gets',
+      {
+        severity: 'high',
+        desc: 'gets() is completely obsolete and highly dangerous as it lacks buffer length validation.',
+      },
+    ],
+    [
+      'vsprintf',
+      {
+        severity: 'high',
+        desc: 'Unsafe format string output function (vsprintf) can lead to buffer overflow. Use vsnprintf.',
+      },
+    ],
+    [
+      'scanf',
+      {
+        severity: 'medium',
+        desc: 'scanf() can lead to buffer overflows when reading strings if width limiters are omitted.',
+      },
+    ],
+    [
+      'sscanf',
+      {
+        severity: 'medium',
+        desc: 'sscanf() can lead to buffer overflows if width limiters are omitted.',
+      },
+    ],
+    [
+      'fscanf',
+      {
+        severity: 'medium',
+        desc: 'fscanf() can lead to buffer overflows if width limiters are omitted.',
+      },
+    ],
+    [
+      'wcscpy',
+      {
+        severity: 'high',
+        desc: 'Unsafe wide character copy (wcscpy). Use wcsncpy instead.',
+      },
+    ],
+    [
+      'wcscat',
+      {
+        severity: 'high',
+        desc: 'Unsafe wide character concatenation (wcscat). Use wcsncat instead.',
+      },
+    ],
+    [
+      'realpath',
+      {
+        severity: 'medium',
+        desc: 'realpath() can overflow the destination buffer if it is smaller than PATH_MAX.',
+      },
+    ],
+    [
+      'tempnam',
+      {
+        severity: 'medium',
+        desc: 'tempnam() creates temporary files insecurely. Use mkstemp instead.',
+      },
+    ],
+    [
+      'tmpnam',
+      {
+        severity: 'medium',
+        desc: 'tmpnam() creates temporary files insecurely. Use mkstemp instead.',
+      },
+    ],
+    [
+      'getwd',
+      {
+        severity: 'high',
+        desc: 'getwd() does not prevent overflow of buffer. Use getcwd instead.',
+      },
+    ],
+    [
+      'system',
+      {
+        severity: 'high',
+        desc: 'Potential command injection vulnerability on system() calls. Ensure argument inputs are strictly sanitized.',
+      },
+    ],
   ]);
 
   /**
@@ -60,7 +157,11 @@ export class VulnScanner {
     sections: Section[],
     symbols: Symbol[],
     instructions: Instruction[],
-    config: VulnScannerConfig = { unsafeApi: true, bufferOverflow: true, integerOverflow: true }
+    config: VulnScannerConfig = {
+      unsafeApi: true,
+      bufferOverflow: true,
+      integerOverflow: true,
+    }
   ): VulnMatch[] {
     const matches: VulnMatch[] = [];
 
@@ -76,14 +177,16 @@ export class VulnScanner {
             severity: apiInfo.severity,
             description: apiInfo.desc,
             address: sym.address,
-            evidence: sym.name
+            evidence: sym.name,
           });
         }
       }
 
       // Check instructions for direct jumps or calls to known unsafe APIs
       for (const inst of instructions) {
-        const isCall = inst.mnemonic.toLowerCase() === 'call' || inst.mnemonic.toLowerCase().startsWith('jmp');
+        const isCall =
+          inst.mnemonic.toLowerCase() === 'call' ||
+          inst.mnemonic.toLowerCase().startsWith('jmp');
         if (isCall && inst.opStr) {
           const dest = inst.opStr.trim();
           const cleanedDest = this.cleanSymbolName(dest);
@@ -94,7 +197,7 @@ export class VulnScanner {
               severity: apiInfo.severity,
               description: `Instruction calls dangerous API: ${cleanedDest}. ${apiInfo.desc}`,
               address: inst.address,
-              evidence: inst.opStr
+              evidence: inst.opStr,
             });
           }
         }
@@ -113,9 +216,10 @@ export class VulnScanner {
           matches.push({
             category: 'buffer_overflow',
             severity: 'medium',
-            description: 'Repeated string/memory move instruction (rep movs) detected. May perform an unchecked block copy if the counter register (ecx/rcx) is not securely bounded.',
+            description:
+              'Repeated string/memory move instruction (rep movs) detected. May perform an unchecked block copy if the counter register (ecx/rcx) is not securely bounded.',
             address: inst.address,
-            evidence: inst.mnemonic + ' ' + inst.opStr
+            evidence: inst.mnemonic + ' ' + inst.opStr,
           });
         }
 
@@ -131,7 +235,7 @@ export class VulnScanner {
                 severity: 'low',
                 description: `Large stack frame allocation (${val} bytes) detected. Large stack buffers can be targets for stack-based buffer overflows. Ensure all bounds check are implemented.`,
                 address: inst.address,
-                evidence: `sub ${op0.reg}, 0x${val.toString(16)}`
+                evidence: `sub ${op0.reg}, 0x${val.toString(16)}`,
               });
             }
           }
@@ -147,7 +251,12 @@ export class VulnScanner {
 
         // Pattern A: Arithmetic operations followed by conditional jump (potential unsafe overflow checks)
         // e.g. add, mul, imul, sub
-        if (mnemonic === 'add' || mnemonic === 'mul' || mnemonic === 'imul' || mnemonic === 'sub') {
+        if (
+          mnemonic === 'add' ||
+          mnemonic === 'mul' ||
+          mnemonic === 'imul' ||
+          mnemonic === 'sub'
+        ) {
           // Look ahead to check if the next instruction is a conditional jump for overflow/carry
           if (i + 1 < instructions.length) {
             const nextInst = instructions[i + 1];
@@ -161,12 +270,22 @@ export class VulnScanner {
 
           // If no jump/check is visible nearby, check if arithmetic operation is done on registers
           // typically involved in length calculation or array indexing (e.g. index/offset registers)
-          const hasRegDest = inst.operands && inst.operands.length > 0 && inst.operands[0].type === 'reg';
+          const hasRegDest =
+            inst.operands &&
+            inst.operands.length > 0 &&
+            inst.operands[0].type === 'reg';
           if (hasRegDest) {
             const regName = String(inst.operands[0].reg).toLowerCase();
             // Common loop/indexing registers or counter registers
-            const isIndexReg = ['ecx', 'rcx', 'esi', 'rsi', 'edi', 'rdi'].includes(regName);
-            
+            const isIndexReg = [
+              'ecx',
+              'rcx',
+              'esi',
+              'rsi',
+              'edi',
+              'rdi',
+            ].includes(regName);
+
             // Check if there's a large immediate operand
             let isLargeImmediate = false;
             if (inst.operands.length >= 2 && inst.operands[1].type === 'imm') {
@@ -184,7 +303,7 @@ export class VulnScanner {
                   ? `Arithmetic operation (${mnemonic}) with a large immediate value on register (${regName}). Watch out for possible integer overflow.`
                   : `Arithmetic operation (${mnemonic}) on index/counter register (${regName}) without direct adjacent overflow check. Watch out for possible integer wraparound.`,
                 address: inst.address,
-                evidence: `${inst.mnemonic} ${inst.opStr}`
+                evidence: `${inst.mnemonic} ${inst.opStr}`,
               });
             }
           }
@@ -195,9 +314,10 @@ export class VulnScanner {
           matches.push({
             category: 'integer_overflow',
             severity: 'low',
-            description: 'Signed division instruction (idiv) detected. Division by zero or division of INT_MIN by -1 can cause an integer overflow/CPU exception.',
+            description:
+              'Signed division instruction (idiv) detected. Division by zero or division of INT_MIN by -1 can cause an integer overflow/CPU exception.',
             address: inst.address,
-            evidence: `idiv ${inst.opStr}`
+            evidence: `idiv ${inst.opStr}`,
           });
         }
       }

@@ -193,7 +193,7 @@ export function parseHexPattern(pattern: string): (number | null)[] {
     return [];
   }
 
-  return tokens.map(token => {
+  return tokens.map((token) => {
     if (token.includes('?')) {
       return null;
     }

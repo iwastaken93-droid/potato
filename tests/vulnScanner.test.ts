@@ -10,10 +10,12 @@ describe('VulnScanner Core Tests', () => {
     const symbols: Symbol[] = [
       { name: 'strcpy', address: 0x1020, binding: 'global', type: 'function' },
       { name: 'sprintf', address: 0x1040, binding: 'global', type: 'function' },
-      { name: 'memset', address: 0x1060, binding: 'global', type: 'function' } // safe
+      { name: 'memset', address: 0x1060, binding: 'global', type: 'function' }, // safe
     ];
 
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(2);
     expect(matches[0].category).toBe('unsafe_api');
     expect(matches[0].evidence).toBe('strcpy');
@@ -29,7 +31,7 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'call',
         opStr: 'strcpy',
         operands: [],
-        size: 5
+        size: 5,
       },
       {
         address: 0x1005,
@@ -37,11 +39,13 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'call',
         opStr: 'printf', // not directly listed as high-severity unsafe API
         operands: [],
-        size: 5
-      }
+        size: 5,
+      },
     ];
 
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].category).toBe('unsafe_api');
     expect(matches[0].evidence).toBe('strcpy');
@@ -56,7 +60,7 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'rep movsb',
         opStr: '',
         operands: [],
-        size: 2
+        size: 2,
       },
       {
         address: 0x2002,
@@ -65,13 +69,15 @@ describe('VulnScanner Core Tests', () => {
         opStr: 'rsp, 0x1000',
         operands: [
           { type: 'reg', reg: 'rsp' },
-          { type: 'imm', imm: 4096 }
+          { type: 'imm', imm: 4096 },
         ],
-        size: 7
-      }
+        size: 7,
+      },
     ];
 
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { bufferOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      bufferOverflow: true,
+    });
     expect(matches.length).toBe(2);
     expect(matches[0].category).toBe('buffer_overflow');
     expect(matches[1].category).toBe('buffer_overflow');
@@ -87,7 +93,7 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'idiv',
         opStr: 'ecx',
         operands: [{ type: 'reg', reg: 'ecx' }],
-        size: 2
+        size: 2,
       },
       {
         address: 0x3002,
@@ -96,13 +102,15 @@ describe('VulnScanner Core Tests', () => {
         opStr: 'rsi, rbx',
         operands: [
           { type: 'reg', reg: 'rsi' },
-          { type: 'reg', reg: 'rbx' }
+          { type: 'reg', reg: 'rbx' },
         ],
-        size: 3
-      }
+        size: 3,
+      },
     ];
 
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBe(2);
     expect(matches[0].category).toBe('integer_overflow');
     expect(matches[0].evidence).toBe('idiv ecx');
@@ -112,16 +120,29 @@ describe('VulnScanner Core Tests', () => {
 
   // Test 5: Detect gets() with high severity
   test('detects gets API with high severity', () => {
-    const symbols: Symbol[] = [{ name: 'gets', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'gets', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('high');
   });
 
   // Test 6: Detect realpath() with medium severity
   test('detects realpath API with medium severity', () => {
-    const symbols: Symbol[] = [{ name: 'realpath', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      {
+        name: 'realpath',
+        address: 0x1000,
+        binding: 'global',
+        type: 'function',
+      },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('medium');
   });
@@ -129,10 +150,22 @@ describe('VulnScanner Core Tests', () => {
   // Test 7: Clean symbol names test link decorations (e.g. imp__strcpy, strcpy@8)
   test('detects unsafe APIs with decorations', () => {
     const symbols: Symbol[] = [
-      { name: '__imp_strcpy', address: 0x1000, binding: 'global', type: 'function' },
-      { name: '_sprintf@12', address: 0x1008, binding: 'global', type: 'function' }
+      {
+        name: '__imp_strcpy',
+        address: 0x1000,
+        binding: 'global',
+        type: 'function',
+      },
+      {
+        name: '_sprintf@12',
+        address: 0x1008,
+        binding: 'global',
+        type: 'function',
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(2);
     expect(matches[0].evidence).toBe('__imp_strcpy');
     expect(matches[1].evidence).toBe('_sprintf@12');
@@ -147,18 +180,24 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'jmp',
         opStr: 'imp_strcpy',
         operands: [],
-        size: 6
-      }
+        size: 6,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].category).toBe('unsafe_api');
   });
 
   // Test 9: Unsafe API config option disabled
   test('skips unsafe API scanning if option is disabled', () => {
-    const symbols: Symbol[] = [{ name: 'strcpy', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: false });
+    const symbols: Symbol[] = [
+      { name: 'strcpy', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: false,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -171,10 +210,12 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'rep movsb',
         opStr: '',
         operands: [],
-        size: 2
-      }
+        size: 2,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { bufferOverflow: false });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      bufferOverflow: false,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -187,10 +228,12 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'idiv',
         opStr: 'ecx',
         operands: [{ type: 'reg', reg: 'ecx' }],
-        size: 2
-      }
+        size: 2,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: false });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: false,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -202,8 +245,11 @@ describe('VulnScanner Core Tests', () => {
         bytes: new Uint8Array([0x48, 0x01, 0xde]),
         mnemonic: 'add',
         opStr: 'rsi, rbx',
-        operands: [{ type: 'reg', reg: 'rsi' }, { type: 'reg', reg: 'rbx' }],
-        size: 3
+        operands: [
+          { type: 'reg', reg: 'rsi' },
+          { type: 'reg', reg: 'rbx' },
+        ],
+        size: 3,
       },
       {
         address: 0x4003,
@@ -211,10 +257,12 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'jo', // jump on overflow (check present)
         opStr: '0x400a',
         operands: [],
-        size: 2
-      }
+        size: 2,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -227,18 +275,24 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'repnz movs',
         opStr: '',
         operands: [],
-        size: 2
-      }
+        size: 2,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { bufferOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      bufferOverflow: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].category).toBe('buffer_overflow');
   });
 
   // Test 14: Unsafe C APIs wcscpy
   test('detects wcscpy as high severity unsafe wide-char api', () => {
-    const symbols: Symbol[] = [{ name: 'wcscpy', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'wcscpy', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('high');
     expect(matches[0].category).toBe('unsafe_api');
@@ -246,24 +300,36 @@ describe('VulnScanner Core Tests', () => {
 
   // Test 15: Unsafe C APIs wcscat
   test('detects wcscat as high severity unsafe wide-char api', () => {
-    const symbols: Symbol[] = [{ name: 'wcscat', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'wcscat', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('high');
   });
 
   // Test 16: Unsafe C APIs tempnam
   test('detects tempnam with medium severity', () => {
-    const symbols: Symbol[] = [{ name: 'tempnam', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'tempnam', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('medium');
   });
 
   // Test 17: Unsafe C APIs getwd
   test('detects getwd as high severity unsafe api', () => {
-    const symbols: Symbol[] = [{ name: 'getwd', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'getwd', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('high');
   });
@@ -278,12 +344,14 @@ describe('VulnScanner Core Tests', () => {
         opStr: 'rsp, 1023',
         operands: [
           { type: 'reg', reg: 'rsp' },
-          { type: 'imm', imm: 1023 }
+          { type: 'imm', imm: 1023 },
         ],
-        size: 7
-      }
+        size: 7,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { bufferOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      bufferOverflow: true,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -297,12 +365,14 @@ describe('VulnScanner Core Tests', () => {
         opStr: 'rsp, 1024',
         operands: [
           { type: 'reg', reg: 'rsp' },
-          { type: 'imm', imm: 1024 }
+          { type: 'imm', imm: 1024 },
         ],
-        size: 7
-      }
+        size: 7,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { bufferOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      bufferOverflow: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].category).toBe('buffer_overflow');
   });
@@ -317,12 +387,14 @@ describe('VulnScanner Core Tests', () => {
         opStr: 'rax, rbx',
         operands: [
           { type: 'reg', reg: 'rax' },
-          { type: 'reg', reg: 'rbx' }
+          { type: 'reg', reg: 'rbx' },
         ],
-        size: 3
-      }
+        size: 3,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -336,12 +408,14 @@ describe('VulnScanner Core Tests', () => {
         opStr: 'rcx, rbx',
         operands: [
           { type: 'reg', reg: 'rcx' },
-          { type: 'reg', reg: 'rbx' }
+          { type: 'reg', reg: 'rbx' },
         ],
-        size: 3
-      }
+        size: 3,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].category).toBe('integer_overflow');
   });
@@ -356,9 +430,9 @@ describe('VulnScanner Core Tests', () => {
         opStr: 'rcx, rbx',
         operands: [
           { type: 'reg', reg: 'rcx' },
-          { type: 'reg', reg: 'rbx' }
+          { type: 'reg', reg: 'rbx' },
         ],
-        size: 3
+        size: 3,
       },
       {
         address: 0x3003,
@@ -366,20 +440,34 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'js',
         opStr: '0x300a',
         operands: [],
-        size: 2
-      }
+        size: 2,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBe(0);
   });
 
   // Test 23: cleanSymbolName helper regex test
   test('cleans custom mangled names correctly', () => {
     const symbols: Symbol[] = [
-      { name: 'imp_strcpy', address: 0x1000, binding: 'global', type: 'function' },
-      { name: '__dl_strcpy', address: 0x1008, binding: 'global', type: 'function' }
+      {
+        name: 'imp_strcpy',
+        address: 0x1000,
+        binding: 'global',
+        type: 'function',
+      },
+      {
+        name: '__dl_strcpy',
+        address: 0x1008,
+        binding: 'global',
+        type: 'function',
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(2);
     expect(matches[0].evidence).toBe('imp_strcpy');
     expect(matches[1].evidence).toBe('__dl_strcpy');
@@ -388,49 +476,81 @@ describe('VulnScanner Core Tests', () => {
   // Test 24: Unsafe C API scan with namespace/dot separator
   test('detects API with dot separator namespaces', () => {
     const symbols: Symbol[] = [
-      { name: 'libc.strcpy', address: 0x1000, binding: 'global', type: 'function' }
+      {
+        name: 'libc.strcpy',
+        address: 0x1000,
+        binding: 'global',
+        type: 'function',
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].evidence).toBe('libc.strcpy');
   });
 
   // Extra Test 25: Scanf API detection
   test('detects scanf API with medium severity', () => {
-    const symbols: Symbol[] = [{ name: 'scanf', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'scanf', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('medium');
   });
 
   // Extra Test 26: Sscanf API detection
   test('detects sscanf API with medium severity', () => {
-    const symbols: Symbol[] = [{ name: 'sscanf', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'sscanf', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('medium');
   });
 
   // Extra Test 27: Fscanf API detection
   test('detects fscanf API with medium severity', () => {
-    const symbols: Symbol[] = [{ name: 'fscanf', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'fscanf', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('medium');
   });
 
   // Extra Test 28: Vsprintf API detection
   test('detects vsprintf API with high severity', () => {
-    const symbols: Symbol[] = [{ name: 'vsprintf', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      {
+        name: 'vsprintf',
+        address: 0x1000,
+        binding: 'global',
+        type: 'function',
+      },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('high');
   });
 
   // Extra Test 29: Tmpnam API detection
   test('detects tmpnam API with medium severity', () => {
-    const symbols: Symbol[] = [{ name: 'tmpnam', address: 0x1000, binding: 'global', type: 'function' }];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const symbols: Symbol[] = [
+      { name: 'tmpnam', address: 0x1000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].severity).toBe('medium');
   });
@@ -444,10 +564,12 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'mul',
         opStr: 'rsi',
         operands: [{ type: 'reg', reg: 'rsi' }],
-        size: 1
-      }
+        size: 1,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].category).toBe('integer_overflow');
   });
@@ -461,10 +583,12 @@ describe('VulnScanner Core Tests', () => {
         mnemonic: 'imul',
         opStr: 'rdi',
         operands: [{ type: 'reg', reg: 'rdi' }],
-        size: 1
-      }
+        size: 1,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].category).toBe('integer_overflow');
   });
@@ -472,9 +596,16 @@ describe('VulnScanner Core Tests', () => {
   // Extra Test 32: cleanSymbolName with DLL prefix
   test('cleans symbols with DLL linkage prefix correctly', () => {
     const symbols: Symbol[] = [
-      { name: '__imp_dll_strcpy', address: 0x1000, binding: 'global', type: 'function' }
+      {
+        name: '__imp_dll_strcpy',
+        address: 0x1000,
+        binding: 'global',
+        type: 'function',
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].evidence).toBe('__imp_dll_strcpy');
   });
@@ -482,9 +613,18 @@ describe('VulnScanner Core Tests', () => {
   // Extra Test 33: Unsafe API scan with call instruction containing no opStr
   test('does not crash when call instruction has empty opStr', () => {
     const instructions: Instruction[] = [
-      { address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'call', opStr: '', operands: [], size: 1 }
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'call',
+        opStr: '',
+        operands: [],
+        size: 1,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -496,11 +636,16 @@ describe('VulnScanner Core Tests', () => {
         bytes: new Uint8Array([0x90]),
         mnemonic: 'sub',
         opStr: 'rbp, 0x1000',
-        operands: [{ type: 'reg', reg: 'rbp' }, { type: 'imm', imm: 4096 }],
-        size: 1
-      }
+        operands: [
+          { type: 'reg', reg: 'rbp' },
+          { type: 'imm', imm: 4096 },
+        ],
+        size: 1,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { bufferOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      bufferOverflow: true,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -509,24 +654,28 @@ describe('VulnScanner Core Tests', () => {
     const instructions: Instruction[] = [
       { address: 0x1000, mnemonic: 'call', opStr: 'strcpy', size: 5 },
       { address: 0x1005, mnemonic: 'call', opStr: 'malloc', size: 5 },
-      { address: 0x100a, mnemonic: 'call', opStr: 'strcat', size: 5 }
+      { address: 0x100a, mnemonic: 'call', opStr: 'strcat', size: 5 },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(2);
-    expect(matches.map(m => m.evidence)).toContain('strcpy');
-    expect(matches.map(m => m.evidence)).toContain('strcat');
+    expect(matches.map((m) => m.evidence)).toContain('strcpy');
+    expect(matches.map((m) => m.evidence)).toContain('strcat');
   });
 
   // Extra Test 36: Scan with all configuration options disabled
   test('returns no matches when all scanner settings are disabled', () => {
-    const symbols: Symbol[] = [{ name: 'strcpy', address: 0x1000, binding: 'global', type: 'function' }];
+    const symbols: Symbol[] = [
+      { name: 'strcpy', address: 0x1000, binding: 'global', type: 'function' },
+    ];
     const matches = scanner.scan(new Uint8Array(100), [], symbols, [], {
       unsafeApi: false,
       bufferOverflow: false,
       integerOverflow: false,
       cryptoWeakness: false,
       obfuscation: false,
-      shellcode: false
+      shellcode: false,
     });
     expect(matches.length).toBe(0);
   });
@@ -538,11 +687,16 @@ describe('VulnScanner Core Tests', () => {
         address: 0x1000,
         mnemonic: 'add',
         opStr: 'rsp, 0x1000',
-        operands: [{ type: 'reg', reg: 'rsp' }, { type: 'imm', imm: 4096 }],
-        size: 7
-      }
+        operands: [
+          { type: 'reg', reg: 'rsp' },
+          { type: 'imm', imm: 4096 },
+        ],
+        size: 7,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { bufferOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      bufferOverflow: true,
+    });
     expect(matches.length).toBe(0);
   });
 
@@ -553,11 +707,16 @@ describe('VulnScanner Core Tests', () => {
         address: 0x1000,
         mnemonic: 'add',
         opStr: 'eax, 0x7fffffff',
-        operands: [{ type: 'reg', reg: 'eax' }, { type: 'imm', imm: 2147483647 }],
-        size: 5
-      }
+        operands: [
+          { type: 'reg', reg: 'eax' },
+          { type: 'imm', imm: 2147483647 },
+        ],
+        size: 5,
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { integerOverflow: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      integerOverflow: true,
+    });
     expect(matches.length).toBeGreaterThan(0);
   });
 
@@ -578,19 +737,28 @@ describe('VulnScanner Core Tests', () => {
   // Extra Test 41: Format string vulnerability scan with valid formatting strings
   test('does not flag printf calls with literal/static formatting strings', () => {
     const instructions: Instruction[] = [
-      { address: 0x1000, mnemonic: 'call', opStr: 'printf', size: 5 }
+      { address: 0x1000, mnemonic: 'call', opStr: 'printf', size: 5 },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      unsafeApi: true,
+    });
     // Assuming simple scanner does not alert on plain printf if it is not in the unsafe list
-    expect(matches.filter(m => m.evidence === 'printf').length).toBe(0);
+    expect(matches.filter((m) => m.evidence === 'printf').length).toBe(0);
   });
 
   // Extra Test 42: cleanSymbolName handling symbols with trailing compiler decoration
   test('cleans decorated C++ compiler symbols correctly', () => {
     const symbols: Symbol[] = [
-      { name: '_strcpy@8', address: 0x1000, binding: 'global', type: 'function' }
+      {
+        name: '_strcpy@8',
+        address: 0x1000,
+        binding: 'global',
+        type: 'function',
+      },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].evidence).toBe('_strcpy@8');
   });
@@ -605,9 +773,11 @@ describe('VulnScanner Core Tests', () => {
   // Extra Test 44: Command injection detection on system call
   test('detects potential command injection on system calls', () => {
     const symbols: Symbol[] = [
-      { name: 'system', address: 0x2000, binding: 'global', type: 'function' }
+      { name: 'system', address: 0x2000, binding: 'global', type: 'function' },
     ];
-    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], { unsafeApi: true });
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
     expect(matches.length).toBe(1);
     expect(matches[0].evidence).toBe('system');
   });

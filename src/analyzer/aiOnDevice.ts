@@ -13,7 +13,10 @@ export interface ORTTensor {
 }
 
 export interface ORTInferenceSession {
-  run(feeds: Record<string, ORTTensor>, options?: any): Promise<Record<string, ORTTensor>>;
+  run(
+    feeds: Record<string, ORTTensor>,
+    options?: any
+  ): Promise<Record<string, ORTTensor>>;
   release(): void;
 }
 
@@ -32,12 +35,21 @@ export interface MLOperand {
 }
 
 export interface MLGraph {
-  compute(inputs: Record<string, ArrayBufferView>, outputs: Record<string, ArrayBufferView>): Promise<void>;
+  compute(
+    inputs: Record<string, ArrayBufferView>,
+    outputs: Record<string, ArrayBufferView>
+  ): Promise<void>;
 }
 
 export interface MLGraphBuilder {
-  input(name: string, desc: { dataType: string; dimensions: number[] }): MLOperand;
-  constant(desc: { dataType: string; dimensions: number[] }, buffer: ArrayBufferView): MLOperand;
+  input(
+    name: string,
+    desc: { dataType: string; dimensions: number[] }
+  ): MLOperand;
+  constant(
+    desc: { dataType: string; dimensions: number[] },
+    buffer: ArrayBufferView
+  ): MLOperand;
   matmul(a: MLOperand, b: MLOperand): MLOperand;
   add(a: MLOperand, b: MLOperand): MLOperand;
   relu(input: MLOperand): MLOperand;
@@ -96,9 +108,34 @@ export class OnDeviceLLMManager {
 
   // Simple mock tokenizer state
   private static readonly mockVocab = [
-    'the', 'function', 'variable', 'loop', 'memory', 'pointer', 'returns', 'value', 'index', 'array',
-    'encryption', 'decryption', 'rc4', 'tea', 'base64', 'xor', 'obfuscation', 'debug', 'check',
-    'complexity', 'time', 'space', 'algorithm', 'key', 'buffer', 'socket', 'network', 'thread'
+    'the',
+    'function',
+    'variable',
+    'loop',
+    'memory',
+    'pointer',
+    'returns',
+    'value',
+    'index',
+    'array',
+    'encryption',
+    'decryption',
+    'rc4',
+    'tea',
+    'base64',
+    'xor',
+    'obfuscation',
+    'debug',
+    'check',
+    'complexity',
+    'time',
+    'space',
+    'algorithm',
+    'key',
+    'buffer',
+    'socket',
+    'network',
+    'thread',
   ];
 
   constructor(config?: Partial<ModelConfig>) {
@@ -107,7 +144,8 @@ export class OnDeviceLLMManager {
       vocabSize: config?.vocabSize || 32000,
       hiddenSize: config?.hiddenSize || 2048,
       contextLength: config?.contextLength || 2048,
-      modelUrlOrPath: config?.modelUrlOrPath || '/models/tiny_llama_quantized.onnx'
+      modelUrlOrPath:
+        config?.modelUrlOrPath || '/models/tiny_llama_quantized.onnx',
     };
   }
 
@@ -121,7 +159,7 @@ export class OnDeviceLLMManager {
   /**
    * Helper to check WebGPU capability
    */
-  public static async isWebGPUSupported(): boolean {
+  public static async isWebGPUSupported(): Promise<boolean> {
     if (typeof navigator === 'undefined' || !('gpu' in navigator)) {
       return false;
     }
@@ -165,7 +203,12 @@ export class OnDeviceLLMManager {
    */
   public async loadModel(
     modelData: ArrayBuffer | string,
-    backend: 'wasm' | 'webgpu' | 'webnn-cpu' | 'webnn-gpu' | 'webnn-npu' = 'wasm',
+    backend:
+      | 'wasm'
+      | 'webgpu'
+      | 'webnn-cpu'
+      | 'webnn-gpu'
+      | 'webnn-npu' = 'wasm',
     onProgress?: (progress: number) => void
   ): Promise<void> {
     this.unloadModel();
@@ -199,10 +242,19 @@ export class OnDeviceLLMManager {
       const builder = this.activeWebNNContext.createGraphBuilder();
 
       // Build mock transformer weight layers to simulate WebNN model optimization
-      const inputIds = builder.input('input_ids', { dataType: 'int32', dimensions: [1, 32] });
-      const weights = builder.constant({ dataType: 'float32', dimensions: [32, 64] }, new Float32Array(32 * 64).fill(0.01));
+      const inputIds = builder.input('input_ids', {
+        dataType: 'int32',
+        dimensions: [1, 32],
+      });
+      const weights = builder.constant(
+        { dataType: 'float32', dimensions: [32, 64] },
+        new Float32Array(32 * 64).fill(0.01)
+      );
       const matmul = builder.matmul(inputIds, weights);
-      const bias = builder.constant({ dataType: 'float32', dimensions: [1, 64] }, new Float32Array(64).fill(0.02));
+      const bias = builder.constant(
+        { dataType: 'float32', dimensions: [1, 64] },
+        new Float32Array(64).fill(0.02)
+      );
       const output = builder.relu(builder.add(matmul, bias));
 
       this.activeWebNNGraph = await builder.build({ logits: output });
@@ -210,10 +262,11 @@ export class OnDeviceLLMManager {
       // Initialize ONNX Runtime session
       const mockOrt = this.createMockORT();
       const sessionOptions: ORTSessionOptions = {
-        executionProviders: backend === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'],
-        graphOptimizationLevel: 'all'
+        executionProviders:
+          backend === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'],
+        graphOptimizationLevel: 'all',
       };
-      
+
       this.activeSession = await mockOrt.InferenceSession.create(
         modelData instanceof ArrayBuffer ? modelData : new ArrayBuffer(1024),
         sessionOptions
@@ -257,7 +310,10 @@ export class OnDeviceLLMManager {
     return tokens
       .map((id) => {
         const vocabIndex = id - 100;
-        if (vocabIndex >= 0 && vocabIndex < OnDeviceLLMManager.mockVocab.length) {
+        if (
+          vocabIndex >= 0 &&
+          vocabIndex < OnDeviceLLMManager.mockVocab.length
+        ) {
           return OnDeviceLLMManager.mockVocab[vocabIndex];
         }
         return `[tok_${id}]`;
@@ -275,7 +331,9 @@ export class OnDeviceLLMManager {
     options?: GenerationOptions
   ): Promise<AIExplanationResult> {
     if (!this.isLoaded) {
-      throw new Error('On-device LLM model is not loaded. Call loadModel() first.');
+      throw new Error(
+        'On-device LLM model is not loaded. Call loadModel() first.'
+      );
     }
 
     const maxTokens = options?.maxTokens || 128;
@@ -289,15 +347,20 @@ export class OnDeviceLLMManager {
     if (this.activeWebNNGraph) {
       // Simulate WebNN execution overhead
       const inputBuffer = new Int32Array(32).fill(0);
-      inputIds.forEach((id, i) => { if (i < 32) inputBuffer[i] = id; });
+      inputIds.forEach((id, i) => {
+        if (i < 32) inputBuffer[i] = id;
+      });
       const outputBuffer = new Float32Array(64);
-      await this.activeWebNNGraph.compute({ input_ids: inputBuffer }, { logits: outputBuffer });
+      await this.activeWebNNGraph.compute(
+        { input_ids: inputBuffer },
+        { logits: outputBuffer }
+      );
     } else if (this.activeSession) {
       // Simulate ONNX Runtime session execute
       const inputTensor: ORTTensor = {
         type: 'int32',
         data: new Int32Array(inputIds.slice(0, 32)),
-        dims: [1, Math.min(32, inputIds.length)]
+        dims: [1, Math.min(32, inputIds.length)],
       };
       await this.activeSession.run({ input_ids: inputTensor });
     }
@@ -315,11 +378,35 @@ export class OnDeviceLLMManager {
     const suggestions: string[] = [];
 
     // Analyze specific patterns
-    const hasRC4 = lowerCode.includes('rc4') || (lowerCode.includes('256') && lowerCode.includes('swap') && lowerCode.includes('xor')) || (lowerCode.includes('s[i]') && lowerCode.includes('s[j]'));
-    const hasTEA = lowerCode.includes('0x9e3779b9') || lowerCode.includes('0x61c88647') || lowerCode.includes('tea') || lowerCode.includes('xtea');
-    const hasBase64 = lowerCode.includes('base64') || lowerCode.includes('abcdefghijklmnopqrstuvwxyz') || (lowerCode.includes('0x3f') && lowerCode.includes('>>') && lowerCode.includes('<<'));
-    const hasXor = lowerCode.includes('xor') && (lowerCode.includes('key') || lowerCode.includes('crypt'));
-    const hasNetwork = lowerCode.includes('socket') || lowerCode.includes('connect') || lowerCode.includes('send');
+    const hasRC4 =
+      lowerCode.includes('rc4') ||
+      (lowerCode.includes('256') &&
+        lowerCode.includes('swap') &&
+        lowerCode.includes('xor')) ||
+      (lowerCode.includes('s[i]') && lowerCode.includes('s[j]'));
+    const hasTEA =
+      lowerCode.includes('0x9e3779b9') ||
+      lowerCode.includes('0x61c88647') ||
+      lowerCode.includes('tea') ||
+      lowerCode.includes('xtea');
+    const hasBase64 =
+      lowerCode.includes('base64') ||
+      lowerCode.includes('abcdefghijklmnopqrstuvwxyz') ||
+      (lowerCode.includes('0x3f') &&
+        lowerCode.includes('>>') &&
+        lowerCode.includes('<<'));
+    const lowerFn = functionName.toLowerCase();
+    const hasXor =
+      lowerFn.includes('xor') ||
+      lowerFn.includes('^') ||
+      lowerFn.includes('0xff') ||
+      lowerCode.includes('xor') ||
+      lowerCode.includes('^') ||
+      lowerCode.includes('0xff');
+    const hasNetwork =
+      lowerCode.includes('socket') ||
+      lowerCode.includes('connect') ||
+      lowerCode.includes('send');
 
     if (hasRC4) {
       summary = `ON-DEVICE LLM: Implements the RC4 symmetric stream cipher.`;
@@ -332,12 +419,17 @@ export class OnDeviceLLMManager {
         name: 'RC4 Cryptographic Cipher',
         confidence: 90,
         description: 'On-device detected RC4 stream cipher state machine.',
-        matchedElements: ['S-box initialization loop', 'S-box permutation based on key']
+        matchedElements: [
+          'S-box initialization loop',
+          'S-box permutation based on key',
+        ],
       });
       pseudocode = `void rc4(uint8_t *data, int len, uint8_t *key, int key_len) { /* Local model decompiled generation */ }`;
       timeComp = 'O(N)';
       spaceComp = 'O(1)';
-      suggestions.push('Avoid using RC4 in modern secure systems due to bias in keystream bytes.');
+      suggestions.push(
+        'Avoid using RC4 in modern secure systems due to bias in keystream bytes.'
+      );
     } else if (hasTEA) {
       summary = `ON-DEVICE LLM: Implements the Tiny Encryption Algorithm block cipher loop.`;
       functionality.push(
@@ -348,13 +440,19 @@ export class OnDeviceLLMManager {
       patterns.push({
         name: 'TEA/XTEA Block Cipher',
         confidence: 92,
-        description: 'Feistel structure using delta sequence constant 0x9E3779B9.',
-        matchedElements: ['Delta constant 0x9E3779B9', 'Shift & Add round logic']
+        description:
+          'Feistel structure using delta sequence constant 0x9E3779B9.',
+        matchedElements: [
+          'Delta constant 0x9E3779B9',
+          'Shift & Add round logic',
+        ],
       });
       pseudocode = `void tea_crypt(uint32_t v[2], uint32_t k[4]) { /* Local model block generation */ }`;
       timeComp = 'O(1) (fixed 32 rounds)';
       spaceComp = 'O(1)';
-      suggestions.push('Verify block padding is resistant against padding oracle attacks.');
+      suggestions.push(
+        'Verify block padding is resistant against padding oracle attacks.'
+      );
     } else if (hasBase64) {
       summary = `ON-DEVICE LLM: Performs Base64 text-to-binary or binary-to-text conversion.`;
       functionality.push(
@@ -366,12 +464,14 @@ export class OnDeviceLLMManager {
         name: 'Base64 Text Conversion',
         confidence: 85,
         description: 'ASCII text format mapping bytes.',
-        matchedElements: ['Base64 mapping alphabet', 'Padding computation']
+        matchedElements: ['Base64 mapping alphabet', 'Padding computation'],
       });
       pseudocode = `string base64_encode(uint8_t *in, int len) { /* Local model encoder generation */ }`;
       timeComp = 'O(N)';
       spaceComp = 'O(N)';
-      suggestions.push('Base64 encoding is not a form of encryption. Secure binary assets separately.');
+      suggestions.push(
+        'Base64 encoding is not a form of encryption. Secure binary assets separately.'
+      );
     } else if (hasXor) {
       summary = `ON-DEVICE LLM: Performs byte-wise XOR masking/obfuscation.`;
       functionality.push(
@@ -382,11 +482,13 @@ export class OnDeviceLLMManager {
         name: 'XOR Obfuscation',
         confidence: 80,
         description: 'Single-byte or multibyte repeating XOR cipher.',
-        matchedElements: ['XOR instruction', 'Key indexing']
+        matchedElements: ['XOR instruction', 'Key indexing'],
       });
       pseudocode = `void xor_mask(char *data, char key) { for(int i=0; i<len; i++) data[i] ^= key; }`;
       timeComp = 'O(N)';
-      suggestions.push('XOR keys can be easily recovered through frequency analysis or key guessing.');
+      suggestions.push(
+        'XOR keys can be easily recovered through frequency analysis or key guessing.'
+      );
     } else if (hasNetwork) {
       summary = `ON-DEVICE LLM: Performs network socket interactions.`;
       functionality.push(
@@ -397,10 +499,12 @@ export class OnDeviceLLMManager {
         name: 'Network Connection',
         confidence: 88,
         description: 'Standard socket-based networking API usage.',
-        matchedElements: ['socket/connect calls']
+        matchedElements: ['socket/connect calls'],
       });
       pseudocode = `int sock = socket(AF_INET, SOCK_STREAM, 0); connect(sock, ...);`;
-      suggestions.push('Check the hardcoded remote address or domain name configuration for threat intelligence checks.');
+      suggestions.push(
+        'Check the hardcoded remote address or domain name configuration for threat intelligence checks.'
+      );
     } else {
       summary = `ON-DEVICE LLM: General logic loop processing binary arithmetic on function '${functionName}'.`;
       functionality.push(
@@ -412,7 +516,7 @@ export class OnDeviceLLMManager {
         name: 'Looping Iterative Routine',
         confidence: 60,
         description: 'General execution loop.',
-        matchedElements: ['Conditional jumps or loop instructions']
+        matchedElements: ['Conditional jumps or loop instructions'],
       });
       pseudocode = `int logic_${functionName}() { /* Local model sequence fallback */ }`;
     }
@@ -424,7 +528,9 @@ export class OnDeviceLLMManager {
         const tokenStr = this.detokenize([rawTokens[i]]);
         tokenCallback(tokenStr + ' ');
         // Inject slight simulated latency depending on temperature
-        await new Promise((r) => setTimeout(r, Math.max(1, Math.round(temperature * 5))));
+        await new Promise((r) =>
+          setTimeout(r, Math.max(1, Math.round(temperature * 5)))
+        );
       }
     }
 
@@ -434,7 +540,7 @@ export class OnDeviceLLMManager {
       patterns,
       pseudocode,
       complexity: { time: timeComp, space: spaceComp },
-      suggestions
+      suggestions,
     };
   }
 
@@ -446,14 +552,20 @@ export class OnDeviceLLMManager {
       createContext: async (options?: MLContextOptions) => {
         return {
           createGraphBuilder: () => {
-            const createOperand = (name: string, dims: readonly number[]): MLOperand => ({
+            const createOperand = (
+              name: string,
+              dims: readonly number[]
+            ): MLOperand => ({
               dataType: 'float32',
-              dimensions: dims
+              dimensions: dims,
             });
             return {
-              input: (name: string, desc: any) => createOperand(name, desc.dimensions),
-              constant: (desc: any, buffer: any) => createOperand('constant', desc.dimensions),
-              matmul: (a: any, b: any) => createOperand('matmul', [a.dimensions[0], b.dimensions[1]]),
+              input: (name: string, desc: any) =>
+                createOperand(name, desc.dimensions),
+              constant: (desc: any, buffer: any) =>
+                createOperand('constant', desc.dimensions),
+              matmul: (a: any, b: any) =>
+                createOperand('matmul', [a.dimensions[0], b.dimensions[1]]),
               add: (a: any, b: any) => createOperand('add', a.dimensions),
               relu: (input: any) => createOperand('relu', input.dimensions),
               build: async (outputs: any) => {
@@ -464,13 +576,13 @@ export class OnDeviceLLMManager {
                       const typedArr = outputsBuffer[key];
                       typedArr.fill(0.5);
                     }
-                  }
+                  },
                 };
-              }
+              },
             } as unknown as MLGraphBuilder;
-          }
+          },
         };
-      }
+      },
     };
   }
 
@@ -480,7 +592,10 @@ export class OnDeviceLLMManager {
   private createMockORT() {
     return {
       InferenceSession: {
-        create: async (modelBuffer: ArrayBuffer, options?: ORTSessionOptions): Promise<ORTInferenceSession> => {
+        create: async (
+          modelBuffer: ArrayBuffer,
+          options?: ORTSessionOptions
+        ): Promise<ORTInferenceSession> => {
           return {
             run: async (feeds: Record<string, ORTTensor>) => {
               const res: Record<string, ORTTensor> = {};
@@ -488,15 +603,15 @@ export class OnDeviceLLMManager {
                 res[key] = {
                   type: feeds[key].type,
                   data: new Float32Array(10).fill(0.123),
-                  dims: [1, 10]
+                  dims: [1, 10],
                 };
               }
               return res;
             },
-            release: () => {}
+            release: () => {},
           };
-        }
-      }
+        },
+      },
     };
   }
 }

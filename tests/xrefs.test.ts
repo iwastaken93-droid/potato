@@ -5,7 +5,7 @@ import { Instruction, Section } from '../src/disassembler/types.js';
 describe('Cross-References (XRefs) Engine Tests', () => {
   it('should allow manually adding and querying XRefs', () => {
     const engine = new XRefEngine();
-    
+
     const ref1: XRef = {
       from: 0x1000,
       to: 0x2000,
@@ -32,8 +32,8 @@ describe('Cross-References (XRefs) Engine Tests', () => {
     // Query pointing TO an address
     const to2000 = engine.getXRefsTo(0x2000);
     expect(to2000).toHaveLength(2);
-    expect(to2000.map(r => r.from)).toContain(0x1000);
-    expect(to2000.map(r => r.from)).toContain(0x1005);
+    expect(to2000.map((r) => r.from)).toContain(0x1000);
+    expect(to2000.map((r) => r.from)).toContain(0x1005);
 
     // Query originating FROM an address
     const from1010 = engine.getXRefsFrom(0x1010);
@@ -48,9 +48,24 @@ describe('Cross-References (XRefs) Engine Tests', () => {
   it('should filter callers and callees correctly', () => {
     const engine = new XRefEngine();
 
-    engine.addXRef({ from: 0x1000, to: 0x2000, type: 'CALL', context: 'call 0x2000' });
-    engine.addXRef({ from: 0x1005, to: 0x2000, type: 'JUMP', context: 'jmp 0x2000' }); // JUMP should be filtered out
-    engine.addXRef({ from: 0x2000, to: 0x3000, type: 'CALL', context: 'call 0x3000' });
+    engine.addXRef({
+      from: 0x1000,
+      to: 0x2000,
+      type: 'CALL',
+      context: 'call 0x2000',
+    });
+    engine.addXRef({
+      from: 0x1005,
+      to: 0x2000,
+      type: 'JUMP',
+      context: 'jmp 0x2000',
+    }); // JUMP should be filtered out
+    engine.addXRef({
+      from: 0x2000,
+      to: 0x3000,
+      type: 'CALL',
+      context: 'call 0x3000',
+    });
 
     const callers = engine.getCallersOf(0x2000);
     expect(callers).toHaveLength(1);
@@ -93,7 +108,7 @@ describe('Cross-References (XRefs) Engine Tests', () => {
 
   it('should analyze control flow instructions (CALL and JUMP) correctly', () => {
     const engine = new XRefEngine();
-    
+
     const instructions: Instruction[] = [
       {
         address: 0x1000,
@@ -130,7 +145,7 @@ describe('Cross-References (XRefs) Engine Tests', () => {
 
     const to100c = engine.getXRefsTo(0x100c);
     expect(to100c).toHaveLength(2);
-    expect(to100c.every(r => r.type === 'JUMP')).toBe(true);
+    expect(to100c.every((r) => r.type === 'JUMP')).toBe(true);
   });
 
   it('should analyze memory operands and RIP-relative data references', () => {
@@ -212,7 +227,7 @@ describe('Cross-References (XRefs) Engine Tests', () => {
 
   it('should scan data/buffer for 32-bit and 64-bit pointer references', () => {
     const engine = new XRefEngine();
-    
+
     // Set up a mock text/data structure
     const sections: Section[] = [
       {

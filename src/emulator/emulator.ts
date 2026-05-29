@@ -131,7 +131,9 @@ export class Emulator {
         this.cpu.write('rip', savedRip + BigInt(inst.size || 1));
       }
 
-      const halted = this.syscallHandler ? this.syscallHandler.context.exitCode !== null : false;
+      const halted = this.syscallHandler
+        ? this.syscallHandler.context.exitCode !== null
+        : false;
       return { success: true, halted, hitBreakpoint: false };
     } catch (err: any) {
       return {
@@ -486,9 +488,7 @@ export class Emulator {
     ) {
       return 8;
     }
-    if (
-      ['ax', 'bx', 'cx', 'dx', 'si', 'di', 'bp', 'sp', 'ip'].includes(name)
-    ) {
+    if (['ax', 'bx', 'cx', 'dx', 'si', 'di', 'bp', 'sp', 'ip'].includes(name)) {
       return 16;
     }
     return 64;
@@ -627,7 +627,8 @@ export class Emulator {
         } else {
           const num = this.tryParseBigInt(token);
           if (num !== null) {
-            const currentDisp = memOp.disp !== undefined ? BigInt(memOp.disp) : 0n;
+            const currentDisp =
+              memOp.disp !== undefined ? BigInt(memOp.disp) : 0n;
             memOp.disp = currentDisp + num;
           } else {
             if (!memOp.base) {

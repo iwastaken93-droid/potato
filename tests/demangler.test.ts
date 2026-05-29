@@ -54,7 +54,9 @@ describe('Symbol Demangler Unit Tests', () => {
       const result = demangle('_ZN3std6vectorIiSaIiEE9push_backERKi');
       expect(result.isMangled).toBe(true);
       expect(result.name).toBe('push_back');
-      expect(result.demangled).toBe('std::vector<int, std::allocator<int>>::push_back(const int&)');
+      expect(result.demangled).toBe(
+        'std::vector<int, std::allocator<int>>::push_back(const int&)'
+      );
     });
   });
 

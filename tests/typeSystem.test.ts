@@ -28,21 +28,23 @@ describe('TypeSystemPanel Unit Tests', () => {
   it('should support architecture updates and resize pointers', () => {
     // Default pointer size should be 8
     const defaultStructs = panel.getStructs();
-    const nodeStructBefore = defaultStructs.find(s => s.name === 'Node');
+    const nodeStructBefore = defaultStructs.find((s) => s.name === 'Node');
     expect(nodeStructBefore).toBeDefined();
     // value (4) + padding (4) + next (8 ptr) = 16
     expect(nodeStructBefore!.size).toBe(16);
 
     // Update to 32-bit architecture
     panel.updateArchitecture('x86');
-    const nodeStructAfter = panel.getStructs().find(s => s.name === 'Node');
+    const nodeStructAfter = panel.getStructs().find((s) => s.name === 'Node');
     expect(nodeStructAfter).toBeDefined();
     // value (4) + padding (4) + next (4 ptr) = 12
     expect(nodeStructAfter!.size).toBe(12);
   });
 
   it('should search/filter structures correctly', () => {
-    const searchInput = container.querySelector('#type-search') as HTMLInputElement;
+    const searchInput = container.querySelector(
+      '#type-search'
+    ) as HTMLInputElement;
     expect(searchInput).not.toBeNull();
 
     // Set search query and trigger input event
@@ -73,24 +75,24 @@ describe('TypeSystemPanel Unit Tests', () => {
     const parsed = panel.parseCStructs(source);
     expect(parsed.length).toBe(2);
 
-    const vec3 = parsed.find(s => s.name === 'Vector3D');
+    const vec3 = parsed.find((s) => s.name === 'Vector3D');
     expect(vec3).toBeDefined();
     expect(vec3!.fields.length).toBe(3);
     expect(vec3!.size).toBe(12); // 3 * float (4 bytes) = 12
 
-    const player = parsed.find(s => s.name === 'Player');
+    const player = parsed.find((s) => s.name === 'Player');
     expect(player).toBeDefined();
     expect(player!.fields.length).toBe(4);
-    
-    const idField = player!.fields.find(f => f.name === 'id');
+
+    const idField = player!.fields.find((f) => f.name === 'id');
     expect(idField!.type).toBe('int');
     expect(idField!.size).toBe(4);
 
-    const nameField = player!.fields.find(f => f.name === 'name');
+    const nameField = player!.fields.find((f) => f.name === 'name');
     expect(nameField!.type).toBe('char[16]');
     expect(nameField!.size).toBe(16);
 
-    const posField = player!.fields.find(f => f.name === 'pos');
+    const posField = player!.fields.find((f) => f.name === 'pos');
     expect(posField!.type).toBe('Vector3D');
     // In our parser Vector3D is in the parsed structs, so it resolves to 12
     expect(posField!.size).toBe(12);

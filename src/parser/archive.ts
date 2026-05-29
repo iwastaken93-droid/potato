@@ -22,7 +22,8 @@ export class ArchiveUnpacker {
   private buffer: Uint8Array;
 
   constructor(buffer: ArrayBuffer | Uint8Array) {
-    this.buffer = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    this.buffer =
+      buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   }
 
   /**
@@ -40,7 +41,9 @@ export class ArchiveUnpacker {
         return i;
       }
     }
-    throw new Error('Invalid ZIP archive: End of Central Directory (EOCD) signature not found.');
+    throw new Error(
+      'Invalid ZIP archive: End of Central Directory (EOCD) signature not found.'
+    );
   }
 
   /**
@@ -53,7 +56,11 @@ export class ArchiveUnpacker {
 
     try {
       const eocdOffset = this.findEOCD();
-      const view = new DataView(this.buffer.buffer, this.buffer.byteOffset, this.buffer.byteLength);
+      const view = new DataView(
+        this.buffer.buffer,
+        this.buffer.byteOffset,
+        this.buffer.byteLength
+      );
 
       const cdEntriesCount = view.getUint16(eocdOffset + 10, true);
       const cdSize = view.getUint32(eocdOffset + 12, true);
@@ -105,7 +112,8 @@ export class ArchiveUnpacker {
           isDirectory,
         });
 
-        currentOffset += 46 + fileNameLength + extraFieldLength + fileCommentLength;
+        currentOffset +=
+          46 + fileNameLength + extraFieldLength + fileCommentLength;
       }
 
       return entries;
@@ -123,7 +131,11 @@ export class ArchiveUnpacker {
       return new Uint8Array(0);
     }
 
-    const view = new DataView(this.buffer.buffer, this.buffer.byteOffset, this.buffer.byteLength);
+    const view = new DataView(
+      this.buffer.buffer,
+      this.buffer.byteOffset,
+      this.buffer.byteLength
+    );
     const localHeaderOffset = entry.localHeaderOffset;
 
     if (localHeaderOffset + 30 > this.buffer.length) {
@@ -142,13 +154,17 @@ export class ArchiveUnpacker {
 
     const localFileNameLength = view.getUint16(localHeaderOffset + 26, true);
     const localExtraFieldLength = view.getUint16(localHeaderOffset + 28, true);
-    const dataOffset = localHeaderOffset + 30 + localFileNameLength + localExtraFieldLength;
+    const dataOffset =
+      localHeaderOffset + 30 + localFileNameLength + localExtraFieldLength;
 
     if (dataOffset + entry.compressedSize > this.buffer.length) {
       throw new Error(`Truncated file data for: ${entry.path}`);
     }
 
-    const compressedData = this.buffer.subarray(dataOffset, dataOffset + entry.compressedSize);
+    const compressedData = this.buffer.subarray(
+      dataOffset,
+      dataOffset + entry.compressedSize
+    );
 
     if (entry.compressionMethod === 0) {
       return new Uint8Array(compressedData);
@@ -156,22 +172,30 @@ export class ArchiveUnpacker {
       try {
         return new Uint8Array(inflateRawSync(compressedData));
       } catch (err: any) {
-        throw new Error(`Decompression failed for ${entry.path}: ${err.message}`);
+        throw new Error(
+          `Decompression failed for ${entry.path}: ${err.message}`
+        );
       }
     } else {
-      throw new Error(`Unsupported compression method ${entry.compressionMethod} for: ${entry.path}`);
+      throw new Error(
+        `Unsupported compression method ${entry.compressionMethod} for: ${entry.path}`
+      );
     }
   }
 
   /**
    * Identifies the executable component type based on file magic bytes and path extension.
    */
-  private detectExecutableType(data: Uint8Array, path: string): ArchiveEntry['executableType'] {
+  private detectExecutableType(
+    data: Uint8Array,
+    path: string
+  ): ArchiveEntry['executableType'] {
     if (data.length < 4) {
       return 'Unknown';
     }
 
-    const magic = (((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]) >>> 0);
+    const magic =
+      ((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]) >>> 0;
 
     // ELF magic: 0x7F 'E' 'L' 'F' (0x7F454C46)
     if (magic === 0x7f454c46) {
@@ -186,7 +210,12 @@ export class ArchiveUnpacker {
     // Java Class magic: 0xCAFEBABE
     // Mach-O Fat magic: 0xCAFEBABE (or reverse 0xBEBAFECA)
     // Mach-O Thin magic: 0xFEEDFACE or 0xFEEDFACF (reverse 0xCEFAEDFE or 0xCFFAEDFE)
-    if (magic === 0xfeedface || magic === 0xfeedfacf || magic === 0xcefaedfe || magic === 0xcffaedfe) {
+    if (
+      magic === 0xfeedface ||
+      magic === 0xfeedfacf ||
+      magic === 0xcefaedfe ||
+      magic === 0xcffaedfe
+    ) {
       return 'Mach-O';
     }
 
@@ -208,7 +237,12 @@ export class ArchiveUnpacker {
    */
   private isArchiveExtension(path: string): boolean {
     const lower = path.toLowerCase();
-    return lower.endsWith('.zip') || lower.endsWith('.apk') || lower.endsWith('.jar') || lower.endsWith('.ipa');
+    return (
+      lower.endsWith('.zip') ||
+      lower.endsWith('.apk') ||
+      lower.endsWith('.jar') ||
+      lower.endsWith('.ipa')
+    );
   }
 
   /**
@@ -238,7 +272,9 @@ export class ArchiveUnpacker {
         // Skip or append with unknown if extraction fails
       }
 
-      const executableType = data ? this.detectExecutableType(data, entry.path) : 'Unknown';
+      const executableType = data
+        ? this.detectExecutableType(data, entry.path)
+        : 'Unknown';
 
       results.push({
         path: entry.path,
@@ -290,7 +326,10 @@ export class ArchiveUnpacker {
     // Try nested match: e.g. targetPath = "lib.jar/com/test/Foo.class"
     // We look for a local entry that is a prefix archive.
     for (const entry of localEntries) {
-      if (this.isArchiveExtension(entry.path) && normalizedTarget.startsWith(entry.path + '/')) {
+      if (
+        this.isArchiveExtension(entry.path) &&
+        normalizedTarget.startsWith(entry.path + '/')
+      ) {
         const remainingPath = normalizedTarget.substring(entry.path.length + 1);
         const subArchiveData = this.extractLocalEntry(entry);
         const subUnpacker = new ArchiveUnpacker(subArchiveData);

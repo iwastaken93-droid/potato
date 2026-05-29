@@ -45,7 +45,11 @@ export class FCGVisualizer {
   // Cached positions
   private nodePositions = new Map<string, { x: number; y: number }>();
 
-  constructor(container: HTMLElement, graph: FunctionCallGraph, options: FCGVisualizerOptions = {}) {
+  constructor(
+    container: HTMLElement,
+    graph: FunctionCallGraph,
+    options: FCGVisualizerOptions = {}
+  ) {
     this.container = container;
     this.graph = graph;
     this.options = options;
@@ -210,18 +214,28 @@ export class FCGVisualizer {
     if (this.graph.nodes.length === 0) {
       const placeholder = document.createElement('div');
       placeholder.className = 'fcg-placeholder';
-      placeholder.textContent = 'No functions available to construct Call Graph';
+      placeholder.textContent =
+        'No functions available to construct Call Graph';
       this.container.appendChild(placeholder);
       return;
     }
 
     const theme = this.options.theme || {};
-    if (theme.background) this.container.style.setProperty('--fcg-bg', theme.background);
-    if (theme.nodeBg) this.container.style.setProperty('--fcg-node-bg', theme.nodeBg);
-    if (theme.nodeBorder) this.container.style.setProperty('--fcg-node-border', theme.nodeBorder);
-    if (theme.nodeTextColor) this.container.style.setProperty('--fcg-text-primary', theme.nodeTextColor);
-    if (theme.accentColor) this.container.style.setProperty('--fcg-accent', theme.accentColor);
-    if (theme.selectedColor) this.container.style.setProperty('--fcg-selected', theme.selectedColor);
+    if (theme.background)
+      this.container.style.setProperty('--fcg-bg', theme.background);
+    if (theme.nodeBg)
+      this.container.style.setProperty('--fcg-node-bg', theme.nodeBg);
+    if (theme.nodeBorder)
+      this.container.style.setProperty('--fcg-node-border', theme.nodeBorder);
+    if (theme.nodeTextColor)
+      this.container.style.setProperty(
+        '--fcg-text-primary',
+        theme.nodeTextColor
+      );
+    if (theme.accentColor)
+      this.container.style.setProperty('--fcg-accent', theme.accentColor);
+    if (theme.selectedColor)
+      this.container.style.setProperty('--fcg-selected', theme.selectedColor);
 
     // SVG Element
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -236,17 +250,26 @@ export class FCGVisualizer {
     this.svg.appendChild(defs);
 
     // Main Zoom Group
-    this.zoomGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    this.zoomGroup = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'g'
+    );
     this.svg.appendChild(this.zoomGroup);
 
     // Grid Background Pattern
-    const gridPattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+    const gridPattern = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'pattern'
+    );
     gridPattern.setAttribute('id', 'fcg-grid-pattern');
     gridPattern.setAttribute('width', '40');
     gridPattern.setAttribute('height', '40');
     gridPattern.setAttribute('patternUnits', 'userSpaceOnUse');
 
-    const gridPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const gridPath = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'path'
+    );
     gridPath.setAttribute('d', 'M 40 0 L 0 0 0 40');
     gridPath.setAttribute('fill', 'none');
     gridPath.setAttribute('stroke', 'rgba(255, 255, 255, 0.02)');
@@ -254,17 +277,26 @@ export class FCGVisualizer {
     gridPattern.appendChild(gridPath);
     defs.appendChild(gridPattern);
 
-    const gridRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    const gridRect = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'rect'
+    );
     gridRect.setAttribute('width', '100%');
     gridRect.setAttribute('height', '100%');
     gridRect.setAttribute('fill', 'url(#fcg-grid-pattern)');
     this.svg.insertBefore(gridRect, this.zoomGroup);
 
     // Sub-layers
-    this.edgesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    this.edgesGroup = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'g'
+    );
     this.zoomGroup.appendChild(this.edgesGroup);
 
-    this.nodesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    this.nodesGroup = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'g'
+    );
     this.zoomGroup.appendChild(this.nodesGroup);
 
     // Controls Panel
@@ -295,7 +327,10 @@ export class FCGVisualizer {
   }
 
   private createArrowMarker(id: string, color: string): SVGMarkerElement {
-    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    const marker = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'marker'
+    );
     marker.setAttribute('id', id);
     marker.setAttribute('viewBox', '0 0 10 10');
     marker.setAttribute('refX', '6');
@@ -341,25 +376,34 @@ export class FCGVisualizer {
 
     window.addEventListener('mouseup', this.handleMouseUp);
 
-    this.svg.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const zoomFactor = 1.1;
-      const nextScale = e.deltaY < 0 ? this.zoomScale * zoomFactor : this.zoomScale / zoomFactor;
+    this.svg.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const zoomFactor = 1.1;
+        const nextScale =
+          e.deltaY < 0
+            ? this.zoomScale * zoomFactor
+            : this.zoomScale / zoomFactor;
 
-      // Restrict zoom limits
-      if (nextScale < 0.1 || nextScale > 5.0) return;
+        // Restrict zoom limits
+        if (nextScale < 0.1 || nextScale > 5.0) return;
 
-      const rect = this.svg.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+        const rect = this.svg.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
 
-      // Zoom centered on cursor position
-      this.panX = mouseX - (mouseX - this.panX) * (nextScale / this.zoomScale);
-      this.panY = mouseY - (mouseY - this.panY) * (nextScale / this.zoomScale);
-      this.zoomScale = nextScale;
+        // Zoom centered on cursor position
+        this.panX =
+          mouseX - (mouseX - this.panX) * (nextScale / this.zoomScale);
+        this.panY =
+          mouseY - (mouseY - this.panY) * (nextScale / this.zoomScale);
+        this.zoomScale = nextScale;
 
-      this.updateTransform();
-    }, { passive: false });
+        this.updateTransform();
+      },
+      { passive: false }
+    );
   }
 
   /**
@@ -405,11 +449,11 @@ export class FCGVisualizer {
 
     const nodes = this.graph.nodes;
     const nodeMap = new Map<string, FCGNode>();
-    nodes.forEach(n => nodeMap.set(n.id, n));
+    nodes.forEach((n) => nodeMap.set(n.id, n));
 
     // Calculate level layers using simple relaxation
     const layers = new Map<string, number>();
-    nodes.forEach(n => layers.set(n.id, 0));
+    nodes.forEach((n) => layers.set(n.id, 0));
 
     const maxIterations = Math.min(nodes.length, 50);
     for (let iter = 0; iter < maxIterations; iter++) {
@@ -439,9 +483,11 @@ export class FCGVisualizer {
 
     // Compute coordinates
     let currentY = 50;
-    sortedLayers.forEach(layer => {
+    sortedLayers.forEach((layer) => {
       const nodeIds = layerGroups.get(layer) || [];
-      const totalWidth = nodeIds.length * this.nodeWidth + (nodeIds.length - 1) * this.horizontalGap;
+      const totalWidth =
+        nodeIds.length * this.nodeWidth +
+        (nodeIds.length - 1) * this.horizontalGap;
       const startX = -totalWidth / 2 + 300; // Center graph layout horizontally
 
       nodeIds.forEach((nodeId, index) => {
@@ -479,7 +525,10 @@ export class FCGVisualizer {
       const toPos = this.nodePositions.get(edge.to);
 
       if (fromPos && toPos) {
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const path = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'path'
+        );
         path.setAttribute('id', `fcg-edge-${index}`);
         path.setAttribute('class', 'fcg-edge');
         path.setAttribute('data-from', edge.from);
@@ -501,14 +550,20 @@ export class FCGVisualizer {
     });
 
     // Draw Nodes
-    this.graph.nodes.forEach(node => {
+    this.graph.nodes.forEach((node) => {
       const pos = this.nodePositions.get(node.id);
       if (pos) {
-        const nodeG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const nodeG = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'g'
+        );
         nodeG.setAttribute('id', node.id);
 
         // Rect
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const rect = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'rect'
+        );
         rect.setAttribute('x', pos.x.toString());
         rect.setAttribute('y', pos.y.toString());
         rect.setAttribute('width', this.nodeWidth.toString());
@@ -530,7 +585,10 @@ export class FCGVisualizer {
         nodeG.appendChild(rect);
 
         // Name text
-        const titleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const titleText = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'text'
+        );
         titleText.setAttribute('x', (pos.x + 12).toString());
         titleText.setAttribute('y', (pos.y + 24).toString());
         titleText.setAttribute('class', 'fcg-node-text-title');
@@ -538,7 +596,10 @@ export class FCGVisualizer {
         nodeG.appendChild(titleText);
 
         // Address subtitle text
-        const subtitleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const subtitleText = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'text'
+        );
         subtitleText.setAttribute('x', (pos.x + 12).toString());
         subtitleText.setAttribute('y', (pos.y + 45).toString());
         subtitleText.setAttribute('class', 'fcg-node-text-subtitle');
@@ -566,8 +627,13 @@ export class FCGVisualizer {
       const title = nodeG.querySelector('.fcg-node-text-title');
       const subtitle = nodeG.querySelector('.fcg-node-text-subtitle');
 
-      const isConnected = nodeG.id === nodeId ||
-        this.graph.edges.some(e => (e.from === nodeId && e.to === nodeG.id) || (e.to === nodeId && e.from === nodeG.id));
+      const isConnected =
+        nodeG.id === nodeId ||
+        this.graph.edges.some(
+          (e) =>
+            (e.from === nodeId && e.to === nodeG.id) ||
+            (e.to === nodeId && e.from === nodeG.id)
+        );
 
       if (!isConnected) {
         rect?.classList.add('dimmed');
@@ -615,7 +681,11 @@ export class FCGVisualizer {
     const edgeElements = this.edgesGroup.children;
     for (let i = 0; i < edgeElements.length; i++) {
       const path = edgeElements[i] as SVGPathElement;
-      path.classList.remove('highlighted-callee', 'highlighted-caller', 'dimmed');
+      path.classList.remove(
+        'highlighted-callee',
+        'highlighted-caller',
+        'dimmed'
+      );
       path.setAttribute('marker-end', 'url(#fcg-arrow-default)');
     }
   }
@@ -642,7 +712,7 @@ export class FCGVisualizer {
   }
 
   public selectNodeByAddress(address: number) {
-    const node = this.graph.nodes.find(n => n.address === address);
+    const node = this.graph.nodes.find((n) => n.address === address);
     if (node) {
       this.selectNode(node);
       const pos = this.nodePositions.get(node.id);

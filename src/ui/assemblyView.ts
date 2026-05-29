@@ -552,7 +552,10 @@ export class AssemblyView {
     const containerHeight = this.contentEl.clientHeight || 500;
 
     const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 10);
-    const endIndex = Math.min(len, Math.ceil((scrollTop + containerHeight) / rowHeight) + 10);
+    const endIndex = Math.min(
+      len,
+      Math.ceil((scrollTop + containerHeight) / rowHeight) + 10
+    );
 
     this.listEl.style.transform = `translateY(${startIndex * rowHeight}px)`;
 
@@ -961,7 +964,8 @@ export class AssemblyView {
     const idx = this.instructionIndices.get(address);
     if (idx === undefined) return;
     const rowHeight = 24;
-    const targetScrollTop = idx * rowHeight - this.contentEl.clientHeight / 2 + rowHeight / 2;
+    const targetScrollTop =
+      idx * rowHeight - this.contentEl.clientHeight / 2 + rowHeight / 2;
 
     if (typeof this.contentEl.scrollTo === 'function') {
       this.contentEl.scrollTo({ top: targetScrollTop, behavior: 'smooth' });

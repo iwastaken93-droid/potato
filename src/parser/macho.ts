@@ -201,15 +201,20 @@ export class MachoParser {
     if (magicBE === 0xcafebabe || magicBE === 0xbebafeca) {
       const isFatLittleEndian = magicBE === 0xbebafeca;
       const fatArches = this.parseFatHeader(isFatLittleEndian);
-      
+
       const sliceIndex = options.fatIndex ?? 0;
       if (sliceIndex < 0 || sliceIndex >= fatArches.length) {
-        throw new Error(`Fat architecture index ${sliceIndex} out of range (total ${fatArches.length} architectures)`);
+        throw new Error(
+          `Fat architecture index ${sliceIndex} out of range (total ${fatArches.length} architectures)`
+        );
       }
 
       const arch = fatArches[sliceIndex];
-      const slicedBuffer = this.buffer.slice(arch.offset, arch.offset + arch.size);
-      
+      const slicedBuffer = this.buffer.slice(
+        arch.offset,
+        arch.offset + arch.size
+      );
+
       const subParser = new MachoParser(slicedBuffer);
       const parsed = subParser.parse();
       parsed.fatArches = fatArches;
@@ -261,7 +266,13 @@ export class MachoParser {
 
       if (cmd === 0x1 || cmd === 0x19) {
         // LC_SEGMENT (0x1) or LC_SEGMENT_64 (0x19)
-        const segment = this.parseSegment(offset, cmd, cmdsize, is64Bit, isLittleEndian);
+        const segment = this.parseSegment(
+          offset,
+          cmd,
+          cmdsize,
+          is64Bit,
+          isLittleEndian
+        );
         segments.push(segment);
         sections.push(...segment.sections);
       } else if (cmd === 0x2) {
@@ -271,7 +282,15 @@ export class MachoParser {
         payload.stroff = this.view.getUint32(offset + 16, isLittleEndian);
         payload.strsize = this.view.getUint32(offset + 20, isLittleEndian);
 
-        symbols = this.parseSymbols(payload.symoff, payload.nsyms, payload.stroff, payload.strsize, is64Bit, isLittleEndian, sections);
+        symbols = this.parseSymbols(
+          payload.symoff,
+          payload.nsyms,
+          payload.stroff,
+          payload.strsize,
+          is64Bit,
+          isLittleEndian,
+          sections
+        );
       }
 
       loadCommands.push({
@@ -502,7 +521,7 @@ export class MachoParser {
       const type = this.view.getUint8(offset + 4);
       const sect = this.view.getUint8(offset + 5);
       const desc = this.view.getUint16(offset + 6, isLittleEndian);
-      
+
       let value: bigint | number;
       if (is64Bit) {
         value = this.view.getBigUint64(offset + 8, isLittleEndian);
@@ -515,7 +534,11 @@ export class MachoParser {
       if (strx > 0 && strx < strsize) {
         const nameOffset = stroff + strx;
         if (nameOffset < this.buffer.byteLength) {
-          for (let j = nameOffset; j < stroff + strsize && j < this.buffer.byteLength; j++) {
+          for (
+            let j = nameOffset;
+            j < stroff + strsize && j < this.buffer.byteLength;
+            j++
+          ) {
             if (this.bytes[j] === 0) {
               break;
             }
@@ -534,7 +557,8 @@ export class MachoParser {
       }
 
       // Determine symbolType
-      let symbolType: 'function' | 'object' | 'section' | 'file' | 'none' = 'none';
+      let symbolType: 'function' | 'object' | 'section' | 'file' | 'none' =
+        'none';
       const nType = type & 0x0e;
 
       if (nType === 0xe) {
@@ -580,7 +604,10 @@ export class MachoParser {
   }
 }
 
-export function parseMacho(buffer: ArrayBuffer, options?: MachoParserOptions): ParsedMacho {
+export function parseMacho(
+  buffer: ArrayBuffer,
+  options?: MachoParserOptions
+): ParsedMacho {
   const parser = new MachoParser(buffer);
   return parser.parse(options);
 }

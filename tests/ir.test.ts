@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { Instruction } from '../src/disassembler/types.js';
 import { BasicBlock } from '../src/disassembler/cfg.js';
-import { IRTranslator, SSABuilder, IROptimizer, IROp } from '../src/disassembler/ir.js';
+import {
+  IRTranslator,
+  SSABuilder,
+  IROptimizer,
+  IROp,
+} from '../src/disassembler/ir.js';
 
 describe('IR/SSA Framework Unit Tests', () => {
   it('should translate basic machine instructions to intermediate representation', () => {
@@ -94,7 +99,14 @@ describe('IR/SSA Framework Unit Tests', () => {
         startAddress: 0x1000,
         endAddress: 0x1005,
         instructions: [
-          { address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: '', operands: [], size: 1 },
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([0x90]),
+            mnemonic: 'nop',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
         ],
         successors: ['block_2'],
       },
@@ -103,7 +115,14 @@ describe('IR/SSA Framework Unit Tests', () => {
         startAddress: 0x1005,
         endAddress: 0x1010,
         instructions: [
-          { address: 0x1005, bytes: new Uint8Array([0xc3]), mnemonic: 'ret', opStr: '', operands: [], size: 1 },
+          {
+            address: 0x1005,
+            bytes: new Uint8Array([0xc3]),
+            mnemonic: 'ret',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
         ],
         successors: [],
       },
@@ -249,7 +268,7 @@ describe('IR/SSA Framework Unit Tests', () => {
     expect(b3.instructions[0].dest?.name).toBe('rax');
     expect(b3.instructions[0].args.length).toBe(2);
     // Arguments of PHI should represent values coming from block_1 (rax version 1) and block_2 (rax version 2)
-    expect(b3.instructions[0].args.map(a => a.version)).toContain(1);
+    expect(b3.instructions[0].args.map((a) => a.version)).toContain(1);
   });
 
   it('should fold constant arithmetic operations', () => {
@@ -487,11 +506,46 @@ describe('IR/SSA Framework Unit Tests', () => {
         startAddress: 0x1000,
         endAddress: 0x1020,
         instructions: [
-          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
-          { address: 0x1001, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
-          { address: 0x1002, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
-          { address: 0x1003, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
-          { address: 0x1004, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1001,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1002,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1003,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1004,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
         ],
         successors: [],
       },
@@ -551,12 +605,54 @@ describe('IR/SSA Framework Unit Tests', () => {
         startAddress: 0x1000,
         endAddress: 0x1030,
         instructions: [
-          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'mul', opStr: '', operands: [], size: 1 },
-          { address: 0x1001, bytes: new Uint8Array([]), mnemonic: 'mul', opStr: '', operands: [], size: 1 },
-          { address: 0x1002, bytes: new Uint8Array([]), mnemonic: 'mul', opStr: '', operands: [], size: 1 },
-          { address: 0x1003, bytes: new Uint8Array([]), mnemonic: 'div', opStr: '', operands: [], size: 1 },
-          { address: 0x1004, bytes: new Uint8Array([]), mnemonic: 'div', opStr: '', operands: [], size: 1 },
-          { address: 0x1005, bytes: new Uint8Array([]), mnemonic: 'div', opStr: '', operands: [], size: 1 },
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mul',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1001,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mul',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1002,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mul',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1003,
+            bytes: new Uint8Array([]),
+            mnemonic: 'div',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1004,
+            bytes: new Uint8Array([]),
+            mnemonic: 'div',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1005,
+            bytes: new Uint8Array([]),
+            mnemonic: 'div',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
         ],
         successors: [],
       },
@@ -642,11 +738,46 @@ describe('IR/SSA Framework Unit Tests', () => {
         startAddress: 0x1000,
         endAddress: 0x1010,
         instructions: [
-          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'add', opStr: '', operands: [], size: 1 },
-          { address: 0x1001, bytes: new Uint8Array([]), mnemonic: 'add', opStr: '', operands: [], size: 1 },
-          { address: 0x1002, bytes: new Uint8Array([]), mnemonic: 'sub', opStr: '', operands: [], size: 1 },
-          { address: 0x1003, bytes: new Uint8Array([]), mnemonic: 'sub', opStr: '', operands: [], size: 1 },
-          { address: 0x1004, bytes: new Uint8Array([]), mnemonic: 'xor', opStr: '', operands: [], size: 1 },
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1001,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1002,
+            bytes: new Uint8Array([]),
+            mnemonic: 'sub',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1003,
+            bytes: new Uint8Array([]),
+            mnemonic: 'sub',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1004,
+            bytes: new Uint8Array([]),
+            mnemonic: 'xor',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
         ],
         successors: [],
       },
@@ -723,7 +854,14 @@ describe('IR/SSA Framework Unit Tests', () => {
         startAddress: 0x1000,
         endAddress: 0x1005,
         instructions: [
-          { address: 0x1000, bytes: new Uint8Array([]), mnemonic: 'mov', opStr: '', operands: [], size: 1 },
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
         ],
         successors: [],
       },
@@ -772,7 +910,10 @@ describe('IR/SSA Framework Unit Tests', () => {
             bytes: new Uint8Array([]),
             mnemonic: 'mov',
             opStr: 'rax, 0',
-            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 0n }],
+            operands: [
+              { type: 'reg', reg: 'rax' },
+              { type: 'imm', imm: 0n },
+            ],
             size: 5,
           },
         ],
@@ -787,7 +928,10 @@ describe('IR/SSA Framework Unit Tests', () => {
             bytes: new Uint8Array([]),
             mnemonic: 'cmp',
             opStr: 'rax, 10',
-            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 10n }],
+            operands: [
+              { type: 'reg', reg: 'rax' },
+              { type: 'imm', imm: 10n },
+            ],
             size: 5,
           },
         ],
@@ -802,7 +946,10 @@ describe('IR/SSA Framework Unit Tests', () => {
             bytes: new Uint8Array([]),
             mnemonic: 'cmp',
             opStr: 'rax, 20',
-            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 20n }],
+            operands: [
+              { type: 'reg', reg: 'rax' },
+              { type: 'imm', imm: 20n },
+            ],
             size: 5,
           },
         ],
@@ -817,7 +964,10 @@ describe('IR/SSA Framework Unit Tests', () => {
             bytes: new Uint8Array([]),
             mnemonic: 'add',
             opStr: 'rax, 1',
-            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 1n }],
+            operands: [
+              { type: 'reg', reg: 'rax' },
+              { type: 'imm', imm: 1n },
+            ],
             size: 5,
           },
         ],
@@ -832,7 +982,10 @@ describe('IR/SSA Framework Unit Tests', () => {
             bytes: new Uint8Array([]),
             mnemonic: 'add',
             opStr: 'rax, 2',
-            operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 2n }],
+            operands: [
+              { type: 'reg', reg: 'rax' },
+              { type: 'imm', imm: 2n },
+            ],
             size: 5,
           },
         ],

@@ -44,10 +44,18 @@ export function isFilePath(str: string): boolean {
   // Windows absolute or relative paths
   if (/^[a-zA-Z]:\\[\\\w\s.-]+/i.test(str)) return true;
   // Unix paths starting with standard systems or structure
-  if (/^\/(?:bin|usr|lib|etc|var|opt|tmp|home|sbin|dev|sys|proc|run)\b/i.test(str)) return true;
+  if (
+    /^\/(?:bin|usr|lib|etc|var|opt|tmp|home|sbin|dev|sys|proc|run)\b/i.test(str)
+  )
+    return true;
   if (/^\/(?:[\w\s.-]+\/)+[\w\s.-]*$/i.test(str)) return true;
   // Common filenames with extensions
-  if (/^[a-zA-Z0-9_-]+\.(exe|dll|sys|so|dylib|ini|conf|bat|sh|json|xml|bin|cfg)$/i.test(str)) return true;
+  if (
+    /^[a-zA-Z0-9_-]+\.(exe|dll|sys|so|dylib|ini|conf|bat|sh|json|xml|bin|cfg)$/i.test(
+      str
+    )
+  )
+    return true;
   return false;
 }
 
@@ -58,15 +66,48 @@ export function isApiName(str: string): boolean {
   // Must be a valid C identifier (excluding extremely short or long ones)
   if (!/^[a-zA-Z_][a-zA-Z0-9_]{2,63}$/.test(str)) return false;
   // Common prefixes or suffixes for API functions
-  if (/^(Get|Set|Create|Write|Read|Open|Close|Initialize|Query|Reg|Nt|Zw|Rtl|Is|Virtual|Local|Global)[A-Z]/i.test(str)) return true;
+  if (
+    /^(Get|Set|Create|Write|Read|Open|Close|Initialize|Query|Reg|Nt|Zw|Rtl|Is|Virtual|Local|Global)[A-Z]/i.test(
+      str
+    )
+  )
+    return true;
   // Common suffix A or W (Windows ANSI/Unicode) for API functions
   if (/^[a-zA-Z_][a-zA-Z0-9_]+[AW]$/.test(str)) return true;
   // Libc common functions
   const commonLibc = new Set([
-    'malloc', 'calloc', 'realloc', 'free', 'memcpy', 'memset', 'memmove', 'memcmp',
-    'strlen', 'strcpy', 'strncpy', 'strcat', 'strncat', 'strcmp', 'strncmp',
-    'printf', 'sprintf', 'fprintf', 'scanf', 'sscanf', 'fopen', 'fclose', 'fread', 'fwrite',
-    'exit', 'abort', 'getenv', 'system', 'fork', 'execve', 'waitpid', 'pthread_create'
+    'malloc',
+    'calloc',
+    'realloc',
+    'free',
+    'memcpy',
+    'memset',
+    'memmove',
+    'memcmp',
+    'strlen',
+    'strcpy',
+    'strncpy',
+    'strcat',
+    'strncat',
+    'strcmp',
+    'strncmp',
+    'printf',
+    'sprintf',
+    'fprintf',
+    'scanf',
+    'sscanf',
+    'fopen',
+    'fclose',
+    'fread',
+    'fwrite',
+    'exit',
+    'abort',
+    'getenv',
+    'system',
+    'fork',
+    'execve',
+    'waitpid',
+    'pthread_create',
   ]);
   if (commonLibc.has(str)) return true;
   // JNI / Java style or camelCase with non-trivial length
@@ -78,13 +119,18 @@ export function isApiName(str: string): boolean {
  * Detects if a string is a URL.
  */
 export function isUrl(str: string): boolean {
-  return /^(https?|ftp|file):\/\/[a-zA-Z0-9-+&@#/%?=~_|!:,.;]*[a-zA-Z0-9-+&@#/%=~_|]$/i.test(str);
+  return /^(https?|ftp|file):\/\/[a-zA-Z0-9-+&@#/%?=~_|!:,.;]*[a-zA-Z0-9-+&@#/%=~_|]$/i.test(
+    str
+  );
 }
 
 /**
  * Scans a binary buffer and extracts readable strings.
  */
-export function extractStrings(buffer: ArrayBuffer | Uint8Array, options: StringExtractOptions = {}): ExtractedString[] {
+export function extractStrings(
+  buffer: ArrayBuffer | Uint8Array,
+  options: StringExtractOptions = {}
+): ExtractedString[] {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   const minLength = options.minLength ?? 4;
   const baseAddress = options.baseAddress ?? 0;
@@ -117,7 +163,7 @@ export function extractStrings(buffer: ArrayBuffer | Uint8Array, options: String
   };
 
   const isPrintableAscii = (b: number): boolean => {
-    return (b >= 0x20 && b <= 0x7E) || b === 0x09 || b === 0x0A || b === 0x0D;
+    return (b >= 0x20 && b <= 0x7e) || b === 0x09 || b === 0x0a || b === 0x0d;
   };
 
   // Scan ASCII/UTF-8

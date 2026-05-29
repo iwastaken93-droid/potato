@@ -9,7 +9,10 @@ import { ExtractedString } from '../analyzer/strings.js';
 import { XRefEngine, XRef } from '../analyzer/xrefs.js';
 
 export interface XRefsPanelOptions {
-  onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export class XRefsPanel {
@@ -407,20 +410,22 @@ export class XRefsPanel {
       <span class="xrefs-search-icon">🔍</span>
       <input type="text" class="xrefs-search-input" placeholder="Search references..." />
     `;
-    this.searchInputEl = searchBox.querySelector('.xrefs-search-input') as HTMLInputElement;
+    this.searchInputEl = searchBox.querySelector(
+      '.xrefs-search-input'
+    ) as HTMLInputElement;
     controlsRow.appendChild(searchBox);
 
     // Tab buttons
     const tabSelector = document.createElement('div');
     tabSelector.className = 'xrefs-tab-selector';
-    
+
     const tabsConfig = [
       { id: 'all', label: 'All References' },
       { id: 'to', label: 'Incoming To' },
-      { id: 'from', label: 'Outgoing From' }
+      { id: 'from', label: 'Outgoing From' },
     ];
 
-    tabsConfig.forEach(tab => {
+    tabsConfig.forEach((tab) => {
       const btn = document.createElement('button');
       btn.className = 'xrefs-tab-btn';
       btn.textContent = tab.label;
@@ -499,7 +504,7 @@ export class XRefsPanel {
     }
 
     const hexAddr = `0x${this.selectedAddress.toString(16).toUpperCase()}`;
-    const sym = this.symbols.find(s => s.address === this.selectedAddress);
+    const sym = this.symbols.find((s) => s.address === this.selectedAddress);
     const symName = sym ? ` (${sym.name})` : '';
 
     this.selectedAddrHeaderEl.style.display = 'flex';
@@ -512,7 +517,9 @@ export class XRefsPanel {
       <button class="xrefs-clear-addr-btn">Clear Filter</button>
     `;
 
-    const clearBtn = this.selectedAddrHeaderEl.querySelector('.xrefs-clear-addr-btn');
+    const clearBtn = this.selectedAddrHeaderEl.querySelector(
+      '.xrefs-clear-addr-btn'
+    );
     clearBtn?.addEventListener('click', () => this.selectAddress(null));
   }
 
@@ -520,18 +527,20 @@ export class XRefsPanel {
     this.statsCardsEl.innerHTML = '';
 
     const total = this.allXRefs.length;
-    const calls = this.allXRefs.filter(x => x.type === 'CALL').length;
-    const jumps = this.allXRefs.filter(x => x.type === 'JUMP').length;
-    const dataRefs = this.allXRefs.filter(x => x.type.startsWith('DATA')).length;
+    const calls = this.allXRefs.filter((x) => x.type === 'CALL').length;
+    const jumps = this.allXRefs.filter((x) => x.type === 'JUMP').length;
+    const dataRefs = this.allXRefs.filter((x) =>
+      x.type.startsWith('DATA')
+    ).length;
 
     const stats = [
       { label: 'Total References', value: total },
       { label: 'Function Calls', value: calls },
       { label: 'Branch Jumps', value: jumps },
-      { label: 'Data references', value: dataRefs }
+      { label: 'Data references', value: dataRefs },
     ];
 
-    stats.forEach(stat => {
+    stats.forEach((stat) => {
       const card = document.createElement('div');
       card.className = 'xrefs-stat-card';
       card.innerHTML = `
@@ -543,12 +552,12 @@ export class XRefsPanel {
   }
 
   private getSymbolAt(addr: number): string {
-    const sym = this.symbols.find(s => s.address === addr);
+    const sym = this.symbols.find((s) => s.address === addr);
     return sym ? sym.name : '';
   }
 
   private getStringAt(addr: number): string {
-    const str = this.strings.find(s => s.virtualAddress === addr);
+    const str = this.strings.find((s) => s.virtualAddress === addr);
     return str ? str.value : '';
   }
 
@@ -579,7 +588,7 @@ export class XRefsPanel {
 
     // Filter by search query
     if (this.searchQuery) {
-      listToRender = listToRender.filter(xref => {
+      listToRender = listToRender.filter((xref) => {
         const srcHex = `0x${xref.from.toString(16)}`;
         const destHex = `0x${xref.to.toString(16)}`;
         const srcSym = this.getSymbolAt(xref.from).toLowerCase();
@@ -625,7 +634,7 @@ export class XRefsPanel {
 
     const tbody = table.querySelector('tbody')!;
 
-    listToRender.forEach(xref => {
+    listToRender.forEach((xref) => {
       const tr = document.createElement('tr');
 
       const srcHex = `0x${xref.from.toString(16).toUpperCase()}`;
@@ -633,7 +642,7 @@ export class XRefsPanel {
       const srcSym = this.getSymbolAt(xref.from) || '-';
       const targetSym = this.getSymbolAt(xref.to) || '-';
       const badgeClass = `xrefs-badge xrefs-badge-${xref.type.toLowerCase()}`;
-      
+
       let detailsText = xref.context || '';
       const targetStr = this.getStringAt(xref.to);
       if (targetStr) {

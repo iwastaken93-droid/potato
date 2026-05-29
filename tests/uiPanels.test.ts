@@ -65,10 +65,9 @@ describe('HexViewer Unit Tests', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     data = new Uint8Array([
-      0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x02, 0x00, 0x3e, 0x00, 0x01, 0x00, 0x00, 0x00,
-      0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+      0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x3e, 0x00, 0x01, 0x00, 0x00, 0x00,
+      0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ]);
   });
 
@@ -97,7 +96,7 @@ describe('HexViewer Unit Tests', () => {
     const selectSpy = vi.fn();
     const viewer = new HexViewer(container, data, {
       onOffsetHover: hoverSpy,
-      onOffsetSelect: selectSpy
+      onOffsetSelect: selectSpy,
     });
 
     const firstByte = container.querySelector('.hex-byte') as HTMLSpanElement;
@@ -147,7 +146,7 @@ describe('AssemblyView Unit Tests', () => {
         mnemonic: 'push',
         opStr: 'rbp',
         operands: [{ type: 'reg', reg: 'rbp', access: 'r' }],
-        size: 1
+        size: 1,
       },
       {
         address: 0x1001,
@@ -156,10 +155,10 @@ describe('AssemblyView Unit Tests', () => {
         opStr: 'rbp, rsp',
         operands: [
           { type: 'reg', reg: 'rbp', access: 'w' },
-          { type: 'reg', reg: 'rsp', access: 'r' }
+          { type: 'reg', reg: 'rsp', access: 'r' },
         ],
-        size: 3
-      }
+        size: 3,
+      },
     ];
   });
 
@@ -182,27 +181,31 @@ describe('AssemblyView Unit Tests', () => {
   it('should navigate to address and trigger select events', () => {
     const selectSpy = vi.fn();
     const view = new AssemblyView(container, instructions, {
-      onInstructionSelect: selectSpy
+      onInstructionSelect: selectSpy,
     });
 
     view.navigateToAddress(0x1001);
     expect(selectSpy).toHaveBeenCalledWith(instructions[1]);
 
     const activeRow = container.querySelector('.instruction-row.active');
-    expect(activeRow?.querySelector('.row-address')?.textContent).toContain('1001');
+    expect(activeRow?.querySelector('.row-address')?.textContent).toContain(
+      '1001'
+    );
   });
 
   it('should handle comment adding and retrieval', () => {
     const commentSpy = vi.fn();
     const view = new AssemblyView(container, instructions, {
-      onCommentChange: commentSpy
+      onCommentChange: commentSpy,
     });
 
     view.setComment(0x1000, 'Function prologue');
     expect(commentSpy).toHaveBeenCalledWith(0x1000, 'Function prologue');
     expect(view.getComment(0x1000)).toBe('Function prologue');
 
-    const commentEl = container.querySelector('.row-comment[data-address="4096"]');
+    const commentEl = container.querySelector(
+      '.row-comment[data-address="4096"]'
+    );
     expect(commentEl?.textContent).toBe('Function prologue');
     expect(commentEl?.classList.contains('has-comment')).toBe(true);
   });
@@ -214,11 +217,15 @@ describe('AssemblyView Unit Tests', () => {
 
     view.goBack();
     const activeRowBack = container.querySelector('.instruction-row.active');
-    expect(activeRowBack?.querySelector('.row-address')?.textContent).toContain('1000');
+    expect(activeRowBack?.querySelector('.row-address')?.textContent).toContain(
+      '1000'
+    );
 
     view.goForward();
     const activeRowForward = container.querySelector('.instruction-row.active');
-    expect(activeRowForward?.querySelector('.row-address')?.textContent).toContain('1001');
+    expect(
+      activeRowForward?.querySelector('.row-address')?.textContent
+    ).toContain('1001');
   });
 });
 
@@ -241,10 +248,10 @@ describe('CFGVisualizer Unit Tests', () => {
             mnemonic: 'nop',
             opStr: '',
             operands: [],
-            size: 1
-          }
+            size: 1,
+          },
         ],
-        successors: ['block_0x1005']
+        successors: ['block_0x1005'],
       },
       {
         id: 'block_0x1005',
@@ -257,11 +264,11 @@ describe('CFGVisualizer Unit Tests', () => {
             mnemonic: 'ret',
             opStr: '',
             operands: [],
-            size: 1
-          }
+            size: 1,
+          },
         ],
-        successors: []
-      }
+        successors: [],
+      },
     ];
   });
 
@@ -282,7 +289,7 @@ describe('CFGVisualizer Unit Tests', () => {
   it('should handle block selection and trigger onBlockSelect callback', () => {
     const selectSpy = vi.fn();
     const visualizer = new CFGVisualizer(container, blocks, {
-      onBlockSelect: selectSpy
+      onBlockSelect: selectSpy,
     });
 
     const blockCards = container.querySelectorAll('.cfg-block-card');
@@ -294,17 +301,21 @@ describe('CFGVisualizer Unit Tests', () => {
     expect(firstBlockCard.classList.contains('selected')).toBe(true);
 
     // Click empty SVG canvas to clear selection
-    const svgCanvas = container.querySelector('.cfg-svg-canvas') as SVGSVGElement;
+    const svgCanvas = container.querySelector(
+      '.cfg-svg-canvas'
+    ) as SVGSVGElement;
     svgCanvas.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(selectSpy).toHaveBeenCalledWith(null);
     expect(firstBlockCard.classList.contains('selected')).toBe(false);
   });
 
   it('should change layout modes when layout switch is triggered', () => {
-    const visualizer = new CFGVisualizer(container, blocks, { layout: 'layered' });
+    const visualizer = new CFGVisualizer(container, blocks, {
+      layout: 'layered',
+    });
     const layoutBtn = container.querySelector('.cfg-btn') as HTMLButtonElement;
     expect(layoutBtn).not.toBeNull();
-    
+
     // Toggle layout from layered to stack
     layoutBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(layoutBtn.textContent).toContain('Stack');
@@ -313,7 +324,7 @@ describe('CFGVisualizer Unit Tests', () => {
   describe('Coverage Overlay', () => {
     it('should parse various coverage table formats using parseCoverageTable', async () => {
       const { parseCoverageTable } = await import('../src/ui/cfgVisualizer.js');
-      
+
       // Markdown table
       const mdTable = `
 | Block ID    | Hits |
@@ -355,15 +366,17 @@ block_0x1005 0
 
     it('should apply and style basic blocks based on coverage data', () => {
       const coverage = {
-        'block_0x1000': 100,
-        'block_0x1005': 0
+        block_0x1000: 100,
+        block_0x1005: 0,
       };
-      
+
       const visualizer = new CFGVisualizer(container, blocks, {
-        coverageData: coverage
+        coverageData: coverage,
       });
 
-      const cards = container.querySelectorAll('.cfg-block-card') as NodeListOf<HTMLElement>;
+      const cards = container.querySelectorAll(
+        '.cfg-block-card'
+      ) as NodeListOf<HTMLElement>;
       expect(cards.length).toBe(2);
 
       // First card has 100 hits -> should have HSL green/blue/red background
@@ -375,13 +388,15 @@ block_0x1005 0
       expect(secondCard.style.background).toContain('rgba(239, 68, 68, 0.05)');
 
       // Header on first card should have hits in sizeSpan
-      const firstHeaderSpans = firstCard.querySelectorAll('.cfg-block-header span');
+      const firstHeaderSpans = firstCard.querySelectorAll(
+        '.cfg-block-header span'
+      );
       expect(firstHeaderSpans[1].textContent).toContain('100 hits');
     });
 
     it('should dynamically apply coverage via applyCoverage method', () => {
       const visualizer = new CFGVisualizer(container, blocks);
-      
+
       // Before applying, no hits info in spans
       let sizeSpans = container.querySelectorAll('.cfg-block-header span');
       expect(sizeSpans[1].textContent).not.toContain('hits');
@@ -394,10 +409,10 @@ block_0x1005 0
 
     it('should resolve and map hexadecimal/decimal address keys to block IDs', () => {
       const visualizer = new CFGVisualizer(container, blocks);
-      
+
       // 0x1000 matches block_0x1000 startAddress, 4101 (0x1005) matches block_0x1005 startAddress
       visualizer.applyCoverage('0x1000: 500\n4101: 250');
-      
+
       const sizeSpans = container.querySelectorAll('.cfg-block-header span');
       expect(sizeSpans[1].textContent).toContain('500 hits');
       expect(sizeSpans[3].textContent).toContain('250 hits');
@@ -405,18 +420,20 @@ block_0x1005 0
 
     it('should color and style edges with custom stroke-width and dasharray based on coverage', () => {
       const coverage = {
-        'block_0x1000': 10,
-        'block_0x1005': 0
+        block_0x1000: 10,
+        block_0x1005: 0,
       };
 
       const visualizer = new CFGVisualizer(container, blocks, {
-        coverageData: coverage
+        coverageData: coverage,
       });
 
-      const edges = container.querySelectorAll('.cfg-edge') as NodeListOf<SVGPathElement>;
+      const edges = container.querySelectorAll(
+        '.cfg-edge'
+      ) as NodeListOf<SVGPathElement>;
       expect(edges.length).toBeGreaterThan(0);
       const edge = edges[0];
-      
+
       // The edge coverage should be Math.min(10, 0) = 0, so it's unexecuted -> dashed
       expect(edge.getAttribute('stroke-dasharray')).toBe('4,4');
       expect(edge.getAttribute('stroke-width')).toBe('1.5px');

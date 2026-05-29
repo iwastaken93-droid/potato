@@ -41,10 +41,12 @@ describe('EntropyGraph Component Tests', () => {
       roundRect: vi.fn(),
     };
 
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((type) => {
-      if (type === '2d') return mockCtx;
-      return null;
-    });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      (type) => {
+        if (type === '2d') return mockCtx;
+        return null;
+      }
+    );
 
     // Mock parent element dimensions for canvas resizing
     Object.defineProperty(HTMLCanvasElement.prototype, 'parentElement', {
@@ -90,14 +92,16 @@ describe('EntropyGraph Component Tests', () => {
         fileSize: 256,
         flags: { read: true, write: true, execute: false },
         entropy: 8,
-      }
+      },
     ];
     return { data, sections };
   };
 
   it('should initialize and render layout structure', () => {
     const { data, sections } = createSampleData();
-    graph = new EntropyGraph(container, data, sections, { onNavigate: navigateSpy });
+    graph = new EntropyGraph(container, data, sections, {
+      onNavigate: navigateSpy,
+    });
 
     const root = container.querySelector('.entropy-graph-root');
     expect(root).not.toBeNull();
@@ -115,7 +119,9 @@ describe('EntropyGraph Component Tests', () => {
 
   it('should display sections in sidebar with calculated/mapped entropy values', () => {
     const { data, sections } = createSampleData();
-    graph = new EntropyGraph(container, data, sections, { onNavigate: navigateSpy });
+    graph = new EntropyGraph(container, data, sections, {
+      onNavigate: navigateSpy,
+    });
 
     const sectionsList = container.querySelector('#entropy-sections-list');
     expect(sectionsList).not.toBeNull();
@@ -125,9 +131,13 @@ describe('EntropyGraph Component Tests', () => {
 
   it('should respond to window size changes and recalculate', () => {
     const { data, sections } = createSampleData();
-    graph = new EntropyGraph(container, data, sections, { onNavigate: navigateSpy });
+    graph = new EntropyGraph(container, data, sections, {
+      onNavigate: navigateSpy,
+    });
 
-    const windowSelect = container.querySelector('#entropy-window-select') as HTMLSelectElement;
+    const windowSelect = container.querySelector(
+      '#entropy-window-select'
+    ) as HTMLSelectElement;
     expect(windowSelect.value).toBe('256');
 
     // Simulate change event
@@ -140,9 +150,13 @@ describe('EntropyGraph Component Tests', () => {
 
   it('should respond to threshold adjustments and update sidebar/canvas', () => {
     const { data, sections } = createSampleData();
-    graph = new EntropyGraph(container, data, sections, { onNavigate: navigateSpy });
+    graph = new EntropyGraph(container, data, sections, {
+      onNavigate: navigateSpy,
+    });
 
-    const thresholdInput = container.querySelector('#entropy-threshold-input') as HTMLInputElement;
+    const thresholdInput = container.querySelector(
+      '#entropy-threshold-input'
+    ) as HTMLInputElement;
     expect(thresholdInput.value).toBe('7.2');
 
     // Simulate input event with new threshold
@@ -154,10 +168,14 @@ describe('EntropyGraph Component Tests', () => {
 
   it('should trigger navigation callback when jumping to locations from sidebar', () => {
     const { data, sections } = createSampleData();
-    graph = new EntropyGraph(container, data, sections, { onNavigate: navigateSpy });
+    graph = new EntropyGraph(container, data, sections, {
+      onNavigate: navigateSpy,
+    });
 
     // Find the jump button inside sidebar lists
-    const hexJumpButton = container.querySelector('.entropy-sections-list button[data-action="hex"]') as HTMLButtonElement;
+    const hexJumpButton = container.querySelector(
+      '.entropy-sections-list button[data-action="hex"]'
+    ) as HTMLButtonElement;
     expect(hexJumpButton).not.toBeNull();
 
     hexJumpButton.click();
@@ -180,9 +198,13 @@ describe('EntropyGraph Component Tests', () => {
 
   it('should handle mouse events on canvas', () => {
     const { data, sections } = createSampleData();
-    graph = new EntropyGraph(container, data, sections, { onNavigate: navigateSpy });
+    graph = new EntropyGraph(container, data, sections, {
+      onNavigate: navigateSpy,
+    });
 
-    const canvas = container.querySelector('#entropy-canvas') as HTMLCanvasElement;
+    const canvas = container.querySelector(
+      '#entropy-canvas'
+    ) as HTMLCanvasElement;
     expect(canvas).not.toBeNull();
 
     // Mock bounding client rect for coordinate mapping
@@ -195,7 +217,7 @@ describe('EntropyGraph Component Tests', () => {
       height: 400,
       x: 0,
       y: 0,
-      toJSON: () => {}
+      toJSON: () => {},
     });
 
     // Simulate mousemove on chart area

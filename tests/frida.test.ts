@@ -10,7 +10,7 @@ describe('Frida Script Generator Tests', () => {
         args: [{ name: 'size', type: 'int' }],
         logArguments: true,
         logReturnValue: true,
-        returnValueType: 'pointer'
+        returnValueType: 'pointer',
       });
 
       expect(script).toContain('Module.findExportByName(null, "malloc")');
@@ -27,12 +27,12 @@ describe('Frida Script Generator Tests', () => {
         libraryName: 'libc.so',
         args: [
           { name: 'path', type: 'string' },
-          { name: 'flags', type: 'int' }
+          { name: 'flags', type: 'int' },
         ],
         logArguments: true,
         logReturnValue: true,
         returnValueType: 'int',
-        logBacktrace: true
+        logBacktrace: true,
       });
 
       expect(script).toContain('Module.findExportByName("libc.so", "open")');
@@ -46,7 +46,7 @@ describe('Frida Script Generator Tests', () => {
         name: 'sub_1234',
         target: 0x1234,
         libraryName: 'libfoo.so',
-        logReturnValue: false
+        logReturnValue: false,
       });
 
       expect(script).toContain('Module.findBaseAddress("libfoo.so")');
@@ -57,7 +57,7 @@ describe('Frida Script Generator Tests', () => {
       const script = FridaGenerator.generateInterceptor({
         name: 'abs_addr',
         target: 0x7fff0000,
-        logReturnValue: false
+        logReturnValue: false,
       });
 
       expect(script).toContain('ptr("0x7fff0000")');
@@ -71,7 +71,7 @@ describe('Frida Script Generator Tests', () => {
         addressExpression: 'args[0]',
         type: 'utf8',
         length: 256,
-        varName: 'myString'
+        varName: 'myString',
       });
 
       expect(script).toContain('Memory.readUtf8String(args[0], 256)');
@@ -83,7 +83,7 @@ describe('Frida Script Generator Tests', () => {
       const script = FridaGenerator.generateMemoryRead({
         addressExpression: 'this.context.rsp',
         type: 'pointer',
-        varName: 'stackPtr'
+        varName: 'stackPtr',
       });
 
       expect(script).toContain('Memory.readPointer(this.context.rsp)');
@@ -93,12 +93,12 @@ describe('Frida Script Generator Tests', () => {
     it('should generate int32 and byteArray memory reads', () => {
       const script32 = FridaGenerator.generateMemoryRead({
         addressExpression: 'ptr("0x4000")',
-        type: 'int32'
+        type: 'int32',
       });
       const scriptBytes = FridaGenerator.generateMemoryRead({
         addressExpression: 'ptr("0x5000")',
         type: 'byteArray',
-        length: 64
+        length: 64,
       });
 
       expect(script32).toContain('Memory.readS32(ptr("0x4000"))');
@@ -110,7 +110,7 @@ describe('Frida Script Generator Tests', () => {
   describe('Register Dump Templates', () => {
     it('should generate register dump for x64', () => {
       const script = FridaGenerator.generateRegisterDump({
-        architecture: 'x64'
+        architecture: 'x64',
       });
 
       expect(script).toContain('rax');
@@ -122,7 +122,7 @@ describe('Frida Script Generator Tests', () => {
     it('should generate register dump for arm64 with specific registers', () => {
       const script = FridaGenerator.generateRegisterDump({
         architecture: 'arm64',
-        registers: ['x0', 'x1', 'sp']
+        registers: ['x0', 'x1', 'sp'],
       });
 
       expect(script).toContain('x0');
@@ -138,7 +138,7 @@ describe('Frida Script Generator Tests', () => {
         methodName: 'checkLicense',
         overloadTypes: ['java.lang.String', 'int'],
         logArguments: true,
-        logReturnValue: true
+        logReturnValue: true,
       });
 
       expect(script).toContain('Java.perform(');
@@ -154,7 +154,7 @@ describe('Frida Script Generator Tests', () => {
         className: 'AppDelegate',
         selectorName: '- application:didFinishLaunchingWithOptions:',
         logArguments: true,
-        logReturnValue: true
+        logReturnValue: true,
       });
 
       expect(script).toContain('ObjC.available');

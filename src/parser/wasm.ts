@@ -98,7 +98,13 @@ export interface WasmNames {
   module?: string;
   functions?: Record<number, string>;
   locals?: Record<number, Record<number, string>>;
+  labels?: Record<number, Record<number, string>>;
   types?: Record<number, string>;
+  tables?: Record<number, string>;
+  memories?: Record<number, string>;
+  globals?: Record<number, string>;
+  elements?: Record<number, string>;
+  data?: Record<number, string>;
 }
 
 export interface WasmModule {
@@ -775,6 +781,21 @@ export function parseNameSection(payload: Uint8Array): WasmNames {
           }
           names.locals[funcIdx] = localMap;
         }
+      } else if (subId === 3) {
+        // Label names
+        names.labels = {};
+        const funcCount = reader.readVarUint();
+        for (let i = 0; i < funcCount; i++) {
+          const funcIdx = reader.readVarUint();
+          const labelMap: Record<number, string> = {};
+          const labelCount = reader.readVarUint();
+          for (let j = 0; j < labelCount; j++) {
+            const labelIdx = reader.readVarUint();
+            const name = reader.readString();
+            labelMap[labelIdx] = name;
+          }
+          names.labels[funcIdx] = labelMap;
+        }
       } else if (subId === 4) {
         // Type names
         names.types = {};
@@ -783,6 +804,51 @@ export function parseNameSection(payload: Uint8Array): WasmNames {
           const idx = reader.readVarUint();
           const name = reader.readString();
           names.types[idx] = name;
+        }
+      } else if (subId === 5) {
+        // Table names
+        names.tables = {};
+        const count = reader.readVarUint();
+        for (let i = 0; i < count; i++) {
+          const idx = reader.readVarUint();
+          const name = reader.readString();
+          names.tables[idx] = name;
+        }
+      } else if (subId === 6) {
+        // Memory names
+        names.memories = {};
+        const count = reader.readVarUint();
+        for (let i = 0; i < count; i++) {
+          const idx = reader.readVarUint();
+          const name = reader.readString();
+          names.memories[idx] = name;
+        }
+      } else if (subId === 7) {
+        // Global names
+        names.globals = {};
+        const count = reader.readVarUint();
+        for (let i = 0; i < count; i++) {
+          const idx = reader.readVarUint();
+          const name = reader.readString();
+          names.globals[idx] = name;
+        }
+      } else if (subId === 8) {
+        // Element names
+        names.elements = {};
+        const count = reader.readVarUint();
+        for (let i = 0; i < count; i++) {
+          const idx = reader.readVarUint();
+          const name = reader.readString();
+          names.elements[idx] = name;
+        }
+      } else if (subId === 9) {
+        // Data names
+        names.data = {};
+        const count = reader.readVarUint();
+        for (let i = 0; i < count; i++) {
+          const idx = reader.readVarUint();
+          const name = reader.readString();
+          names.data[idx] = name;
         }
       }
 
@@ -824,7 +890,8 @@ export function parseMetadataSection(name: string, payload: Uint8Array): any {
       const count = reader.readVarUint();
       for (let i = 0; i < count; i++) {
         const prefixByte = reader.readByte();
-        const prefix = prefixByte === 0x2b ? '+' : prefixByte === 0x2d ? '-' : '';
+        const prefix =
+          prefixByte === 0x2b ? '+' : prefixByte === 0x2d ? '-' : '';
         const featureName = reader.readString();
         features.push(`${prefix}${featureName}`);
       }
@@ -847,4 +914,3 @@ export function parseMetadataSection(name: string, payload: Uint8Array): any {
     return Array.from(payload);
   }
 }
-

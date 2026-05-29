@@ -380,7 +380,8 @@ export class StringsView {
     this.searchInput = document.createElement('input');
     this.searchInput.type = 'text';
     this.searchInput.className = 'strings-search-input';
-    this.searchInput.placeholder = 'Search strings (value, offset, or address)...';
+    this.searchInput.placeholder =
+      'Search strings (value, offset, or address)...';
     searchWrapper.appendChild(this.searchInput);
 
     const filters = document.createElement('div');
@@ -510,7 +511,8 @@ export class StringsView {
       if (this.selectedEncodingFilter !== 'all') {
         const isUnicode = str.encoding.startsWith('utf16');
         if (this.selectedEncodingFilter === 'ascii' && isUnicode) return false;
-        if (this.selectedEncodingFilter === 'unicode' && !isUnicode) return false;
+        if (this.selectedEncodingFilter === 'unicode' && !isUnicode)
+          return false;
       }
 
       // Filter by tag
@@ -521,8 +523,12 @@ export class StringsView {
       // Filter by search query
       if (this.searchQuery) {
         const valMatch = str.value.toLowerCase().includes(this.searchQuery);
-        const offsetMatch = `0x${str.offset.toString(16)}`.includes(this.searchQuery) || String(str.offset).includes(this.searchQuery);
-        const addrMatch = `0x${str.virtualAddress.toString(16)}`.includes(this.searchQuery);
+        const offsetMatch =
+          `0x${str.offset.toString(16)}`.includes(this.searchQuery) ||
+          String(str.offset).includes(this.searchQuery);
+        const addrMatch = `0x${str.virtualAddress.toString(16)}`.includes(
+          this.searchQuery
+        );
         if (!valMatch && !offsetMatch && !addrMatch) return false;
       }
 
@@ -570,7 +576,10 @@ export class StringsView {
 
     const len = this.filteredStrings.length;
     const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 10);
-    const endIndex = Math.min(len, Math.ceil((scrollTop + containerHeight) / rowHeight) + 10);
+    const endIndex = Math.min(
+      len,
+      Math.ceil((scrollTop + containerHeight) / rowHeight) + 10
+    );
 
     this.tableBody.innerHTML = '';
 
@@ -600,7 +609,9 @@ export class StringsView {
       if (str.tags.length > 0) {
         str.tags.forEach((tag) => {
           const lowerTag = tag.toLowerCase();
-          const badgeClass = ['url', 'filepath', 'api'].includes(lowerTag) ? lowerTag : 'other';
+          const badgeClass = ['url', 'filepath', 'api'].includes(lowerTag)
+            ? lowerTag
+            : 'other';
           tagsHtml += `<span class="tag-badge ${badgeClass}">${tag}</span>`;
         });
       } else {

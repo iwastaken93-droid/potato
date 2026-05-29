@@ -102,7 +102,10 @@ export class Memory {
    */
   getRegionAt(address: bigint): MemoryRegion | null {
     for (const region of this.regions) {
-      if (address >= region.address && address < region.address + BigInt(region.size)) {
+      if (
+        address >= region.address &&
+        address < region.address + BigInt(region.size)
+      ) {
         return region;
       }
     }
@@ -127,8 +130,14 @@ export class Memory {
 
       // Copy initialized data bypassing permissions
       if (sec.fileSize > 0 && sec.fileOffset < binaryData.length) {
-        const loadSize = Math.min(sec.fileSize, binaryData.length - sec.fileOffset);
-        const dataToCopy = binaryData.subarray(sec.fileOffset, sec.fileOffset + loadSize);
+        const loadSize = Math.min(
+          sec.fileSize,
+          binaryData.length - sec.fileOffset
+        );
+        const dataToCopy = binaryData.subarray(
+          sec.fileOffset,
+          sec.fileOffset + loadSize
+        );
         this.writeBuffer(address, dataToCopy, true);
       }
     }
@@ -137,7 +146,10 @@ export class Memory {
   /**
    * Verify memory access permissions.
    */
-  private checkPermission(address: bigint, accessType: 'read' | 'write' | 'execute'): void {
+  private checkPermission(
+    address: bigint,
+    accessType: 'read' | 'write' | 'execute'
+  ): void {
     const region = this.getRegionAt(address);
     if (region) {
       if (!region.permissions[accessType]) {
@@ -159,7 +171,11 @@ export class Memory {
   /**
    * Write a buffer to a virtual address.
    */
-  writeBuffer(address: bigint, data: Uint8Array, bypassPermissions = false): void {
+  writeBuffer(
+    address: bigint,
+    data: Uint8Array,
+    bypassPermissions = false
+  ): void {
     for (let i = 0; i < data.length; i++) {
       this.write8(address + BigInt(i), data[i], bypassPermissions);
     }
@@ -223,9 +239,10 @@ export class Memory {
   read32(address: bigint): number {
     return (
       (this.read8(address) |
-      (this.read8(address + 1n) << 8) |
-      (this.read8(address + 2n) << 16) |
-      (this.read8(address + 3n) << 24)) >>> 0
+        (this.read8(address + 1n) << 8) |
+        (this.read8(address + 2n) << 16) |
+        (this.read8(address + 3n) << 24)) >>>
+      0
     );
   }
 
@@ -257,4 +274,3 @@ export class Memory {
     this.write32(address + 4n, Number((val >> 32n) & 0xffffffffn));
   }
 }
-

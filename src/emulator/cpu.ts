@@ -4,24 +4,39 @@
  */
 
 export const GPR_LIST = [
-  'rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'rsp',
-  'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15',
-  'rip', 'rflags'
+  'rax',
+  'rbx',
+  'rcx',
+  'rdx',
+  'rsi',
+  'rdi',
+  'rbp',
+  'rsp',
+  'r8',
+  'r9',
+  'r10',
+  'r11',
+  'r12',
+  'r13',
+  'r14',
+  'r15',
+  'rip',
+  'rflags',
 ] as const;
 
-export type GPR = typeof GPR_LIST[number];
+export type GPR = (typeof GPR_LIST)[number];
 
 // RFLAGS bits
 export enum RFlag {
-  CF = 1 << 0,   // Carry Flag
-  PF = 1 << 2,   // Parity Flag
-  AF = 1 << 4,   // Auxiliary Carry Flag
-  ZF = 1 << 6,   // Zero Flag
-  SF = 1 << 7,   // Sign Flag
-  TF = 1 << 8,   // Trap Flag
-  IF = 1 << 9,   // Interrupt Enable Flag
-  DF = 1 << 10,  // Direction Flag
-  OF = 1 << 11,  // Overflow Flag
+  CF = 1 << 0, // Carry Flag
+  PF = 1 << 2, // Parity Flag
+  AF = 1 << 4, // Auxiliary Carry Flag
+  ZF = 1 << 6, // Zero Flag
+  SF = 1 << 7, // Sign Flag
+  TF = 1 << 8, // Trap Flag
+  IF = 1 << 9, // Interrupt Enable Flag
+  DF = 1 << 10, // Direction Flag
+  OF = 1 << 11, // Overflow Flag
 }
 
 interface RegisterInfo {
@@ -35,12 +50,18 @@ interface RegisterInfo {
 // Map sub-register names to their GPR representation, size, shift, and behavior.
 const SUB_REG_MAP: Record<string, RegisterInfo> = {};
 
-function registerSubReg(name: string, gpr: GPR, size: 8 | 16 | 32 | 64, shift: number, zeroExtend = false) {
+function registerSubReg(
+  name: string,
+  gpr: GPR,
+  size: 8 | 16 | 32 | 64,
+  shift: number,
+  zeroExtend = false
+) {
   let mask = 0xffffffffffffffffn;
   if (size === 8) mask = 0xffn;
   else if (size === 16) mask = 0xffffn;
   else if (size === 32) mask = 0xffffffffn;
-  
+
   SUB_REG_MAP[name.toLowerCase()] = {
     gpr,
     size,
@@ -98,7 +119,7 @@ for (let i = 8; i <= 15; i++) {
   const gpr = `r${i}` as GPR;
   registerSubReg(`${gpr}d`, gpr, 32, 0, true); // r8d
   registerSubReg(`${gpr}w`, gpr, 16, 0, false); // r8w
-  registerSubReg(`${gpr}b`, gpr, 8, 0, false);  // r8b
+  registerSubReg(`${gpr}b`, gpr, 8, 0, false); // r8b
 }
 
 export class CPU {
@@ -106,11 +127,24 @@ export class CPU {
 
   constructor() {
     this.registers = {
-      rax: 0n, rbx: 0n, rcx: 0n, rdx: 0n,
-      rsi: 0n, rdi: 0n, rbp: 0n, rsp: 0n,
-      r8: 0n,  r9: 0n,  r10: 0n, r11: 0n,
-      r12: 0n, r13: 0n, r14: 0n, r15: 0n,
-      rip: 0n, rflags: 0n,
+      rax: 0n,
+      rbx: 0n,
+      rcx: 0n,
+      rdx: 0n,
+      rsi: 0n,
+      rdi: 0n,
+      rbp: 0n,
+      rsp: 0n,
+      r8: 0n,
+      r9: 0n,
+      r10: 0n,
+      r11: 0n,
+      r12: 0n,
+      r13: 0n,
+      r14: 0n,
+      r15: 0n,
+      rip: 0n,
+      rflags: 0n,
     };
   }
 

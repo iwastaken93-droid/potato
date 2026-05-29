@@ -44,12 +44,18 @@ export function unescapeString(val: string): string {
       return String.fromCharCode(parseInt(p1.substring(1), 16));
     }
     switch (p1) {
-      case 'n': return '\n';
-      case 'r': return '\r';
-      case 't': return '\t';
-      case '"': return '"';
-      case '\\': return '\\';
-      default: return match;
+      case 'n':
+        return '\n';
+      case 'r':
+        return '\r';
+      case 't':
+        return '\t';
+      case '"':
+        return '"';
+      case '\\':
+        return '\\';
+      default:
+        return match;
     }
   });
 }
@@ -107,12 +113,14 @@ function parseRuleBody(name: string, body: string): YaraRule {
   const sections = [
     { name: 'meta', index: metaIndex },
     { name: 'strings', index: stringsIndex },
-    { name: 'condition', index: conditionIndex }
-  ].filter(x => x.index !== -1).sort((a, b) => a.index - b.index);
+    { name: 'condition', index: conditionIndex },
+  ]
+    .filter((x) => x.index !== -1)
+    .sort((a, b) => a.index - b.index);
 
   for (let i = 0; i < sections.length; i++) {
     const start = sections[i].index + sections[i].name.length + 1;
-    const end = (i + 1 < sections.length) ? sections[i + 1].index : body.length;
+    const end = i + 1 < sections.length ? sections[i + 1].index : body.length;
     const content = body.substring(start, end).trim();
 
     if (sections[i].name === 'meta') {
@@ -141,7 +149,8 @@ function parseRuleBody(name: string, body: string): YaraRule {
         }
       }
     } else if (sections[i].name === 'strings') {
-      const stringDefRegex = /\$([a-zA-Z0-9_]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|\{([^}]+)\})([a-zA-Z0-9_\s]*)/g;
+      const stringDefRegex =
+        /\$([a-zA-Z0-9_]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|\{([^}]+)\})([a-zA-Z0-9_\s]*)/g;
       let strMatch;
       while ((strMatch = stringDefRegex.exec(content)) !== null) {
         const id = '$' + strMatch[1];
@@ -164,14 +173,14 @@ function parseRuleBody(name: string, body: string): YaraRule {
             id,
             type: 'text',
             value: unescapeString(textVal),
-            modifiers
+            modifiers,
           });
         } else if (hexVal !== undefined) {
           strings.push({
             id,
             type: 'hex',
             value: hexVal.trim(),
-            modifiers
+            modifiers,
           });
         }
       }
@@ -184,14 +193,17 @@ function parseRuleBody(name: string, body: string): YaraRule {
     name,
     meta: Object.keys(meta).length > 0 ? meta : undefined,
     strings,
-    condition
+    condition,
   };
 }
 
 /**
  * Searches for a string pattern in a binary buffer.
  */
-export function matchPattern(buffer: Uint8Array, pattern: YaraStringPattern): YaraMatch[] {
+export function matchPattern(
+  buffer: Uint8Array,
+  pattern: YaraStringPattern
+): YaraMatch[] {
   const matches: YaraMatch[] = [];
 
   if (pattern.type === 'hex') {
@@ -212,7 +224,7 @@ export function matchPattern(buffer: Uint8Array, pattern: YaraStringPattern): Ya
       if (matched) {
         const matchedBytes = buffer.subarray(i, i + parsed.length);
         const hexVal = Array.from(matchedBytes)
-          .map(b => b.toString(16).padStart(2, '0'))
+          .map((b) => b.toString(16).padStart(2, '0'))
           .join(' ');
         matches.push({
           stringId: pattern.id,
@@ -289,14 +301,23 @@ export function matchPattern(buffer: Uint8Array, pattern: YaraStringPattern): Ya
 /**
  * Safely evaluates a boolean condition string using matched variable values.
  */
-export function evaluateCondition(condition: string, variableValues: Record<string, boolean>): boolean {
+export function evaluateCondition(
+  condition: string,
+  variableValues: Record<string, boolean>
+): boolean {
   let cond = condition.trim();
 
-  cond = cond.replace(/\bany of them\b/gi, variableValues['any of them'] ? 'true' : 'false');
-  cond = cond.replace(/\ball of them\b/gi, variableValues['all of them'] ? 'true' : 'false');
+  cond = cond.replace(
+    /\bany of them\b/gi,
+    variableValues['any of them'] ? 'true' : 'false'
+  );
+  cond = cond.replace(
+    /\ball of them\b/gi,
+    variableValues['all of them'] ? 'true' : 'false'
+  );
 
   const sortedKeys = Object.keys(variableValues)
-    .filter(k => k.startsWith('$'))
+    .filter((k) => k.startsWith('$'))
     .sort((a, b) => b.length - a.length);
 
   for (const key of sortedKeys) {
@@ -305,9 +326,10 @@ export function evaluateCondition(condition: string, variableValues: Record<stri
     cond = cond.replace(regex, variableValues[key] ? 'true' : 'false');
   }
 
-  cond = cond.replace(/\band\b/gi, '&&')
-             .replace(/\bor\b/gi, '||')
-             .replace(/\bnot\b/gi, '!');
+  cond = cond
+    .replace(/\band\b/gi, '&&')
+    .replace(/\bor\b/gi, '||')
+    .replace(/\bnot\b/gi, '!');
 
   const tokenRegex = /\(|\)|&&|\|\||!|true|false/g;
   const tokens = cond.match(tokenRegex) || [];
@@ -429,16 +451,17 @@ export class YaraEngine {
       }
 
       // Check "any of them" / "all of them"
-      const values = rule.strings.map(p => variableValues[p.id]);
-      variableValues['any of them'] = values.some(v => v);
-      variableValues['all of them'] = rule.strings.length > 0 && values.every(v => v);
+      const values = rule.strings.map((p) => variableValues[p.id]);
+      variableValues['any of them'] = values.some((v) => v);
+      variableValues['all of them'] =
+        rule.strings.length > 0 && values.every((v) => v);
 
       const matched = evaluateCondition(rule.condition, variableValues);
 
       results.push({
         ruleName: rule.name,
         matched,
-        matches: matched ? matches : []
+        matches: matched ? matches : [],
       });
     }
 

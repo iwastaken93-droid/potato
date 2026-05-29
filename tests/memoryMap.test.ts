@@ -42,7 +42,7 @@ describe('MemoryMapOverlay Unit Tests', () => {
         fileSize: 512,
         flags: { read: true, write: true, execute: false },
         entropy: 5.5,
-      }
+      },
     ];
 
     onNavigateSpy = vi.fn();
@@ -70,7 +70,9 @@ describe('MemoryMapOverlay Unit Tests', () => {
     // Check overlay DOM
     const overlayEl = document.querySelector('.mem-map-overlay');
     expect(overlayEl).not.toBeNull();
-    expect(overlayEl?.querySelector('.mem-map-title h3')?.textContent).toContain('Binary Memory Map');
+    expect(
+      overlayEl?.querySelector('.mem-map-title h3')?.textContent
+    ).toContain('Binary Memory Map');
   });
 
   it('should show and hide overlay', () => {
@@ -115,7 +117,7 @@ describe('MemoryMapOverlay Unit Tests', () => {
 
     overlay.show();
     const overlayEl = document.querySelector('.mem-map-overlay') as HTMLElement;
-    
+
     // Dispatch click directly on overlay container
     overlayEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(overlayEl.classList.contains('active')).toBe(false);
@@ -130,9 +132,15 @@ describe('MemoryMapOverlay Unit Tests', () => {
 
     overlay.show();
     const overlayEl = document.querySelector('.mem-map-overlay') as HTMLElement;
-    const entropyBtn = overlayEl.querySelector('button[data-mode="entropy"]') as HTMLButtonElement;
-    const permissionBtn = overlayEl.querySelector('button[data-mode="permission"]') as HTMLButtonElement;
-    const sectionBtn = overlayEl.querySelector('button[data-mode="section"]') as HTMLButtonElement;
+    const entropyBtn = overlayEl.querySelector(
+      'button[data-mode="entropy"]'
+    ) as HTMLButtonElement;
+    const permissionBtn = overlayEl.querySelector(
+      'button[data-mode="permission"]'
+    ) as HTMLButtonElement;
+    const sectionBtn = overlayEl.querySelector(
+      'button[data-mode="section"]'
+    ) as HTMLButtonElement;
 
     // Check default active button
     expect(sectionBtn.classList.contains('active')).toBe(true);
@@ -141,7 +149,7 @@ describe('MemoryMapOverlay Unit Tests', () => {
     entropyBtn.click();
     expect(entropyBtn.classList.contains('active')).toBe(true);
     expect(sectionBtn.classList.contains('active')).toBe(false);
-    
+
     // Switch to permission
     permissionBtn.click();
     expect(permissionBtn.classList.contains('active')).toBe(true);
@@ -156,7 +164,7 @@ describe('MemoryMapOverlay Unit Tests', () => {
 
     overlay.show();
     const overlayEl = document.querySelector('.mem-map-overlay') as HTMLElement;
-    
+
     // Click the first cell in grid
     const firstCell = overlayEl.querySelector('.grid-cell') as HTMLDivElement;
     expect(firstCell).not.toBeNull();
@@ -174,7 +182,7 @@ describe('MemoryMapOverlay Unit Tests', () => {
 
     overlay.show();
     const overlayEl = document.querySelector('.mem-map-overlay') as HTMLElement;
-    
+
     // Click the second section bar segment
     const segments = overlayEl.querySelectorAll('.mem-map-bar-segment');
     expect(segments.length).toBe(2);
@@ -193,7 +201,7 @@ describe('MemoryMapOverlay Unit Tests', () => {
     overlay.show();
     const overlayEl = document.querySelector('.mem-map-overlay') as HTMLElement;
     const cells = overlayEl.querySelectorAll('.grid-cell');
-    
+
     // Hover the first cell (which belongs to .text section, offset 0)
     const firstCell = cells[0] as HTMLDivElement;
     firstCell.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
@@ -222,13 +230,23 @@ describe('MemoryMapOverlay Unit Tests', () => {
       onNavigate: onNavigateSpy,
     });
     emptySecOverlay.show();
-    const emptyOverlayEl = document.querySelector('.mem-map-overlay') as HTMLElement;
+    const emptyOverlayEl = document.querySelector(
+      '.mem-map-overlay'
+    ) as HTMLElement;
     const emptyCells = emptyOverlayEl.querySelectorAll('.grid-cell');
-    (emptyCells[0] as HTMLDivElement).dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    (emptyCells[0] as HTMLDivElement).dispatchEvent(
+      new MouseEvent('mouseenter', { bubbles: true })
+    );
 
-    expect(emptyOverlayEl.querySelector('#inspect-section')?.textContent).toBe('Raw binary (No Section)');
-    expect(emptyOverlayEl.querySelector('#inspect-addresses')?.textContent).toBe('N/A');
-    expect(emptyOverlayEl.querySelector('#inspect-perms')?.textContent).toBe('R--');
+    expect(emptyOverlayEl.querySelector('#inspect-section')?.textContent).toBe(
+      'Raw binary (No Section)'
+    );
+    expect(
+      emptyOverlayEl.querySelector('#inspect-addresses')?.textContent
+    ).toBe('N/A');
+    expect(emptyOverlayEl.querySelector('#inspect-perms')?.textContent).toBe(
+      'R--'
+    );
   });
 
   it('should render legends properly for each mode', () => {
@@ -247,7 +265,9 @@ describe('MemoryMapOverlay Unit Tests', () => {
     expect(legendItems[1].textContent).toContain('.data');
 
     // Switch to entropy mode and check legend
-    const entropyBtn = overlayEl.querySelector('button[data-mode="entropy"]') as HTMLButtonElement;
+    const entropyBtn = overlayEl.querySelector(
+      'button[data-mode="entropy"]'
+    ) as HTMLButtonElement;
     entropyBtn.click();
     legendItems = overlayEl.querySelectorAll('.legend-item');
     expect(legendItems.length).toBe(4);
@@ -255,7 +275,9 @@ describe('MemoryMapOverlay Unit Tests', () => {
     expect(legendItems[3].textContent).toContain('Packed/Encrypted');
 
     // Switch to permission mode and check legend
-    const permissionBtn = overlayEl.querySelector('button[data-mode="permission"]') as HTMLButtonElement;
+    const permissionBtn = overlayEl.querySelector(
+      'button[data-mode="permission"]'
+    ) as HTMLButtonElement;
     permissionBtn.click();
     legendItems = overlayEl.querySelectorAll('.legend-item');
     expect(legendItems.length).toBe(4);

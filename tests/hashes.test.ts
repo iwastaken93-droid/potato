@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeMD5, computeSHA1, computeSHA256 } from '../src/analyzer/hashes.js';
+import {
+  computeMD5,
+  computeSHA1,
+  computeSHA256,
+} from '../src/analyzer/hashes.js';
 
 describe('Hash Computation Tests', () => {
   const encoder = new TextEncoder();
@@ -48,31 +52,41 @@ describe('Hash Computation Tests', () => {
     it('should compute SHA-256 for empty data', () => {
       const data = new Uint8Array([]);
       const hash = computeSHA256(data);
-      expect(hash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+      expect(hash).toBe(
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+      );
     });
 
     it('should compute SHA-256 for standard input "abc"', () => {
       const data = encoder.encode('abc');
       const hash = computeSHA256(data);
-      expect(hash).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+      expect(hash).toBe(
+        'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+      );
     });
 
     it('should compute SHA-256 for "hello world"', () => {
       const data = encoder.encode('hello world');
       const hash = computeSHA256(data);
-      expect(hash).toBe('b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9');
+      expect(hash).toBe(
+        'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9'
+      );
     });
 
     it('should compute SHA-256 for a single byte of zero', () => {
       const data = new Uint8Array([0]);
       const hash = computeSHA256(data);
-      expect(hash).toBe('6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d');
+      expect(hash).toBe(
+        '6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d'
+      );
     });
 
     it('should compute SHA-256 for a single byte of 0xff', () => {
       const data = new Uint8Array([0xff]);
       const hash = computeSHA256(data);
-      expect(hash).toBe('a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89');
+      expect(hash).toBe(
+        'a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89'
+      );
     });
   });
 
@@ -84,12 +98,16 @@ describe('Hash Computation Tests', () => {
 
     it('should compute correct SHA-1 for a long sequence of characters', () => {
       const data = encoder.encode('a'.repeat(1000));
-      expect(computeSHA1(data)).toBe('291e9a6c66994949b57ba5e650361e98fc36b1ba');
+      expect(computeSHA1(data)).toBe(
+        '291e9a6c66994949b57ba5e650361e98fc36b1ba'
+      );
     });
 
     it('should compute correct SHA-256 for a long sequence of characters', () => {
       const data = encoder.encode('a'.repeat(1000));
-      expect(computeSHA256(data)).toBe('41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3');
+      expect(computeSHA256(data)).toBe(
+        '41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3'
+      );
     });
   });
 });

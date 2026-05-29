@@ -199,8 +199,8 @@ describe('Debug Symbols Parser Framework Tests', () => {
       const strBytes: number[] = [];
 
       // Create debug_str content: "main" at 0, "helper" at 5
-      strBytes.push(...[...'main'].map(c => c.charCodeAt(0)), 0);
-      strBytes.push(...[...'helper'].map(c => c.charCodeAt(0)), 0);
+      strBytes.push(...[...'main'].map((c) => c.charCodeAt(0)), 0);
+      strBytes.push(...[...'helper'].map((c) => c.charCodeAt(0)), 0);
 
       // debug_info unit header
       infoBytes.push(0, 0, 0, 0); // unit_length placeholder
@@ -223,7 +223,7 @@ describe('Debug Symbols Parser Framework Tests', () => {
       infoBytes.push(...writeULEB128(2)); // code
       infoBytes.push(0x2e); // tag
       infoBytes.push(1); // form: inline string
-      infoBytes.push(...[...'inline_func'].map(c => c.charCodeAt(0)), 0);
+      infoBytes.push(...[...'inline_func'].map((c) => c.charCodeAt(0)), 0);
       // Low PC: 0x2000 (8 bytes)
       infoBytes.push(0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
       // High PC: 0x2020 (8 bytes)
@@ -256,7 +256,9 @@ describe('Debug Symbols Parser Framework Tests', () => {
   describe('PDB MSF & Symbol Parser Tests', () => {
     it('should fail parsing PDB if magic is invalid', () => {
       const buffer = new ArrayBuffer(64);
-      expect(() => parseMsfHeader(buffer)).toThrow('Invalid MSF magic signature');
+      expect(() => parseMsfHeader(buffer)).toThrow(
+        'Invalid MSF magic signature'
+      );
     });
 
     it('should parse a valid MSF header', () => {
@@ -320,7 +322,7 @@ describe('Debug Symbols Parser Framework Tests', () => {
       // segment(2) = 1
       bytes.push(1, 0);
       // name = "func1\0"
-      bytes.push(...[...'func1'].map(c => c.charCodeAt(0)), 0);
+      bytes.push(...[...'func1'].map((c) => c.charCodeAt(0)), 0);
 
       // Record 2: S_DEFSYM_LINE (0x1015)
       // len(2) = 23
@@ -334,7 +336,7 @@ describe('Debug Symbols Parser Framework Tests', () => {
       // line(4) = 42
       bytes.push(42, 0, 0, 0);
       // filename = "source.cpp\0"
-      bytes.push(...[...'source.cpp'].map(c => c.charCodeAt(0)), 0);
+      bytes.push(...[...'source.cpp'].map((c) => c.charCodeAt(0)), 0);
 
       const buffer = new Uint8Array(bytes).buffer;
       const res = parsePdbSymbols(buffer);

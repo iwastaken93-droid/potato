@@ -19,7 +19,7 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
       vocabSize: 10000,
       hiddenSize: 1024,
       contextLength: 512,
-      modelUrlOrPath: '/custom.onnx'
+      modelUrlOrPath: '/custom.onnx',
     });
     const config = manager.getConfig();
     expect(config.modelName).toBe('Custom-3B-Model');
@@ -44,15 +44,17 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
     const manager = new OnDeviceLLMManager();
     await expect(
       manager.explainFunction('test_func', 'xor eax, eax')
-    ).rejects.toThrow('On-device LLM model is not loaded. Call loadModel() first.');
+    ).rejects.toThrow(
+      'On-device LLM model is not loaded. Call loadModel() first.'
+    );
   });
 
   it('should successfully load a mock model and update progress using ORT/WASM backend', async () => {
     const manager = new OnDeviceLLMManager();
     const progressSpy = vi.fn();
-    
+
     await manager.loadModel('mock-model-path.onnx', 'wasm', progressSpy);
-    
+
     expect(manager.isModelLoaded()).toBe(true);
     expect(progressSpy).toHaveBeenCalledWith(0.1);
     expect(progressSpy).toHaveBeenCalledWith(0.4);
@@ -68,11 +70,11 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
 
   it('should encode and decode tokens deterministically (tokenize / detokenize)', () => {
     const manager = new OnDeviceLLMManager();
-    
+
     // Test known words
     const tokens = manager.tokenize('function loop encryption');
     expect(tokens.length).toBe(3);
-    
+
     const text = manager.detokenize(tokens);
     expect(text).toBe('function loop encryption');
 
@@ -96,10 +98,15 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
     `;
 
     const tokens: string[] = [];
-    const result = await manager.explainFunction('rc4_decrypt', rc4Code, 'x86_64', {
-      temperature: 0.2,
-      onToken: (tok) => tokens.push(tok.trim())
-    });
+    const result = await manager.explainFunction(
+      'rc4_decrypt',
+      rc4Code,
+      'x86_64',
+      {
+        temperature: 0.2,
+        onToken: (tok) => tokens.push(tok.trim()),
+      }
+    );
 
     expect(result.summary).toContain('RC4');
     expect(result.patterns[0].name).toBe('RC4 Cryptographic Cipher');
@@ -131,7 +138,11 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
       const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     `;
 
-    const result = await manager.explainFunction('b64_encode', base64Code, 'wasm');
+    const result = await manager.explainFunction(
+      'b64_encode',
+      base64Code,
+      'wasm'
+    );
     expect(result.summary).toContain('Base64');
     expect(result.patterns[0].name).toBe('Base64 Text Conversion');
   });
@@ -146,9 +157,40 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
       }
     `;
 
-    const result = await manager.explainFunction('xor_obfuscation', xorCode, 'x86');
+    const result = await manager.explainFunction(
+      'xor_obfuscation',
+      xorCode,
+      'x86'
+    );
     expect(result.summary).toContain('XOR');
     expect(result.patterns[0].name).toBe('XOR Obfuscation');
+
+    // Test XOR detected by function name only
+    const resultByFuncName = await manager.explainFunction(
+      'my_xor_func',
+      'return data;',
+      'x86'
+    );
+    expect(resultByFuncName.summary).toContain('XOR');
+    expect(resultByFuncName.patterns[0].name).toBe('XOR Obfuscation');
+
+    // Test XOR detected by '0xff' in body
+    const resultByHex = await manager.explainFunction(
+      'some_func',
+      'val = val & 0xff;',
+      'x86'
+    );
+    expect(resultByHex.summary).toContain('XOR');
+    expect(resultByHex.patterns[0].name).toBe('XOR Obfuscation');
+
+    // Test XOR detected by 'xor' in body
+    const resultByLiteral = await manager.explainFunction(
+      'some_func',
+      'mov eax, ebx; xor eax, eax;',
+      'x86'
+    );
+    expect(resultByLiteral.summary).toContain('XOR');
+    expect(resultByLiteral.patterns[0].name).toBe('XOR Obfuscation');
   });
 
   it('should generate explanations for socket network code', async () => {
@@ -175,7 +217,11 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
       return a + b;
     `;
 
-    const result = await manager.explainFunction('simple_sum', unknownCode, 'mips');
+    const result = await manager.explainFunction(
+      'simple_sum',
+      unknownCode,
+      'mips'
+    );
     expect(result.summary).toContain('General logic loop');
     expect(result.patterns[0].name).toBe('Looping Iterative Routine');
   });

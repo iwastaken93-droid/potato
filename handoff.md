@@ -93,74 +93,74 @@ Session 10 was a **massive feature expansion, optimization, and coverage improve
 
 ### ✅ New Features & Parsers
 
-| Category | Module | Details | Status |
-|----------|--------|---------|--------|
-| **Parser** | [javaClass.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/javaClass.ts) | Java class file format parser — `0xCAFEBABE` magic, constant pool, bytecode attributes (`Code`, `LineNumberTable`, `LocalVariableTable`, `SourceFile`, `ConstantValue`) | ✅ 5/5 pass |
-| **Parser** | [debugSymbols.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/debugSymbols.ts) | DWARF `.debug_line`/`.debug_info` + PDB MSF/DBI symbol parsing with `resolveAddress` and `getSymbolName` | ✅ 11/11 pass |
-| **Parser** | [dotnetMetadata.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/dotnetMetadata.ts) | .NET ECMA-335 metadata parser — CLI headers, `BSJB` signature, stream headers, metadata tables (TypeDef, TypeRef, Module, etc.) | ✅ 3/3 pass |
-| **Parser** | [archive.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/archive.ts) | Nested archive unpacker — ZIP/APK/JAR/IPA, Store/Deflate decompression, recursive extraction, magic detection | ✅ 4/4 pass |
-| **Parser** | [machoSignature.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/machoSignature.ts) | Mach-O code signature parser *(NEW, untracked)* | ⚠️ Incomplete |
-| **Emulator** | [gdbProtocol.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/gdbProtocol.ts) | GDB/LLDB Remote Serial Protocol — packet parsing, checksum, register/memory access, execution control | ✅ 16/16 pass |
-| **Analyzer** | [frida.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/frida.ts) | Frida DBI scripting helper — function hooking, argument logging, backtrace, Java/ObjC hooking, register dumping | ✅ 11/11 pass |
-| **Analyzer** | [aiOnDevice.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/aiOnDevice.ts) | On-device LLM execution (ONNX/WebNN/WebGPU) *(NEW, untracked)* | ⚠️ 14/15 (1 fail) |
-| **UI** | [pluginsPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/pluginsPanel.ts) | Plugin management panel with discovery, config UI, and findings overview | ✅ Integrated |
-| **UI** | [machoObjcPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/machoObjcPanel.ts) | Mach-O ObjC metadata display panel *(NEW, untracked)* | ⚠️ Incomplete |
+| Category     | Module                                                                                                     | Details                                                                                                                                                                 | Status            |
+| ------------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| **Parser**   | [javaClass.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/javaClass.ts)           | Java class file format parser — `0xCAFEBABE` magic, constant pool, bytecode attributes (`Code`, `LineNumberTable`, `LocalVariableTable`, `SourceFile`, `ConstantValue`) | ✅ 5/5 pass       |
+| **Parser**   | [debugSymbols.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/debugSymbols.ts)     | DWARF `.debug_line`/`.debug_info` + PDB MSF/DBI symbol parsing with `resolveAddress` and `getSymbolName`                                                                | ✅ 11/11 pass     |
+| **Parser**   | [dotnetMetadata.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/dotnetMetadata.ts) | .NET ECMA-335 metadata parser — CLI headers, `BSJB` signature, stream headers, metadata tables (TypeDef, TypeRef, Module, etc.)                                         | ✅ 3/3 pass       |
+| **Parser**   | [archive.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/archive.ts)               | Nested archive unpacker — ZIP/APK/JAR/IPA, Store/Deflate decompression, recursive extraction, magic detection                                                           | ✅ 4/4 pass       |
+| **Parser**   | [machoSignature.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/machoSignature.ts) | Mach-O code signature parser _(NEW, untracked)_                                                                                                                         | ⚠️ Incomplete     |
+| **Emulator** | [gdbProtocol.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/gdbProtocol.ts)     | GDB/LLDB Remote Serial Protocol — packet parsing, checksum, register/memory access, execution control                                                                   | ✅ 16/16 pass     |
+| **Analyzer** | [frida.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/frida.ts)                 | Frida DBI scripting helper — function hooking, argument logging, backtrace, Java/ObjC hooking, register dumping                                                         | ✅ 11/11 pass     |
+| **Analyzer** | [aiOnDevice.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/aiOnDevice.ts)       | On-device LLM execution (ONNX/WebNN/WebGPU) _(NEW, untracked)_                                                                                                          | ⚠️ 14/15 (1 fail) |
+| **UI**       | [pluginsPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/pluginsPanel.ts)         | Plugin management panel with discovery, config UI, and findings overview                                                                                                | ✅ Integrated     |
+| **UI**       | [machoObjcPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/machoObjcPanel.ts)     | Mach-O ObjC metadata display panel _(NEW, untracked)_                                                                                                                   | ⚠️ Incomplete     |
 
 ### ✅ Performance Optimizations
 
-| Optimization | Module | Impact |
-|-------------|--------|--------|
-| **Virtual scrolling** | [hexViewer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/hexViewer.ts) | Reduced DOM nodes from 400,000+ to <1,000 for large binaries |
-| **Virtual scrolling** | [assemblyView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/assemblyView.ts) | Reduced DOM nodes from 120,000+ to <500 |
-| **Virtual scrolling** | [stringsView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/stringsView.ts) | Lazy rendering only visible elements |
-| **Upload freeze fix** | [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts) | Fixed O(S×I) → O(S+I) local call graph resolution using Map index lookups (100x speedup) |
-| **Function discovery** | [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts) | Fixed O(F×S) → O(F+S) using Set of existing addresses |
-| **Memory leak fix** | [cfgVisualizer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/cfgVisualizer.ts) | Fixed orphaned event listeners, added `destroy()` method |
-| **Memory leak fix** | [fcgVisualizer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/fcgVisualizer.ts) | Fixed orphaned event listeners, added `destroy()` method |
+| Optimization           | Module                                                                                               | Impact                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Virtual scrolling**  | [hexViewer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/hexViewer.ts)         | Reduced DOM nodes from 400,000+ to <1,000 for large binaries                             |
+| **Virtual scrolling**  | [assemblyView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/assemblyView.ts)   | Reduced DOM nodes from 120,000+ to <500                                                  |
+| **Virtual scrolling**  | [stringsView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/stringsView.ts)     | Lazy rendering only visible elements                                                     |
+| **Upload freeze fix**  | [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts)                      | Fixed O(S×I) → O(S+I) local call graph resolution using Map index lookups (100x speedup) |
+| **Function discovery** | [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts)                      | Fixed O(F×S) → O(F+S) using Set of existing addresses                                    |
+| **Memory leak fix**    | [cfgVisualizer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/cfgVisualizer.ts) | Fixed orphaned event listeners, added `destroy()` method                                 |
+| **Memory leak fix**    | [fcgVisualizer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/fcgVisualizer.ts) | Fixed orphaned event listeners, added `destroy()` method                                 |
 
 ### ✅ IR/SSA Framework Expansion
 
-| Change | Details |
-|--------|---------|
-| **Fixed strength reduction** | `mul by 1` now correctly produces `MOV` instead of `SHL by 0` in [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts) |
-| **Algebraic simplification pass** | Folds identities like `x + 0`, `x - x`, `x ^ x` |
-| **PHI simplification pass** | Simplifies redundant PHI nodes |
+| Change                              | Details                                                                                                                                                              |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fixed strength reduction**        | `mul by 1` now correctly produces `MOV` instead of `SHL by 0` in [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts)            |
+| **Algebraic simplification pass**   | Folds identities like `x + 0`, `x - x`, `x ^ x`                                                                                                                      |
+| **PHI simplification pass**         | Simplifies redundant PHI nodes                                                                                                                                       |
 | **Cooper-Harvey-Kennedy algorithm** | O(N) dominator tree computation replaces O(N²) iterative in [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts) |
 
 ### ✅ Coverage Improvements
 
-| Module | Before | After | Tests |
-|--------|--------|-------|-------|
-| [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts) | ~60% | **100%** | 5 → 15 |
-| [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts) | 47.87% | **99.65%** | 6 → 15 |
-| [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts) | 49.14% | **98.41%** | 29 → 41 |
-| [memoryMap.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/memoryMap.ts) | 0% | **96.13%** | 0 → 9 |
-| [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts) | ~60% | **94.08%** | 6 → 11 |
+| Module                                                                                                   | Before | After      | Tests   |
+| -------------------------------------------------------------------------------------------------------- | ------ | ---------- | ------- |
+| [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts)                     | ~60%   | **100%**   | 5 → 15  |
+| [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts)                       | 47.87% | **99.65%** | 6 → 15  |
+| [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts)         | 49.14% | **98.41%** | 29 → 41 |
+| [memoryMap.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/memoryMap.ts)             | 0%     | **96.13%** | 0 → 9   |
+| [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts) | ~60%   | **94.08%** | 6 → 11  |
 
 ### ✅ PE Resources
 
-| Feature | Details |
-|---------|---------|
-| **Resource directory tree parser** | Extracts manifests, string tables, and icons from PE `.rsrc` sections |
-| **Resource UI** | Integrated into [metadataPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/metadataPanel.ts) and [reportPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/reportPanel.ts) |
+| Feature                            | Details                                                                                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Resource directory tree parser** | Extracts manifests, string tables, and icons from PE `.rsrc` sections                                                                                                                                                     |
+| **Resource UI**                    | Integrated into [metadataPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/metadataPanel.ts) and [reportPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/reportPanel.ts) |
 
 ### ✅ Plugin System Expansion
 
-| Feature | Details |
-|---------|---------|
-| **Lifecycle hooks** | `onBeforeAnalyze`, `onAfterAnalyze`, `onEnable`, `onDisable` |
-| **Dynamic configuration** | Config options UI with real-time updates |
-| **Plugin discovery** | 4 mock discoverable plugins: `elf-hardening`, `crypto-scanner`, `suspicious-apis`, `packer-detector` |
-| **Plugins panel** | [pluginsPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/pluginsPanel.ts) with config UI and findings overview |
+| Feature                   | Details                                                                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Lifecycle hooks**       | `onBeforeAnalyze`, `onAfterAnalyze`, `onEnable`, `onDisable`                                                                            |
+| **Dynamic configuration** | Config options UI with real-time updates                                                                                                |
+| **Plugin discovery**      | 4 mock discoverable plugins: `elf-hardening`, `crypto-scanner`, `suspicious-apis`, `packer-detector`                                    |
+| **Plugins panel**         | [pluginsPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/pluginsPanel.ts) with config UI and findings overview |
 
 ### ✅ E2E Test Expansion
 
-| Tests Added | Description |
-|-------------|-------------|
-| Tab navigation (all 18 panels) | Clicking and cycling through all tab panels |
-| Binary upload workflow | Mocked FileReader input for ELF binary loading |
-| Drag-and-drop workflow | Mocked drop zone events |
-| Search panel workflows | Text query + hex wildcard (`90 55 ?? 89`) mode switches |
+| Tests Added                    | Description                                             |
+| ------------------------------ | ------------------------------------------------------- |
+| Tab navigation (all 18 panels) | Clicking and cycling through all tab panels             |
+| Binary upload workflow         | Mocked FileReader input for ELF binary loading          |
+| Drag-and-drop workflow         | Mocked drop zone events                                 |
+| Search panel workflows         | Text query + hex wildcard (`90 55 ?? 89`) mode switches |
 
 ### Progress Summary
 
@@ -398,6 +398,7 @@ Received: "BBAaseText"
 **Root cause:** The CRDT sequence insert implementation in [collab.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/network/collab.ts) doesn't correctly handle concurrent insertions at the same position. The character ordering is non-deterministic.
 
 **Fix options:**
+
 - **Option A (recommended):** Fix the CRDT `insert` logic in `collab.ts` to use a tie-breaking rule (e.g., peer ID comparison) for concurrent inserts at the same position
 - **Option B:** Update the test expectation to accept either ordering (both `BAaBseText` and `BBAaseText`) since both are valid CRDT convergences
 
@@ -429,54 +430,54 @@ Received: "rgba(112, 16, 16, 0.35)"
 
 ### ✅ Full Test Breakdown (45 files, 568 total tests)
 
-| # | Test File | Tests | Status |
-|---|-----------|-------|--------|
-| 1 | [ai.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ai.test.ts) | 5 | ✅ Pass |
-| 2 | [aiOnDevice.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/aiOnDevice.test.ts) | 14/15 | ⚠️ 1 FAILING (NEW S10) |
-| 3 | [archive.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/archive.test.ts) | 4 | ✅ Pass (NEW S10) |
-| 4 | [capstoneWasm.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/capstoneWasm.test.ts) | 9 | ✅ Pass |
-| 5 | [collab.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/collab.test.ts) | 9/10 | ⚠️ 1 FAILING |
-| 6 | [debugSymbols.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/debugSymbols.test.ts) | 11 | ✅ Pass (NEW S10) |
-| 7 | [decompiler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/decompiler.test.ts) | 11 | ✅ Pass (EXPANDED S10) |
-| 8 | [demangler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/demangler.test.ts) | 8 | ✅ Pass |
-| 9 | [dex.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/dex.test.ts) | 8 | ✅ Pass |
-| 10 | [diff.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/diff.test.ts) | 42 | ✅ Pass |
-| 11 | [dotnetMetadata.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/dotnetMetadata.test.ts) | 3 | ✅ Pass (NEW S10) |
-| 12 | [e2e.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/e2e.test.ts) | 8 | ✅ Pass (EXPANDED S10) |
-| 13 | [elf.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/elf.test.ts) | 15 | ✅ Pass (EXPANDED S10, 100% cov) |
-| 14 | [emulator.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/emulator.test.ts) | 32 | ✅ Pass (EXPANDED S10) |
-| 15 | [entropy.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/entropy.test.ts) | 9 | ✅ Pass |
-| 16 | [entropyGraph.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/entropyGraph.test.ts) | 7 | ✅ Pass |
-| 17 | [fcg.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/fcg.test.ts) | 14 | ✅ Pass |
-| 18 | [frida.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/frida.test.ts) | 11 | ✅ Pass (NEW S10) |
-| 19 | [gdbProtocol.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/gdbProtocol.test.ts) | 16 | ✅ Pass (NEW S10) |
-| 20 | [hashes.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/hashes.test.ts) | 14 | ✅ Pass |
-| 21 | [ir.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ir.test.ts) | 14 | ✅ Pass (EXPANDED S10) |
-| 22 | [javaClass.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/javaClass.test.ts) | 5 | ✅ Pass (NEW S10) |
-| 23 | [macho.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/macho.test.ts) | 9 | ✅ Pass |
-| 24 | [machoObjc.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/machoObjc.test.ts) | 1 | ✅ Pass |
-| 25 | [memoryMap.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/memoryMap.test.ts) | 9 | ✅ Pass (NEW S10, 96% cov) |
-| 26 | [metadata.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/metadata.test.ts) | 6 | ✅ Pass |
-| 27 | [patcher.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/patcher.test.ts) | 18 | ✅ Pass |
-| 28 | [pe.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/pe.test.ts) | 15 | ✅ Pass (EXPANDED S10, 99.65% cov) |
-| 29 | [peResources.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/peResources.test.ts) | 1 | ✅ Pass (NEW S10) |
-| 30 | [plugins.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/plugins.test.ts) | 8 | ✅ Pass (EXPANDED S10) |
-| 31 | [report.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/report.test.ts) | 15 | ✅ Pass |
-| 32 | [reportPanel.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/reportPanel.test.ts) | 5 | ✅ Pass |
-| 33 | [router.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/router.test.ts) | 41 | ✅ Pass (EXPANDED S10, 98.41% cov) |
-| 34 | [scripting.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/scripting.test.ts) | 22 | ✅ Pass |
-| 35 | [search.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/search.test.ts) | 15 | ✅ Pass |
-| 36 | [signatures.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/signatures.test.ts) | 19 | ✅ Pass |
-| 37 | [strings.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/strings.test.ts) | 8 | ✅ Pass |
-| 38 | [syscall.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/syscall.test.ts) | 14 | ✅ Pass (EXPANDED S10) |
-| 39 | [typeSystem.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/typeSystem.test.ts) | 4 | ✅ Pass |
-| 40 | [uiPanels.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/uiPanels.test.ts) | 13/15 | ⚠️ 2 FAILING |
-| 41 | [vulnScanner.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/vulnScanner.test.ts) | 44 | ✅ Pass |
-| 42 | [wasm.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/wasm.test.ts) | 6 | ✅ Pass (EXPANDED S10) |
-| 43 | [xrefs.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/xrefs.test.ts) | 7 | ✅ Pass |
-| 44 | [yara.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/yara.test.ts) | 9 | ✅ Pass |
-| 45 | [yaraPanel.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/yaraPanel.test.ts) | 6 | ✅ Pass |
-| | **TOTAL** | **564/568** | **99.3% pass rate** |
+| #   | Test File                                                                                                       | Tests       | Status                             |
+| --- | --------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------- |
+| 1   | [ai.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ai.test.ts)                         | 5           | ✅ Pass                            |
+| 2   | [aiOnDevice.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/aiOnDevice.test.ts)         | 14/15       | ⚠️ 1 FAILING (NEW S10)             |
+| 3   | [archive.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/archive.test.ts)               | 4           | ✅ Pass (NEW S10)                  |
+| 4   | [capstoneWasm.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/capstoneWasm.test.ts)     | 9           | ✅ Pass                            |
+| 5   | [collab.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/collab.test.ts)                 | 9/10        | ⚠️ 1 FAILING                       |
+| 6   | [debugSymbols.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/debugSymbols.test.ts)     | 11          | ✅ Pass (NEW S10)                  |
+| 7   | [decompiler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/decompiler.test.ts)         | 11          | ✅ Pass (EXPANDED S10)             |
+| 8   | [demangler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/demangler.test.ts)           | 8           | ✅ Pass                            |
+| 9   | [dex.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/dex.test.ts)                       | 8           | ✅ Pass                            |
+| 10  | [diff.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/diff.test.ts)                     | 42          | ✅ Pass                            |
+| 11  | [dotnetMetadata.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/dotnetMetadata.test.ts) | 3           | ✅ Pass (NEW S10)                  |
+| 12  | [e2e.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/e2e.test.ts)                       | 8           | ✅ Pass (EXPANDED S10)             |
+| 13  | [elf.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/elf.test.ts)                       | 15          | ✅ Pass (EXPANDED S10, 100% cov)   |
+| 14  | [emulator.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/emulator.test.ts)             | 32          | ✅ Pass (EXPANDED S10)             |
+| 15  | [entropy.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/entropy.test.ts)               | 9           | ✅ Pass                            |
+| 16  | [entropyGraph.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/entropyGraph.test.ts)     | 7           | ✅ Pass                            |
+| 17  | [fcg.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/fcg.test.ts)                       | 14          | ✅ Pass                            |
+| 18  | [frida.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/frida.test.ts)                   | 11          | ✅ Pass (NEW S10)                  |
+| 19  | [gdbProtocol.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/gdbProtocol.test.ts)       | 16          | ✅ Pass (NEW S10)                  |
+| 20  | [hashes.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/hashes.test.ts)                 | 14          | ✅ Pass                            |
+| 21  | [ir.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ir.test.ts)                         | 14          | ✅ Pass (EXPANDED S10)             |
+| 22  | [javaClass.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/javaClass.test.ts)           | 5           | ✅ Pass (NEW S10)                  |
+| 23  | [macho.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/macho.test.ts)                   | 9           | ✅ Pass                            |
+| 24  | [machoObjc.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/machoObjc.test.ts)           | 1           | ✅ Pass                            |
+| 25  | [memoryMap.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/memoryMap.test.ts)           | 9           | ✅ Pass (NEW S10, 96% cov)         |
+| 26  | [metadata.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/metadata.test.ts)             | 6           | ✅ Pass                            |
+| 27  | [patcher.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/patcher.test.ts)               | 18          | ✅ Pass                            |
+| 28  | [pe.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/pe.test.ts)                         | 15          | ✅ Pass (EXPANDED S10, 99.65% cov) |
+| 29  | [peResources.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/peResources.test.ts)       | 1           | ✅ Pass (NEW S10)                  |
+| 30  | [plugins.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/plugins.test.ts)               | 8           | ✅ Pass (EXPANDED S10)             |
+| 31  | [report.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/report.test.ts)                 | 15          | ✅ Pass                            |
+| 32  | [reportPanel.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/reportPanel.test.ts)       | 5           | ✅ Pass                            |
+| 33  | [router.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/router.test.ts)                 | 41          | ✅ Pass (EXPANDED S10, 98.41% cov) |
+| 34  | [scripting.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/scripting.test.ts)           | 22          | ✅ Pass                            |
+| 35  | [search.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/search.test.ts)                 | 15          | ✅ Pass                            |
+| 36  | [signatures.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/signatures.test.ts)         | 19          | ✅ Pass                            |
+| 37  | [strings.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/strings.test.ts)               | 8           | ✅ Pass                            |
+| 38  | [syscall.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/syscall.test.ts)               | 14          | ✅ Pass (EXPANDED S10)             |
+| 39  | [typeSystem.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/typeSystem.test.ts)         | 4           | ✅ Pass                            |
+| 40  | [uiPanels.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/uiPanels.test.ts)             | 13/15       | ⚠️ 2 FAILING                       |
+| 41  | [vulnScanner.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/vulnScanner.test.ts)       | 44          | ✅ Pass                            |
+| 42  | [wasm.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/wasm.test.ts)                     | 6           | ✅ Pass (EXPANDED S10)             |
+| 43  | [xrefs.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/xrefs.test.ts)                   | 7           | ✅ Pass                            |
+| 44  | [yara.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/yara.test.ts)                     | 9           | ✅ Pass                            |
+| 45  | [yaraPanel.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/yaraPanel.test.ts)           | 6           | ✅ Pass                            |
+|     | **TOTAL**                                                                                                       | **564/568** | **99.3% pass rate**                |
 
 ---
 
@@ -484,17 +485,17 @@ Received: "rgba(112, 16, 16, 0.35)"
 
 ### Versions
 
-| Component | Version | Notes |
-|-----------|---------|-------|
-| TypeScript | 6.0.3 | Strict mode, ES2022 target |
-| Vite | 8.0.14 | Dev server on port 5173, root: `src/` |
-| Vitest | 4.1.7 | Test runner, test files in `tests/` |
-| pnpm | latest | **ALWAYS use pnpm, NEVER npm** |
-| Node.js | latest LTS | |
-| ESLint | 10.4.0 | Flat config with typescript-eslint |
-| Prettier | 3.8.3 | Semi, singleQuote, tabWidth:2, trailingComma:es5 |
-| jsdom | 29.1.1 | For UI component testing |
-| @vitest/coverage-v8 | 4.1.7 | Coverage reporting |
+| Component           | Version    | Notes                                            |
+| ------------------- | ---------- | ------------------------------------------------ |
+| TypeScript          | 6.0.3      | Strict mode, ES2022 target                       |
+| Vite                | 8.0.14     | Dev server on port 5173, root: `src/`            |
+| Vitest              | 4.1.7      | Test runner, test files in `tests/`              |
+| pnpm                | latest     | **ALWAYS use pnpm, NEVER npm**                   |
+| Node.js             | latest LTS |                                                  |
+| ESLint              | 10.4.0     | Flat config with typescript-eslint               |
+| Prettier            | 3.8.3      | Semi, singleQuote, tabWidth:2, trailingComma:es5 |
+| jsdom               | 29.1.1     | For UI component testing                         |
+| @vitest/coverage-v8 | 4.1.7      | Coverage reporting                               |
 
 ### Key Configuration Details
 
@@ -582,31 +583,31 @@ These tasks were started in Session 10 but hit quota limits:
 
 ### Code Review Findings
 
-| Area | Finding | Recommendation |
-|------|---------|----------------|
-| **main.ts** (71.5 KB) | Monolithic 2000-line god class | Decompose into `TabManager`, `BinaryLoader`, `PanelCoordinator` modules |
-| **DOM rendering** | Virtual scrolling now implemented for hex/assembly/strings | ✅ Resolved in S10 |
-| **Bundle size** | 558 KB chunk exceeds 500 KB warning | Implement code splitting with dynamic import() |
+| Area                  | Finding                                                    | Recommendation                                                          |
+| --------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **main.ts** (71.5 KB) | Monolithic 2000-line god class                             | Decompose into `TabManager`, `BinaryLoader`, `PanelCoordinator` modules |
+| **DOM rendering**     | Virtual scrolling now implemented for hex/assembly/strings | ✅ Resolved in S10                                                      |
+| **Bundle size**       | 558 KB chunk exceeds 500 KB warning                        | Implement code splitting with dynamic import()                          |
 
 ### Performance Audit Findings
 
-| Issue | Location | Impact | Status |
-|-------|----------|--------|--------|
-| **Memory leak** | cfgVisualizer.ts | Orphaned `window` resize listeners | ✅ Fixed S10 |
-| **Memory leak** | fcgVisualizer.ts | Orphaned `window` event listeners | ✅ Fixed S10 |
-| **Upload freeze** | main.ts | O(N²) loops caused 200KB+ binary hangs | ✅ Fixed S10 |
-| **Layout pressure** | Hex/Assembly/Strings views | Large datasets cause jank | ✅ Fixed S10 (virtual scrolling) |
-| **Recursion risk** | decompiler.ts | Deep AST structuring can overflow stack | ⚠️ Still open |
+| Issue               | Location                   | Impact                                  | Status                           |
+| ------------------- | -------------------------- | --------------------------------------- | -------------------------------- |
+| **Memory leak**     | cfgVisualizer.ts           | Orphaned `window` resize listeners      | ✅ Fixed S10                     |
+| **Memory leak**     | fcgVisualizer.ts           | Orphaned `window` event listeners       | ✅ Fixed S10                     |
+| **Upload freeze**   | main.ts                    | O(N²) loops caused 200KB+ binary hangs  | ✅ Fixed S10                     |
+| **Layout pressure** | Hex/Assembly/Strings views | Large datasets cause jank               | ✅ Fixed S10 (virtual scrolling) |
+| **Recursion risk**  | decompiler.ts              | Deep AST structuring can overflow stack | ⚠️ Still open                    |
 
 ### Coverage Achievements (Session 10)
 
-| File | Coverage Before S10 | Coverage After S10 |
-|------|---------------------|-------------------|
-| [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts) | ~60% | **100%** ✅ |
-| [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts) | 47.87% | **99.65%** ✅ |
-| [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts) | 49.14% | **98.41%** ✅ |
-| [memoryMap.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/memoryMap.ts) | 0% | **96.13%** ✅ |
-| [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts) | ~60% | **94.08%** ✅ |
+| File                                                                                                     | Coverage Before S10 | Coverage After S10 |
+| -------------------------------------------------------------------------------------------------------- | ------------------- | ------------------ |
+| [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts)                     | ~60%                | **100%** ✅        |
+| [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts)                       | 47.87%              | **99.65%** ✅      |
+| [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts)         | 49.14%              | **98.41%** ✅      |
+| [memoryMap.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/memoryMap.ts)             | 0%                  | **96.13%** ✅      |
+| [decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts) | ~60%                | **94.08%** ✅      |
 
 ---
 
@@ -659,30 +660,30 @@ pnpm eslint src/
 
 ### Session-by-Session Table
 
-| Metric | S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8 | S9 | **S10** |
-|--------|----|----|----|----|----|----|----|----|----|---------| 
-| Test Files | 4 | 10 | 11 | 13 | 18 | 31 | 31 | 33 | 35 | **45** |
-| Total Tests | 17 | 84 | 97 | 144 | 173 | 297 | 297 | 398 | 423 | **568** |
-| Passing | 17 | 84 | 97 | 144 | 171 | 292 | 292 | 394 | 422 | **564** |
-| Failing | 0 | 0 | 0 | 0 | 2 | 5 | 5 | 4 | 1 | **4** |
-| Source Files | 17 | 30 | 32 | 38 | 55+ | 65+ | 68+ | 70+ | 75+ | **85+** |
-| Bundle (KB) | 91 | ~150 | ~180 | ~250 | 354 | 487 | 487 | 487 | 497 | **558** |
+| Metric       | S1   | S2   | S3   | S4   | S5   | S6   | S7  | S8  | S9  | **S10**  |
+| ------------ | ---- | ---- | ---- | ---- | ---- | ---- | --- | --- | --- | -------- |
+| Test Files   | 4    | 10   | 11   | 13   | 18   | 31   | 31  | 33  | 35  | **45**   |
+| Total Tests  | 17   | 84   | 97   | 144  | 173  | 297  | 297 | 398 | 423 | **568**  |
+| Passing      | 17   | 84   | 97   | 144  | 171  | 292  | 292 | 394 | 422 | **564**  |
+| Failing      | 0    | 0    | 0    | 0    | 2    | 5    | 5   | 4   | 1   | **4**    |
+| Source Files | 17   | 30   | 32   | 38   | 55+  | 65+  | 68+ | 70+ | 75+ | **85+**  |
+| Bundle (KB)  | 91   | ~150 | ~180 | ~250 | 354  | 487  | 487 | 487 | 497 | **558**  |
 | DEVLOG Lines | ~100 | ~300 | ~400 | ~500 | ~640 | ~736 | 776 | 866 | 906 | **1160** |
 
 ### Session Highlights
 
-| Session | Key Deliverables |
-|---------|-----------------|
-| **1** | Project init, ELF/PE/WASM parsers, CFG builder, decompiler, hex viewer, assembly view, CFG visualizer, CSS design system, 17 tests |
-| **2** | Mach-O/DEX parsers, entropy/strings/search/signatures analyzers, memory map, strings viewer, search panel, dependency graph |
-| **3** | Router testing, signature scan panel, report generator, emulator CPU/memory core |
-| **4** | Emulator executor, report panel, memory permissions, XRefs engine, YARA engine |
-| **5** | Full docs suite, imports/exports panel, XRefs panel, collab sync, AI/patcher/FCG/scripting, entropy graph, FCG visualizer |
-| **6** | Demangler, binary diff, vuln scanner, type system, metadata, Capstone WASM, syscall emulation, 297 tests, massive integration push |
-| **7** | Tab integration wiring, docs expansion, git commit all files |
-| **8** | Fixed 5 original test failures (capstone/syscall/cfg). Built IR/SSA framework. Expanded tests (+101). 394/398 tests |
-| **9** | Fixed ALL 4 remaining failures. Plugin architecture. E2E integration tests. Expanded instruction tables (x86+ARM). Code audits. 422/423 tests (99.8% pass) |
-| **10** | **Java class parser, debug symbols (DWARF+PDB), .NET metadata, archive unpacker, GDB RSP protocol, Frida DBI, on-device AI, plugin expansion, virtual scrolling (hex/assembly/strings), upload freeze fix (O(N²)→O(N)), memory leak fixes, PE resources, decompiler CHK algorithm, IR algebraic+PHI simplification, coverage: ELF→100%, PE→99.65%, router→98.41%, memoryMap→96.13%, decompiler→94.08%. 564/568 tests (99.3% pass)** |
+| Session | Key Deliverables                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1**   | Project init, ELF/PE/WASM parsers, CFG builder, decompiler, hex viewer, assembly view, CFG visualizer, CSS design system, 17 tests                                                                                                                                                                                                                                                                                                  |
+| **2**   | Mach-O/DEX parsers, entropy/strings/search/signatures analyzers, memory map, strings viewer, search panel, dependency graph                                                                                                                                                                                                                                                                                                         |
+| **3**   | Router testing, signature scan panel, report generator, emulator CPU/memory core                                                                                                                                                                                                                                                                                                                                                    |
+| **4**   | Emulator executor, report panel, memory permissions, XRefs engine, YARA engine                                                                                                                                                                                                                                                                                                                                                      |
+| **5**   | Full docs suite, imports/exports panel, XRefs panel, collab sync, AI/patcher/FCG/scripting, entropy graph, FCG visualizer                                                                                                                                                                                                                                                                                                           |
+| **6**   | Demangler, binary diff, vuln scanner, type system, metadata, Capstone WASM, syscall emulation, 297 tests, massive integration push                                                                                                                                                                                                                                                                                                  |
+| **7**   | Tab integration wiring, docs expansion, git commit all files                                                                                                                                                                                                                                                                                                                                                                        |
+| **8**   | Fixed 5 original test failures (capstone/syscall/cfg). Built IR/SSA framework. Expanded tests (+101). 394/398 tests                                                                                                                                                                                                                                                                                                                 |
+| **9**   | Fixed ALL 4 remaining failures. Plugin architecture. E2E integration tests. Expanded instruction tables (x86+ARM). Code audits. 422/423 tests (99.8% pass)                                                                                                                                                                                                                                                                          |
+| **10**  | **Java class parser, debug symbols (DWARF+PDB), .NET metadata, archive unpacker, GDB RSP protocol, Frida DBI, on-device AI, plugin expansion, virtual scrolling (hex/assembly/strings), upload freeze fix (O(N²)→O(N)), memory leak fixes, PE resources, decompiler CHK algorithm, IR algebraic+PHI simplification, coverage: ELF→100%, PE→99.65%, router→98.41%, memoryMap→96.13%, decompiler→94.08%. 564/568 tests (99.3% pass)** |
 
 ### Cumulative Growth
 
@@ -714,26 +715,27 @@ git add -A && git commit -m "feat: session 10 - Java/debugSymbols/dotnet/archive
 
 ### ⚡ STEP 3: Launch 5 Subagents NOW
 
-| # | Subagent Task | Priority |
-|---|---------------|----------|
-| 1 | **Fix 4 failing tests** (aiOnDevice, collab, uiPanels) | 🔴 P0 |
-| 2 | **Git add + commit all files** | 🔴 P0 |
-| 3 | **Run `pnpm build` and verify bundle** | 🔴 P0 |
-| 4 | **Complete Mach-O ObjC parser + tests** | 🟠 P1 |
-| 5 | **Complete Mach-O code signature parser + tests** | 🟠 P1 |
-| 6 | **Wire machoObjcPanel into main.ts** | 🟠 P1 |
-| 7 | **Fix WASM name section parser** | 🟠 P1 |
-| 8 | **Create GDB debug panel UI** | 🟠 P1 |
-| 9 | **Expand type system** — more tests, struct editing | 🟡 P2 |
-| 10 | **Decompose main.ts** into TabManager/BinaryLoader/PanelCoordinator | 🟡 P2 |
-| 11 | **Add code splitting** via dynamic import() for bundle optimization | 🟡 P2 |
-| 12 | **Expand IR/SSA** — loop invariant code motion, register allocation | 🟡 P2 |
+| #   | Subagent Task                                                       | Priority |
+| --- | ------------------------------------------------------------------- | -------- |
+| 1   | **Fix 4 failing tests** (aiOnDevice, collab, uiPanels)              | 🔴 P0    |
+| 2   | **Git add + commit all files**                                      | 🔴 P0    |
+| 3   | **Run `pnpm build` and verify bundle**                              | 🔴 P0    |
+| 4   | **Complete Mach-O ObjC parser + tests**                             | 🟠 P1    |
+| 5   | **Complete Mach-O code signature parser + tests**                   | 🟠 P1    |
+| 6   | **Wire machoObjcPanel into main.ts**                                | 🟠 P1    |
+| 7   | **Fix WASM name section parser**                                    | 🟠 P1    |
+| 8   | **Create GDB debug panel UI**                                       | 🟠 P1    |
+| 9   | **Expand type system** — more tests, struct editing                 | 🟡 P2    |
+| 10  | **Decompose main.ts** into TabManager/BinaryLoader/PanelCoordinator | 🟡 P2    |
+| 11  | **Add code splitting** via dynamic import() for bundle optimization | 🟡 P2    |
+| 12  | **Expand IR/SSA** — loop invariant code motion, register allocation | 🟡 P2    |
 
 ---
 
 ## 🎨 Design Rules
 
 ### Visual Theme
+
 - **Dark glassmorphic** — use CSS variables from [styles.css](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/styles.css)
 - **Color palette**: Slate/charcoal backgrounds (`--bg-primary: #0a0c10`, `--bg-secondary: #12151c`)
 - **Accent**: Indigo-to-violet gradient (`--accent-start: #6366f1`, `--accent-end: #8b5cf6`)
@@ -742,6 +744,7 @@ git add -A && git commit -m "feat: session 10 - Java/debugSymbols/dotnet/archive
 - **Glass effect**: `backdrop-filter: blur(16px)`, semi-transparent `rgba()` backgrounds, subtle borders
 
 ### Component Patterns
+
 - **Panels**: Reference [searchPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/searchPanel.ts) and [signaturePanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/signaturePanel.ts)
 - **Glassmorphism**: `background: var(--bg-glass)`, `border: 1px solid var(--border-color)`, `border-radius: 12px`
 - **Micro-animations**: Hover transforms (`translateY(-2px)`), smooth transitions (`0.2s ease`), box-shadow glow
@@ -749,6 +752,7 @@ git add -A && git commit -m "feat: session 10 - Java/debugSymbols/dotnet/archive
 - **Badges**: Gradient backgrounds, rounded pills, status indicators
 
 ### Code Style Rules
+
 - **Always use `.js` extensions** in TypeScript imports (ESM/NodeNext requirement)
 - **Follow existing patterns** — each UI panel exports a class with `render()` method
 - **Panel integration pattern** (in [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts)):
@@ -779,4 +783,4 @@ git add -A && git commit -m "feat: session 10 - Java/debugSymbols/dotnet/archive
 
 ---
 
-*Session 11 must IMMEDIATELY START BUILDING. Fix the 4 failing tests, commit everything, then launch 5 subagents to build new features. Focus on completing incomplete Session 10 tasks (Mach-O ObjC, code signature, WASM name section, GDB panel, type system). We are at 564/568 tests passing (99.3%) — let's hit 600+ tests and zero failures. SCALE TOWARD 1M LOC. 🚀🚀🚀*
+_Session 11 must IMMEDIATELY START BUILDING. Fix the 4 failing tests, commit everything, then launch 5 subagents to build new features. Focus on completing incomplete Session 10 tasks (Mach-O ObjC, code signature, WASM name section, GDB panel, type system). We are at 564/568 tests passing (99.3%) — let's hit 600+ tests and zero failures. SCALE TOWARD 1M LOC. 🚀🚀🚀_

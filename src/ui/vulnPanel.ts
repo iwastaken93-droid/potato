@@ -4,10 +4,17 @@
  */
 
 import { Section, Symbol, Instruction } from '../disassembler/types.js';
-import { VulnScanner, VulnMatch, VulnScannerConfig } from '../analyzer/vulnScanner.js';
+import {
+  VulnScanner,
+  VulnMatch,
+  VulnScannerConfig,
+} from '../analyzer/vulnScanner.js';
 
 export interface VulnPanelOptions {
-  onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export class VulnPanel {
@@ -25,7 +32,7 @@ export class VulnPanel {
   private config: VulnScannerConfig = {
     unsafeApi: true,
     bufferOverflow: true,
-    integerOverflow: true
+    integerOverflow: true,
   };
 
   // DOM Elements
@@ -292,12 +299,18 @@ export class VulnPanel {
     `;
 
     this.container.appendChild(this.rootEl);
-    this.scanResultsEl = document.getElementById('vuln-results-list') as HTMLDivElement;
-    this.summaryStatsEl = document.getElementById('vuln-stats-bar') as HTMLDivElement;
+    this.scanResultsEl = document.getElementById(
+      'vuln-results-list'
+    ) as HTMLDivElement;
+    this.summaryStatsEl = document.getElementById(
+      'vuln-stats-bar'
+    ) as HTMLDivElement;
   }
 
   private setupEvents() {
-    const chkUnsafe = document.getElementById('vuln-chk-unsafe') as HTMLInputElement;
+    const chkUnsafe = document.getElementById(
+      'vuln-chk-unsafe'
+    ) as HTMLInputElement;
     const chkBuf = document.getElementById('vuln-chk-buf') as HTMLInputElement;
     const chkInt = document.getElementById('vuln-chk-int') as HTMLInputElement;
 
@@ -326,16 +339,20 @@ export class VulnPanel {
     );
 
     // Update statistics
-    let high = 0, medium = 0, low = 0;
-    matches.forEach(m => {
+    let high = 0,
+      medium = 0,
+      low = 0;
+    matches.forEach((m) => {
       if (m.severity === 'high') high++;
       else if (m.severity === 'medium') medium++;
       else if (m.severity === 'low') low++;
     });
 
-    document.getElementById('vuln-stat-total')!.textContent = matches.length.toString();
+    document.getElementById('vuln-stat-total')!.textContent =
+      matches.length.toString();
     document.getElementById('vuln-stat-high')!.textContent = high.toString();
-    document.getElementById('vuln-stat-medium')!.textContent = medium.toString();
+    document.getElementById('vuln-stat-medium')!.textContent =
+      medium.toString();
     document.getElementById('vuln-stat-low')!.textContent = low.toString();
 
     if (matches.length === 0) {
@@ -382,11 +399,16 @@ export class VulnPanel {
 
   private getCategoryName(category: string): string {
     switch (category) {
-      case 'unsafe_api': return 'Unsafe API Usage';
-      case 'buffer_overflow': return 'Potential Buffer Overflow';
-      case 'integer_overflow': return 'Potential Integer Overflow';
-      case 'format_string': return 'Format String Vulnerability';
-      default: return 'Security Flaw';
+      case 'unsafe_api':
+        return 'Unsafe API Usage';
+      case 'buffer_overflow':
+        return 'Potential Buffer Overflow';
+      case 'integer_overflow':
+        return 'Potential Integer Overflow';
+      case 'format_string':
+        return 'Format String Vulnerability';
+      default:
+        return 'Security Flaw';
     }
   }
 }

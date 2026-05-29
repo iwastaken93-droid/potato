@@ -113,7 +113,10 @@ export interface MachoSignatureInfo {
 /**
  * Basic ASN.1 DER Parser
  */
-export function parseASN1(data: Uint8Array, offset = 0): { node: ASN1Node; nextOffset: number } {
+export function parseASN1(
+  data: Uint8Array,
+  offset = 0
+): { node: ASN1Node; nextOffset: number } {
   const start = offset;
   if (offset >= data.length) {
     throw new Error('ASN.1: empty data');
@@ -149,7 +152,9 @@ export function parseASN1(data: Uint8Array, offset = 0): { node: ASN1Node; nextO
   }
 
   if (offset + length > data.length) {
-    throw new Error(`ASN.1: value out of bounds (length: ${length}, size: ${data.length - offset})`);
+    throw new Error(
+      `ASN.1: value out of bounds (length: ${length}, size: ${data.length - offset})`
+    );
   }
 
   const valueBytes = data.slice(offset, offset + length);
@@ -158,20 +163,48 @@ export function parseASN1(data: Uint8Array, offset = 0): { node: ASN1Node; nextO
   let type = `TAG_${tagNumber}`;
   if (tagClass === 0) {
     switch (tagNumber) {
-      case 1: type = 'BOOLEAN'; break;
-      case 2: type = 'INTEGER'; break;
-      case 3: type = 'BIT STRING'; break;
-      case 4: type = 'OCTET STRING'; break;
-      case 5: type = 'NULL'; break;
-      case 6: type = 'OBJECT IDENTIFIER'; break;
-      case 12: type = 'UTF8String'; break;
-      case 16: type = 'SEQUENCE'; break;
-      case 17: type = 'SET'; break;
-      case 19: type = 'PrintableString'; break;
-      case 20: type = 'T61String'; break;
-      case 22: type = 'IA5String'; break;
-      case 23: type = 'UTCTime'; break;
-      case 24: type = 'GeneralizedTime'; break;
+      case 1:
+        type = 'BOOLEAN';
+        break;
+      case 2:
+        type = 'INTEGER';
+        break;
+      case 3:
+        type = 'BIT STRING';
+        break;
+      case 4:
+        type = 'OCTET STRING';
+        break;
+      case 5:
+        type = 'NULL';
+        break;
+      case 6:
+        type = 'OBJECT IDENTIFIER';
+        break;
+      case 12:
+        type = 'UTF8String';
+        break;
+      case 16:
+        type = 'SEQUENCE';
+        break;
+      case 17:
+        type = 'SET';
+        break;
+      case 19:
+        type = 'PrintableString';
+        break;
+      case 20:
+        type = 'T61String';
+        break;
+      case 22:
+        type = 'IA5String';
+        break;
+      case 23:
+        type = 'UTCTime';
+        break;
+      case 24:
+        type = 'GeneralizedTime';
+        break;
     }
   } else if (tagClass === 2) {
     type = `CONTEXT_${tagNumber}`;
@@ -262,10 +295,17 @@ export function parseX509Name(node: ASN1Node): Record<string, string> {
   for (const setNode of node.value) {
     if (setNode.type === 'SET' && Array.isArray(setNode.value)) {
       for (const seq of setNode.value) {
-        if (seq.type === 'SEQUENCE' && Array.isArray(seq.value) && seq.value.length >= 2) {
+        if (
+          seq.type === 'SEQUENCE' &&
+          Array.isArray(seq.value) &&
+          seq.value.length >= 2
+        ) {
           const oidNode = seq.value[0];
           const valNode = seq.value[1];
-          if (oidNode.type === 'OBJECT IDENTIFIER' && oidNode.value instanceof Uint8Array) {
+          if (
+            oidNode.type === 'OBJECT IDENTIFIER' &&
+            oidNode.value instanceof Uint8Array
+          ) {
             const oid = parseOID(oidNode.value);
             const key = OID_MAP[oid] || oid;
             if (valNode.value instanceof Uint8Array) {
@@ -285,10 +325,17 @@ export function formatX509Name(name: Record<string, string>): string {
     .join(', ');
 }
 
-export function parseValidity(node: ASN1Node): { notBefore: string; notAfter: string } {
+export function parseValidity(node: ASN1Node): {
+  notBefore: string;
+  notAfter: string;
+} {
   let notBefore = '';
   let notAfter = '';
-  if (node.type === 'SEQUENCE' && Array.isArray(node.value) && node.value.length >= 2) {
+  if (
+    node.type === 'SEQUENCE' &&
+    Array.isArray(node.value) &&
+    node.value.length >= 2
+  ) {
     const nb = node.value[0];
     const na = node.value[1];
     if (nb.value instanceof Uint8Array) {
@@ -313,7 +360,11 @@ export function parseSerialNumber(node: ASN1Node): string {
 }
 
 export function parseCertificate(certNode: ASN1Node): ParsedCertificate | null {
-  if (certNode.type !== 'SEQUENCE' || !Array.isArray(certNode.value) || certNode.value.length < 3) {
+  if (
+    certNode.type !== 'SEQUENCE' ||
+    !Array.isArray(certNode.value) ||
+    certNode.value.length < 3
+  ) {
     return null;
   }
 
@@ -378,7 +429,10 @@ export function extractCertificates(node: ASN1Node): ASN1Node[] {
 /**
  * Parses raw code signature blob wrapper and extracts CMS/PKCS7 certificate chains.
  */
-export function parseSignatureSlot(bytes: Uint8Array): { raw: Uint8Array; certificates: ParsedCertificate[] } {
+export function parseSignatureSlot(bytes: Uint8Array): {
+  raw: Uint8Array;
+  certificates: ParsedCertificate[];
+} {
   try {
     const { node } = parseASN1(bytes);
     const certNodes = extractCertificates(node);
@@ -505,13 +559,20 @@ export function parseEntitlements(bytes: Uint8Array): string {
   // Entitlements magic is 0xfade0c01 (or CSMAGIC_REQUIREMENTS, but in this slot context it contains XML plist)
   // Skip the magic (4 bytes) and length (4 bytes)
   if (bytes.length < 8) return '';
-  return parseASN1String(bytes.slice(8));
+  const str = parseASN1String(bytes.slice(8));
+  const nullIdx = str.indexOf('\0');
+  const cleanStr = nullIdx !== -1 ? str.slice(0, nullIdx) : str;
+  return cleanStr.trim();
 }
 
 /**
  * Main function to parse code signature from a binary buffer given its offset and size.
  */
-export function parseMachoSignature(buffer: ArrayBuffer, dataoff: number, datasize: number): MachoSignatureInfo {
+export function parseMachoSignature(
+  buffer: ArrayBuffer,
+  dataoff: number,
+  datasize: number
+): MachoSignatureInfo {
   if (dataoff + datasize > buffer.byteLength) {
     throw new Error('Code signature offset and size exceed buffer bounds');
   }
@@ -542,12 +603,14 @@ export function parseMachoSignature(buffer: ArrayBuffer, dataoff: number, datasi
 
     if (offset >= datasize) continue;
 
-    const typeName = SLOT_NAMES[type] || `CSSLOT_UNKNOWN_0x${type.toString(16)}`;
+    const typeName =
+      SLOT_NAMES[type] || `CSSLOT_UNKNOWN_0x${type.toString(16)}`;
 
     // Read the blob header at the specified offset
     const blobMagic = view.getUint32(offset, false);
     const blobLength = view.getUint32(offset + 4, false);
-    const magicName = MAGIC_NAMES[blobMagic] || `CSMAGIC_UNKNOWN_0x${blobMagic.toString(16)}`;
+    const magicName =
+      MAGIC_NAMES[blobMagic] || `CSMAGIC_UNKNOWN_0x${blobMagic.toString(16)}`;
 
     if (offset + blobLength > datasize) continue;
 

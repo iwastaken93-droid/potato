@@ -309,7 +309,11 @@ describe('PE Parser Unit Tests', () => {
     const sectionOffset = optionalOffset + sizeOfOptionalHeader; // 312
 
     // Section 1: .text
-    bytes[sectionOffset] = 0x2e; bytes[sectionOffset + 1] = 0x74; bytes[sectionOffset + 2] = 0x65; bytes[sectionOffset + 3] = 0x78; bytes[sectionOffset + 4] = 0x74;
+    bytes[sectionOffset] = 0x2e;
+    bytes[sectionOffset + 1] = 0x74;
+    bytes[sectionOffset + 2] = 0x65;
+    bytes[sectionOffset + 3] = 0x78;
+    bytes[sectionOffset + 4] = 0x74;
     view.setUint32(sectionOffset + 8, 0x1000, true); // VirtualSize
     view.setUint32(sectionOffset + 12, 0x1000, true); // VirtualAddress
     view.setUint32(sectionOffset + 16, 0x200, true); // SizeOfRawData
@@ -317,7 +321,12 @@ describe('PE Parser Unit Tests', () => {
 
     // Section 2: .edata (Export data)
     const sec2Offset = sectionOffset + 40; // 352
-    bytes[sec2Offset] = 0x2e; bytes[sec2Offset + 1] = 0x65; bytes[sec2Offset + 2] = 0x64; bytes[sec2Offset + 3] = 0x61; bytes[sec2Offset + 4] = 0x74; bytes[sec2Offset + 5] = 0x61;
+    bytes[sec2Offset] = 0x2e;
+    bytes[sec2Offset + 1] = 0x65;
+    bytes[sec2Offset + 2] = 0x64;
+    bytes[sec2Offset + 3] = 0x61;
+    bytes[sec2Offset + 4] = 0x74;
+    bytes[sec2Offset + 5] = 0x61;
     view.setUint32(sec2Offset + 8, 0x1000, true);
     view.setUint32(sec2Offset + 12, 0x3000, true);
     view.setUint32(sec2Offset + 16, 0x1000, true);
@@ -325,9 +334,19 @@ describe('PE Parser Unit Tests', () => {
 
     // Section 3: .idata (Import data)
     const sec3Offset = sectionOffset + 80; // 392
-    bytes[sec3Offset] = 0x2e; bytes[sec3Offset + 1] = 0x69; bytes[sec3Offset + 2] = 0x69; bytes[sec3Offset + 3] = 0x64; bytes[sec3Offset + 4] = 0x74; bytes[sec3Offset + 5] = 0x61; // typo? let's make it ".idata"
+    bytes[sec3Offset] = 0x2e;
+    bytes[sec3Offset + 1] = 0x69;
+    bytes[sec3Offset + 2] = 0x69;
+    bytes[sec3Offset + 3] = 0x64;
+    bytes[sec3Offset + 4] = 0x74;
+    bytes[sec3Offset + 5] = 0x61; // typo? let's make it ".idata"
     // Wait, bytes[sec3Offset] is '.', 'i', 'd', 'a', 't', 'a'. Let's correct it:
-    bytes[sec3Offset] = 0x2e; bytes[sec3Offset + 1] = 0x69; bytes[sec3Offset + 2] = 0x64; bytes[sec3Offset + 3] = 0x61; bytes[sec3Offset + 4] = 0x74; bytes[sec3Offset + 5] = 0x61;
+    bytes[sec3Offset] = 0x2e;
+    bytes[sec3Offset + 1] = 0x69;
+    bytes[sec3Offset + 2] = 0x64;
+    bytes[sec3Offset + 3] = 0x61;
+    bytes[sec3Offset + 4] = 0x74;
+    bytes[sec3Offset + 5] = 0x61;
     view.setUint32(sec3Offset + 8, 0x1000, true);
     view.setUint32(sec3Offset + 12, 0x4000, true);
     view.setUint32(sec3Offset + 16, 0x1000, true);
@@ -348,7 +367,7 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(expOffset + 36, 0x3080, true); // addressOfNameOrdinals (points to 0x3080, file offset 0x1080)
 
     // Write DLL name at 0x3030 (file offset 0x1030)
-    const dllName = "my_dll.dll";
+    const dllName = 'my_dll.dll';
     for (let i = 0; i < dllName.length; i++) {
       bytes[0x1030 + i] = dllName.charCodeAt(i);
     }
@@ -363,7 +382,7 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(0x1068, 0x0000, true);
 
     // Write forwarder string at 0x3040 (file offset 0x1040)
-    const forwarder = "other_dll.other_func";
+    const forwarder = 'other_dll.other_func';
     for (let i = 0; i < forwarder.length; i++) {
       bytes[0x1040 + i] = forwarder.charCodeAt(i);
     }
@@ -375,12 +394,14 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(0x1070, 0x3090, true);
     view.setUint32(0x1074, 0x30a0, true);
 
-    const name1 = "func_one";
-    for (let i = 0; i < name1.length; i++) bytes[0x1090 + i] = name1.charCodeAt(i);
+    const name1 = 'func_one';
+    for (let i = 0; i < name1.length; i++)
+      bytes[0x1090 + i] = name1.charCodeAt(i);
     bytes[0x1090 + name1.length] = 0;
 
-    const name2 = "func_two";
-    for (let i = 0; i < name2.length; i++) bytes[0x10a0 + i] = name2.charCodeAt(i);
+    const name2 = 'func_two';
+    for (let i = 0; i < name2.length; i++)
+      bytes[0x10a0 + i] = name2.charCodeAt(i);
     bytes[0x10a0 + name2.length] = 0;
 
     // Write addressOfNameOrdinals at 0x3080 (file offset 0x1080)
@@ -398,7 +419,7 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(impOffset + 16, 0x4040, true); // firstThunk (IAT)
 
     // Write dll name "kernel32.dll" at 0x4050 (file offset 0x2050)
-    const impDllName = "kernel32.dll";
+    const impDllName = 'kernel32.dll';
     for (let i = 0; i < impDllName.length; i++) {
       bytes[0x2050 + i] = impDllName.charCodeAt(i);
     }
@@ -415,7 +436,7 @@ describe('PE Parser Unit Tests', () => {
     // Write name descriptor at 0x4060 (file offset 0x2060)
     // hint = 12 (uint16), name = "CreateFileA"
     view.setUint16(0x2060, 12, true);
-    const impFuncName = "CreateFileA";
+    const impFuncName = 'CreateFileA';
     for (let i = 0; i < impFuncName.length; i++) {
       bytes[0x2062 + i] = impFuncName.charCodeAt(i);
     }
@@ -426,23 +447,23 @@ describe('PE Parser Unit Tests', () => {
 
     // Verify exports
     expect(parsed.exports).toBeDefined();
-    expect(parsed.exports!.dllName).toBe("my_dll.dll");
+    expect(parsed.exports!.dllName).toBe('my_dll.dll');
     expect(parsed.exports!.exports.length).toBe(2);
     expect(parsed.exports!.exports[0].ordinal).toBe(1);
     expect(parsed.exports!.exports[0].address).toBe(0x1500);
-    expect(parsed.exports!.exports[0].name).toBe("func_one");
+    expect(parsed.exports!.exports[0].name).toBe('func_one');
     expect(parsed.exports!.exports[0].forwarder).toBeUndefined();
 
     expect(parsed.exports!.exports[1].ordinal).toBe(2);
     expect(parsed.exports!.exports[1].address).toBe(0x3040);
-    expect(parsed.exports!.exports[1].name).toBe("func_two");
-    expect(parsed.exports!.exports[1].forwarder).toBe("other_dll.other_func");
+    expect(parsed.exports!.exports[1].name).toBe('func_two');
+    expect(parsed.exports!.exports[1].forwarder).toBe('other_dll.other_func');
 
     // Verify imports
     expect(parsed.imports.length).toBe(1);
-    expect(parsed.imports[0].dllName).toBe("kernel32.dll");
+    expect(parsed.imports[0].dllName).toBe('kernel32.dll');
     expect(parsed.imports[0].imports.length).toBe(2);
-    expect(parsed.imports[0].imports[0].name).toBe("CreateFileA");
+    expect(parsed.imports[0].imports[0].name).toBe('CreateFileA');
     expect(parsed.imports[0].imports[0].hint).toBe(12);
     expect(parsed.imports[0].imports[1].ordinal).toBe(5);
   });
@@ -487,7 +508,11 @@ describe('PE Parser Unit Tests', () => {
     const sectionOffset = optionalOffset + sizeOfOptionalHeader; // 328
 
     // Section 1: .text
-    bytes[sectionOffset] = 0x2e; bytes[sectionOffset + 1] = 0x74; bytes[sectionOffset + 2] = 0x65; bytes[sectionOffset + 3] = 0x78; bytes[sectionOffset + 4] = 0x74;
+    bytes[sectionOffset] = 0x2e;
+    bytes[sectionOffset + 1] = 0x74;
+    bytes[sectionOffset + 2] = 0x65;
+    bytes[sectionOffset + 3] = 0x78;
+    bytes[sectionOffset + 4] = 0x74;
     view.setUint32(sectionOffset + 8, 0x1000, true);
     view.setUint32(sectionOffset + 12, 0x1000, true);
     view.setUint32(sectionOffset + 16, 0x200, true);
@@ -495,7 +520,12 @@ describe('PE Parser Unit Tests', () => {
 
     // Section 2: .idata (Import data)
     const sec2Offset = sectionOffset + 40; // 368
-    bytes[sec2Offset] = 0x2e; bytes[sec2Offset + 1] = 0x69; bytes[sec2Offset + 2] = 0x64; bytes[sec2Offset + 3] = 0x61; bytes[sec2Offset + 4] = 0x74; bytes[sec2Offset + 5] = 0x61;
+    bytes[sec2Offset] = 0x2e;
+    bytes[sec2Offset + 1] = 0x69;
+    bytes[sec2Offset + 2] = 0x64;
+    bytes[sec2Offset + 3] = 0x61;
+    bytes[sec2Offset + 4] = 0x74;
+    bytes[sec2Offset + 5] = 0x61;
     view.setUint32(sec2Offset + 8, 0x1000, true);
     view.setUint32(sec2Offset + 12, 0x4000, true);
     view.setUint32(sec2Offset + 16, 0x1000, true);
@@ -508,7 +538,7 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(impOffset + 16, 0x4040, true); // firstThunk (IAT)
 
     // Write dll name "kernel32.dll" at 0x4050 (file offset 0x2050)
-    const impDllName = "kernel32.dll";
+    const impDllName = 'kernel32.dll';
     for (let i = 0; i < impDllName.length; i++) {
       bytes[0x2050 + i] = impDllName.charCodeAt(i);
     }
@@ -525,7 +555,7 @@ describe('PE Parser Unit Tests', () => {
     // Write name descriptor at 0x4060 (file offset 0x2060)
     // hint = 12 (uint16), name = "CreateFileA"
     view.setUint16(0x2060, 12, true);
-    const impFuncName = "CreateFileA";
+    const impFuncName = 'CreateFileA';
     for (let i = 0; i < impFuncName.length; i++) {
       bytes[0x2062 + i] = impFuncName.charCodeAt(i);
     }
@@ -536,9 +566,9 @@ describe('PE Parser Unit Tests', () => {
 
     // Verify imports
     expect(parsed.imports.length).toBe(1);
-    expect(parsed.imports[0].dllName).toBe("kernel32.dll");
+    expect(parsed.imports[0].dllName).toBe('kernel32.dll');
     expect(parsed.imports[0].imports.length).toBe(2);
-    expect(parsed.imports[0].imports[0].name).toBe("CreateFileA");
+    expect(parsed.imports[0].imports[0].name).toBe('CreateFileA');
     expect(parsed.imports[0].imports[0].hint).toBe(12);
     expect(parsed.imports[0].imports[1].ordinal).toBe(5);
   });
@@ -566,9 +596,9 @@ describe('PE Parser Unit Tests', () => {
     bytes[1] = 0x5a;
     view.setUint32(60, 64, true);
     view.setUint32(64, 0x00004550, true);
-    // Coff Offset = 68. 
+    // Coff Offset = 68.
     // optionalOffset = 88. optionalOffset + 2 = 90. But buffer is 88.
-    view.setUint16(68 + 16, 224, true); 
+    view.setUint16(68 + 16, 224, true);
     const parser = new PEParser(buffer);
     expect(() => parser.parse()).toThrow(
       'Optional header magic points outside of file limits'
@@ -672,7 +702,11 @@ describe('PE Parser Unit Tests', () => {
     const sectionOffset = optionalOffset + sizeOfOptionalHeader; // 312
 
     // Section 1: .text
-    bytes[sectionOffset] = 0x2e; bytes[sectionOffset + 1] = 0x74; bytes[sectionOffset + 2] = 0x65; bytes[sectionOffset + 3] = 0x78; bytes[sectionOffset + 4] = 0x74;
+    bytes[sectionOffset] = 0x2e;
+    bytes[sectionOffset + 1] = 0x74;
+    bytes[sectionOffset + 2] = 0x65;
+    bytes[sectionOffset + 3] = 0x78;
+    bytes[sectionOffset + 4] = 0x74;
     view.setUint32(sectionOffset + 8, 0x1000, true);
     view.setUint32(sectionOffset + 12, 0x1000, true);
     view.setUint32(sectionOffset + 16, 0x200, true);
@@ -680,7 +714,11 @@ describe('PE Parser Unit Tests', () => {
 
     // Section 2: .rsrc (Resource data)
     const sec2Offset = sectionOffset + 40; // 352
-    bytes[sec2Offset] = 0x2e; bytes[sec2Offset + 1] = 0x72; bytes[sec2Offset + 2] = 0x73; bytes[sec2Offset + 3] = 0x72; bytes[sec2Offset + 4] = 0x63;
+    bytes[sec2Offset] = 0x2e;
+    bytes[sec2Offset + 1] = 0x72;
+    bytes[sec2Offset + 2] = 0x73;
+    bytes[sec2Offset + 3] = 0x72;
+    bytes[sec2Offset + 4] = 0x63;
     view.setUint32(sec2Offset + 8, 0x1000, true);
     view.setUint32(sec2Offset + 12, 0x5000, true);
     view.setUint32(sec2Offset + 16, 0x1000, true);
@@ -712,7 +750,7 @@ describe('PE Parser Unit Tests', () => {
 
     // Write String at 0x30c0
     view.setUint16(0x30c0, 8, true); // Length 8
-    const manifestStr = "MANIFEST";
+    const manifestStr = 'MANIFEST';
     for (let i = 0; i < manifestStr.length; i++) {
       view.setUint16(0x30c2 + i * 2, manifestStr.charCodeAt(i), true);
     }
@@ -729,7 +767,7 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(0x3104, 21, true); // Size
 
     // Write Manifest Data at 0x3120
-    const manifestXml = "<assembly></assembly>";
+    const manifestXml = '<assembly></assembly>';
     for (let i = 0; i < manifestXml.length; i++) {
       bytes[0x3120 + i] = manifestXml.charCodeAt(i);
     }
@@ -755,7 +793,7 @@ describe('PE Parser Unit Tests', () => {
     // Write String Block at 0x3180
     // String 0: "hello"
     view.setUint16(0x3180, 5, true); // Length 5
-    const helloStr = "hello";
+    const helloStr = 'hello';
     for (let i = 0; i < helloStr.length; i++) {
       view.setUint16(0x3182 + i * 2, helloStr.charCodeAt(i), true);
     }
@@ -783,10 +821,10 @@ describe('PE Parser Unit Tests', () => {
 
     expect(parsed.resources).toBeDefined();
     expect(parsed.resources!.manifests.length).toBe(1);
-    expect(parsed.resources!.manifests[0]).toBe("<assembly></assembly>");
-    expect(parsed.resources!.strings[0]).toBe("hello");
+    expect(parsed.resources!.manifests[0]).toBe('<assembly></assembly>');
+    expect(parsed.resources!.strings[0]).toBe('hello');
     expect(parsed.resources!.icons.length).toBe(1);
-    expect(parsed.resources!.icons[0].type).toBe("Icon");
+    expect(parsed.resources!.icons[0].type).toBe('Icon');
     expect(parsed.resources!.icons[0].size).toBe(64);
   });
 
@@ -796,7 +834,8 @@ describe('PE Parser Unit Tests', () => {
     const bytes = new Uint8Array(buffer);
 
     // DOS Header
-    bytes[0] = 0x4d; bytes[1] = 0x5a;
+    bytes[0] = 0x4d;
+    bytes[1] = 0x5a;
     const e_lfanew = 64;
     view.setUint32(60, e_lfanew, true);
     // PE Signature
@@ -819,13 +858,18 @@ describe('PE Parser Unit Tests', () => {
     // Section Headers
     const sectionOffset = optionalOffset + sizeOfOptionalHeader; // 312
     // .text
-    bytes[sectionOffset] = 0x2e; bytes[sectionOffset + 1] = 0x74;
+    bytes[sectionOffset] = 0x2e;
+    bytes[sectionOffset + 1] = 0x74;
     view.setUint32(sectionOffset + 12, 0x1000, true);
     view.setUint32(sectionOffset + 16, 0x200, true);
     view.setUint32(sectionOffset + 20, 0x400, true);
     // .rsrc
     const sec2Offset = sectionOffset + 40;
-    bytes[sec2Offset] = 0x2e; bytes[sec2Offset + 1] = 0x72; bytes[sec2Offset + 2] = 0x73; bytes[sec2Offset + 3] = 0x72; bytes[sec2Offset + 4] = 0x63;
+    bytes[sec2Offset] = 0x2e;
+    bytes[sec2Offset + 1] = 0x72;
+    bytes[sec2Offset + 2] = 0x73;
+    bytes[sec2Offset + 3] = 0x72;
+    bytes[sec2Offset + 4] = 0x63;
     view.setUint32(sec2Offset + 8, 0x1000, true);
     view.setUint32(sec2Offset + 12, 0x5000, true);
     view.setUint32(sec2Offset + 16, 0x1000, true);
@@ -846,7 +890,7 @@ describe('PE Parser Unit Tests', () => {
 
     // Write String for Named Type name at 0x30a0
     view.setUint16(0x30a0, 4, true); // length = 4
-    const customTypeName = "MYTY";
+    const customTypeName = 'MYTY';
     for (let i = 0; i < customTypeName.length; i++) {
       view.setUint16(0x30a2 + i * 2, customTypeName.charCodeAt(i), true);
     }
@@ -885,7 +929,11 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(0x3204, 4, true); // size = 4
 
     // Write Manifest data: "xml5"
-    bytes[0x3220] = 120; bytes[0x3221] = 109; bytes[0x3222] = 108; bytes[0x3223] = 53; bytes[0x3224] = 0;
+    bytes[0x3220] = 120;
+    bytes[0x3221] = 109;
+    bytes[0x3222] = 108;
+    bytes[0x3223] = 53;
+    bytes[0x3224] = 0;
 
     // Test named type parsing
     const parser = new PEParser(buffer);
@@ -893,23 +941,23 @@ describe('PE Parser Unit Tests', () => {
 
     expect(parsed.resources).toBeDefined();
     expect(parsed.resources!.manifests.length).toBe(1);
-    expect(parsed.resources!.manifests[0]).toBe("xml5");
-    const customRes = parsed.resources!.all.find(r => r.type === "MYTY");
+    expect(parsed.resources!.manifests[0]).toBe('xml5');
+    const customRes = parsed.resources!.all.find((r) => r.type === 'MYTY');
     expect(customRes).toBeDefined();
-    expect(customRes!.typeName).toBe("MYTY");
+    expect(customRes!.typeName).toBe('MYTY');
 
     // Override TextDecoder to hit TextDecoder catch block
     const originalTextDecoder = globalThis.TextDecoder;
     globalThis.TextDecoder = class {
       decode() {
-        throw new Error("TextDecoder failed");
+        throw new Error('TextDecoder failed');
       }
     } as any;
 
     try {
       const parser2 = new PEParser(buffer);
       const parsed2 = parser2.parse();
-      expect(parsed2.resources!.manifests[0]).toBe("xml5");
+      expect(parsed2.resources!.manifests[0]).toBe('xml5');
     } finally {
       globalThis.TextDecoder = originalTextDecoder;
     }
@@ -919,7 +967,9 @@ describe('PE Parser Unit Tests', () => {
     view.setUint32(0x3134, 0x80003ffd, true); // Point to subdirectory near end of buffer
     const parser3 = new PEParser(buffer);
     const parsed3 = parser3.parse();
-    expect(parsed3.resources!.all.find(r => r.type === "MYTY")).toBeUndefined();
+    expect(
+      parsed3.resources!.all.find((r) => r.type === 'MYTY')
+    ).toBeUndefined();
 
     // 2. absoluteEntryOffset + 8 > byteLength
     view.setUint32(0x3134, 0x180, true);
@@ -930,10 +980,12 @@ describe('PE Parser Unit Tests', () => {
     expect(parsed4.resources).toBeDefined();
 
     // 3. absoluteStrOffset + 2 > byteLength
-    view.setUint32(0x3010, 0x80003ffe, true); 
+    view.setUint32(0x3010, 0x80003ffe, true);
     const parser5 = new PEParser(buffer);
     const parsed5 = parser5.parse();
-    const truncatedTypeRes = parsed5.resources!.all.find(r => typeof r.type === 'string' && r.type.startsWith('Offset_0x'));
+    const truncatedTypeRes = parsed5.resources!.all.find(
+      (r) => typeof r.type === 'string' && r.type.startsWith('Offset_0x')
+    );
     expect(truncatedTypeRes).toBeDefined();
   });
 });

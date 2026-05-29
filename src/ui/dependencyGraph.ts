@@ -73,7 +73,7 @@ export class DependencyGraph {
   private charge = -350;
   private linkDistance = 80;
   private linkStrength = 0.08;
-  private friction = 0.90;
+  private friction = 0.9;
   private activeSimulations = true;
   private showParticles = true;
 
@@ -238,27 +238,37 @@ export class DependencyGraph {
     this.container.appendChild(tooltip);
 
     // Bind UI actions
-    const searchInput = controlPanel.querySelector('.dep-search-input') as HTMLInputElement;
+    const searchInput = controlPanel.querySelector(
+      '.dep-search-input'
+    ) as HTMLInputElement;
     searchInput.addEventListener('input', (e) => {
       this.searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
     });
 
-    const chkPhysics = controlPanel.querySelector('#chk-physics') as HTMLInputElement;
+    const chkPhysics = controlPanel.querySelector(
+      '#chk-physics'
+    ) as HTMLInputElement;
     chkPhysics.addEventListener('change', (e) => {
       this.activeSimulations = (e.target as HTMLInputElement).checked;
     });
 
-    const chkParticles = controlPanel.querySelector('#chk-particles') as HTMLInputElement;
+    const chkParticles = controlPanel.querySelector(
+      '#chk-particles'
+    ) as HTMLInputElement;
     chkParticles.addEventListener('change', (e) => {
       this.showParticles = (e.target as HTMLInputElement).checked;
     });
 
-    const btnReset = controlPanel.querySelector('.btn-reset-zoom') as HTMLButtonElement;
+    const btnReset = controlPanel.querySelector(
+      '.btn-reset-zoom'
+    ) as HTMLButtonElement;
     btnReset.addEventListener('click', () => {
       this.resetViewport();
     });
 
-    const btnExport = controlPanel.querySelector('.btn-export-png') as HTMLButtonElement;
+    const btnExport = controlPanel.querySelector(
+      '.btn-export-png'
+    ) as HTMLButtonElement;
     btnExport.addEventListener('click', () => {
       this.exportAsPNG();
     });
@@ -312,12 +322,12 @@ export class DependencyGraph {
 
     // Keep track of imported libraries to create library group nodes
     const libraries = new Set<string>();
-    data.imports.forEach(imp => libraries.add(imp.library));
+    data.imports.forEach((imp) => libraries.add(imp.library));
 
     // 2. Library Nodes
     const libraryNodesMap = new Map<string, GraphNode>();
     let index = 0;
-    libraries.forEach(lib => {
+    libraries.forEach((lib) => {
       const angle = (index / libraries.size) * Math.PI * 2;
       const rx = cx + Math.cos(angle) * 150;
       const ry = cy + Math.sin(angle) * 150;
@@ -466,10 +476,12 @@ export class DependencyGraph {
     });
 
     // Wire calls between local functions and imports/exports
-    data.locals.forEach(loc => {
-      const locId = this.nodeMap.has(`exp_${loc.name}`) ? `exp_${loc.name}` : `loc_${loc.name}`;
+    data.locals.forEach((loc) => {
+      const locId = this.nodeMap.has(`exp_${loc.name}`)
+        ? `exp_${loc.name}`
+        : `loc_${loc.name}`;
 
-      loc.calls.forEach(calledName => {
+      loc.calls.forEach((calledName) => {
         // 1. Check if it's an import symbol
         // The imported name might be inside various libraries, let's find it
         let targetId = '';
@@ -501,7 +513,7 @@ export class DependencyGraph {
     });
 
     // Initialize particles on edges
-    this.edges.forEach(edge => {
+    this.edges.forEach((edge) => {
       edge.particles = [];
       const numParticles = Math.floor(Math.random() * 2);
       for (let p = 0; p < numParticles; p++) {
@@ -521,7 +533,7 @@ export class DependencyGraph {
   private addEdge(edge: GraphEdge) {
     // Avoid duplicates
     const duplicate = this.edges.find(
-      e => e.source === edge.source && e.target === edge.target
+      (e) => e.source === edge.source && e.target === edge.target
     );
     if (!duplicate) {
       this.edges.push(edge);
@@ -535,7 +547,7 @@ export class DependencyGraph {
     this.canvas.addEventListener('wheel', this.handleWheel);
 
     // Prevent context menu
-    this.canvas.addEventListener('contextmenu', e => e.preventDefault());
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   private handleMouseDown = (e: MouseEvent) => {
@@ -576,8 +588,10 @@ export class DependencyGraph {
       const worldDx = dx / this.scale;
       const worldDy = dy / this.scale;
 
-      this.draggedNode.fx = (this.draggedNode.fx || this.draggedNode.x) + worldDx;
-      this.draggedNode.fy = (this.draggedNode.fy || this.draggedNode.y) + worldDy;
+      this.draggedNode.fx =
+        (this.draggedNode.fx || this.draggedNode.x) + worldDx;
+      this.draggedNode.fy =
+        (this.draggedNode.fy || this.draggedNode.y) + worldDy;
       this.draggedNode.x = this.draggedNode.fx;
       this.draggedNode.y = this.draggedNode.fy;
     } else if (this.isDraggingCanvas) {
@@ -622,7 +636,7 @@ export class DependencyGraph {
     const mouseWorldX = (mousePos.x - this.panX) / this.scale;
     const mouseWorldY = (mousePos.y - this.panY) / this.scale;
 
-    const zoomFactor = e.deltaY < 0 ? (1 + zoomIntensity) : (1 - zoomIntensity);
+    const zoomFactor = e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
     const nextScale = Math.max(0.15, Math.min(4.0, this.scale * zoomFactor));
 
     this.scale = nextScale;
@@ -654,7 +668,9 @@ export class DependencyGraph {
   }
 
   private showTooltip(e: MouseEvent, node: GraphNode | null) {
-    const tooltip = this.container.querySelector('.dep-tooltip') as HTMLDivElement;
+    const tooltip = this.container.querySelector(
+      '.dep-tooltip'
+    ) as HTMLDivElement;
     if (!tooltip) return;
 
     if (!node) {
@@ -693,7 +709,7 @@ export class DependencyGraph {
     }
 
     // Spread other nodes out initially so they don't overlap completely
-    this.nodes.forEach(node => {
+    this.nodes.forEach((node) => {
       if (node.id !== 'binary_root') {
         node.x = cx + (Math.random() - 0.5) * 200;
         node.y = cy + (Math.random() - 0.5) * 200;
@@ -763,7 +779,7 @@ export class DependencyGraph {
     }
 
     // 2. Link Attraction force
-    this.edges.forEach(edge => {
+    this.edges.forEach((edge) => {
       const sourceNode = this.nodeMap.get(edge.source);
       const targetNode = this.nodeMap.get(edge.target);
 
@@ -792,7 +808,7 @@ export class DependencyGraph {
 
       // Update flow particles along this edge
       if (this.showParticles && edge.particles) {
-        edge.particles.forEach(p => {
+        edge.particles.forEach((p) => {
           p.progress += p.speed;
           if (p.progress > 1.0) {
             p.progress = 0;
@@ -802,7 +818,7 @@ export class DependencyGraph {
     });
 
     // 3. Gravity pulling to center of canvas & apply velocity
-    this.nodes.forEach(node => {
+    this.nodes.forEach((node) => {
       if (node.fx !== null) return;
 
       // Gravity force pull to center
@@ -820,9 +836,11 @@ export class DependencyGraph {
       // Basic bounds check to prevent flying off screen
       const border = 100;
       if (node.x < -border) node.x = -border;
-      if (node.x > this.container.clientWidth + border) node.x = this.container.clientWidth + border;
+      if (node.x > this.container.clientWidth + border)
+        node.x = this.container.clientWidth + border;
       if (node.y < -border) node.y = -border;
-      if (node.y > this.container.clientHeight + border) node.y = this.container.clientHeight + border;
+      if (node.y > this.container.clientHeight + border)
+        node.y = this.container.clientHeight + border;
     });
 
     // Central node always fixed at center
@@ -855,7 +873,7 @@ export class DependencyGraph {
     const highlightedEdges = new Set<GraphEdge>();
 
     if (isSearching) {
-      this.nodes.forEach(node => {
+      this.nodes.forEach((node) => {
         if (node.label.toLowerCase().includes(this.searchQuery)) {
           highlightedNodes.add(node.id);
         }
@@ -864,7 +882,7 @@ export class DependencyGraph {
       const activeNodeId = this.hoveredNode.id;
       highlightedNodes.add(activeNodeId);
 
-      this.edges.forEach(edge => {
+      this.edges.forEach((edge) => {
         if (edge.source === activeNodeId) {
           highlightedNodes.add(edge.target);
           highlightedEdges.add(edge);
@@ -876,15 +894,17 @@ export class DependencyGraph {
     }
 
     // 1. Draw Edges
-    this.edges.forEach(edge => {
+    this.edges.forEach((edge) => {
       const sourceNode = this.nodeMap.get(edge.source);
       const targetNode = this.nodeMap.get(edge.target);
 
       if (!sourceNode || !targetNode) return;
 
-      const isEdgeHighlighted = isSearching 
-        ? (highlightedNodes.has(edge.source) && highlightedNodes.has(edge.target))
-        : (isHovering ? highlightedEdges.has(edge) : true);
+      const isEdgeHighlighted = isSearching
+        ? highlightedNodes.has(edge.source) && highlightedNodes.has(edge.target)
+        : isHovering
+          ? highlightedEdges.has(edge)
+          : true;
 
       const alpha = isEdgeHighlighted ? 0.6 : 0.08;
       const strokeWidth = isEdgeHighlighted ? 1.8 : 0.8;
@@ -893,7 +913,7 @@ export class DependencyGraph {
       this.ctx.strokeStyle = sourceNode.color;
       this.ctx.globalAlpha = alpha;
       this.ctx.lineWidth = strokeWidth;
-      
+
       // Draw smooth quadratic bezier curve or line
       this.ctx.moveTo(sourceNode.x, sourceNode.y);
       this.ctx.lineTo(targetNode.x, targetNode.y);
@@ -902,7 +922,7 @@ export class DependencyGraph {
       // Draw flow particles
       if (this.showParticles && edge.particles && isEdgeHighlighted) {
         this.ctx.globalAlpha = 1.0;
-        edge.particles.forEach(p => {
+        edge.particles.forEach((p) => {
           // Linear interpolation for simple line flow
           const px = sourceNode.x + (targetNode.x - sourceNode.x) * p.progress;
           const py = sourceNode.y + (targetNode.y - sourceNode.y) * p.progress;
@@ -921,10 +941,12 @@ export class DependencyGraph {
     this.ctx.globalAlpha = 1.0;
 
     // 2. Draw Nodes
-    this.nodes.forEach(node => {
+    this.nodes.forEach((node) => {
       const isNodeHighlighted = isSearching
         ? highlightedNodes.has(node.id)
-        : (isHovering ? highlightedNodes.has(node.id) : true);
+        : isHovering
+          ? highlightedNodes.has(node.id)
+          : true;
 
       const alpha = isNodeHighlighted ? 1.0 : 0.25;
 
@@ -957,9 +979,10 @@ export class DependencyGraph {
       // Node Label Text
       this.ctx.save();
       this.ctx.globalAlpha = alpha;
-      this.ctx.font = node.type === 'binary' 
-        ? 'bold 12px var(--font-sans, system-ui)' 
-        : '11px var(--font-mono, monospace)';
+      this.ctx.font =
+        node.type === 'binary'
+          ? 'bold 12px var(--font-sans, system-ui)'
+          : '11px var(--font-mono, monospace)';
       this.ctx.fillStyle = this.colors.text;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
@@ -974,7 +997,9 @@ export class DependencyGraph {
         14
       );
 
-      this.ctx.fillStyle = isNodeHighlighted ? this.colors.text : this.colors.textMuted;
+      this.ctx.fillStyle = isNodeHighlighted
+        ? this.colors.text
+        : this.colors.textMuted;
       this.ctx.fillText(node.label, node.x, node.y + node.radius + 17);
       this.ctx.restore();
     });

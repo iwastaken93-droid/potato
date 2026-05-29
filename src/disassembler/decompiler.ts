@@ -26,14 +26,240 @@ export interface DataType {
   length?: number; // For 'array'
 }
 
+// Expression AST Nodes
+export interface IdentifierExpr {
+  type: 'Identifier';
+  name: string;
+}
+
+export interface ConstantExpr {
+  type: 'Constant';
+  value: string;
+}
+
+export interface BinaryExpr {
+  type: 'Binary';
+  operator: string;
+  left: Expression;
+  right: Expression;
+}
+
+export interface AssignExpr {
+  type: 'Assign';
+  left: Expression;
+  right: Expression;
+}
+
+export interface MemoryExpr {
+  type: 'Memory';
+  base: string;
+  index?: string;
+  scale?: number;
+  offset: number;
+  isStructAccess: boolean;
+  structName?: string;
+}
+
+export interface StackExpr {
+  type: 'Stack';
+  offset: number;
+}
+
+export interface CallExpr {
+  type: 'Call';
+  callee: string;
+  args: Expression[];
+}
+
+export type Expression =
+  | IdentifierExpr
+  | ConstantExpr
+  | BinaryExpr
+  | AssignExpr
+  | MemoryExpr
+  | StackExpr
+  | CallExpr;
+
+export interface ExpressionVisitor<R> {
+  visitIdentifier(expr: IdentifierExpr): R;
+  visitConstant(expr: ConstantExpr): R;
+  visitBinary(expr: BinaryExpr): R;
+  visitAssign(expr: AssignExpr): R;
+  visitMemory(expr: MemoryExpr): R;
+  visitStack(expr: StackExpr): R;
+  visitCall(expr: CallExpr): R;
+}
+
 // AST Nodes for Structured Control Flow
-type ASTNode =
-  | { type: 'Block'; statements: ASTNode[] }
-  | { type: 'Statement'; code: string }
-  | { type: 'If'; condition: string; thenBranch: ASTNode; elseBranch?: ASTNode }
-  | { type: 'While'; condition: string; body: ASTNode }
-  | { type: 'DoWhile'; condition: string; body: ASTNode }
-  | { type: 'Return'; value?: string };
+export interface BlockNode {
+  type: 'Block';
+  statements: ASTNode[];
+}
+
+export interface StatementNode {
+  type: 'Statement';
+  expr: Expression;
+}
+
+export interface IfNode {
+  type: 'If';
+  condition: Expression;
+  thenBranch: ASTNode;
+  elseBranch?: ASTNode;
+}
+
+export interface WhileNode {
+  type: 'While';
+  condition: Expression;
+  body: ASTNode;
+}
+
+export interface DoWhileNode {
+  type: 'DoWhile';
+  condition: Expression;
+  body: ASTNode;
+}
+
+export interface ReturnNode {
+  type: 'Return';
+  value?: Expression;
+}
+
+export type ASTNode =
+  | BlockNode
+  | StatementNode
+  | IfNode
+  | WhileNode
+  | DoWhileNode
+  | ReturnNode;
+
+export interface ASTVisitor<R> {
+  visitBlock(node: BlockNode, level: number): R;
+  visitStatement(node: StatementNode, level: number): R;
+  visitIf(node: IfNode, level: number): R;
+  visitWhile(node: WhileNode, level: number): R;
+  visitDoWhile(node: DoWhileNode, level: number): R;
+  visitReturn(node: ReturnNode, level: number): R;
+}
+
+// AST and Expression Printer implementing Visitor Pattern
+export class ASTPrinter
+  implements ASTVisitor<string>, ExpressionVisitor<string>
+{
+  private indent(level: number): string {
+    return '  '.repeat(level);
+  }
+
+  public render(node: ASTNode, level: number = 0): string {
+    return this.visitNode(node, level);
+  }
+
+  private visitNode(node: ASTNode, level: number): string {
+    switch (node.type) {
+      case 'Block':
+        return this.visitBlock(node, level);
+      case 'Statement':
+        return this.visitStatement(node, level);
+      case 'If':
+        return this.visitIf(node, level);
+      case 'While':
+        return this.visitWhile(node, level);
+      case 'DoWhile':
+        return this.visitDoWhile(node, level);
+      case 'Return':
+        return this.visitReturn(node, level);
+    }
+  }
+
+  public renderExpr(expr: Expression): string {
+    switch (expr.type) {
+      case 'Identifier':
+        return this.visitIdentifier(expr);
+      case 'Constant':
+        return this.visitConstant(expr);
+      case 'Binary':
+        return this.visitBinary(expr);
+      case 'Assign':
+        return this.visitAssign(expr);
+      case 'Memory':
+        return this.visitMemory(expr);
+      case 'Stack':
+        return this.visitStack(expr);
+      case 'Call':
+        return this.visitCall(expr);
+    }
+  }
+
+  visitBlock(node: BlockNode, level: number): string {
+    return node.statements
+      .map((s) => this.visitNode(s, level))
+      .filter((s) => s.trim().length > 0)
+      .join('\n');
+  }
+
+  visitStatement(node: StatementNode, level: number): string {
+    return `${this.indent(level)}${this.renderExpr(node.expr)};`;
+  }
+
+  visitIf(node: IfNode, level: number): string {
+    const cond = this.renderExpr(node.condition);
+    let result = `${this.indent(level)}if (${cond}) {\n${this.visitNode(node.thenBranch, level + 1)}\n${this.indent(level)}}`;
+    if (
+      node.elseBranch &&
+      node.elseBranch.type === 'Block' &&
+      node.elseBranch.statements.length > 0
+    ) {
+      result += ` else {\n${this.visitNode(node.elseBranch, level + 1)}\n${this.indent(level)}}`;
+    }
+    return result;
+  }
+
+  visitWhile(node: WhileNode, level: number): string {
+    return `${this.indent(level)}while (${this.renderExpr(node.condition)}) {\n${this.visitNode(node.body, level + 1)}\n${this.indent(level)}}`;
+  }
+
+  visitDoWhile(node: DoWhileNode, level: number): string {
+    return `${this.indent(level)}do {\n${this.visitNode(node.body, level + 1)}\n${this.indent(level)}} while (${this.renderExpr(node.condition)});`;
+  }
+
+  visitReturn(node: ReturnNode, level: number): string {
+    return `${this.indent(level)}return${node.value ? ` ${this.renderExpr(node.value)}` : ''};`;
+  }
+
+  visitIdentifier(expr: IdentifierExpr): string {
+    return expr.name;
+  }
+
+  visitConstant(expr: ConstantExpr): string {
+    return expr.value;
+  }
+
+  visitBinary(expr: BinaryExpr): string {
+    return `${this.renderExpr(expr.left)} ${expr.operator} ${this.renderExpr(expr.right)}`;
+  }
+
+  visitAssign(expr: AssignExpr): string {
+    return `${this.renderExpr(expr.left)} = ${this.renderExpr(expr.right)}`;
+  }
+
+  visitMemory(expr: MemoryExpr): string {
+    if (expr.index && expr.scale) {
+      return `${expr.base}[${expr.index}]`;
+    }
+    if (expr.isStructAccess) {
+      return `${expr.base}->field_${expr.offset}`;
+    }
+    return `*( ${expr.base} + ${expr.offset} )`;
+  }
+
+  visitStack(expr: StackExpr): string {
+    return `local_${Math.abs(expr.offset || 0)}`;
+  }
+
+  visitCall(expr: CallExpr): string {
+    return `${expr.callee}(${expr.args.map((a) => this.renderExpr(a)).join(', ')})`;
+  }
+}
 
 // Helper to represent parsed operands
 interface ParsedOperand {
@@ -128,19 +354,20 @@ export class Decompiler {
       // Only declare local variables/registers if they are actually used, not in args, and not stack/base pointers directly
       if (
         usedVars.has(lowerVar) &&
-        !args.map(a => a.toLowerCase()).includes(lowerVar) &&
+        !args.map((a) => a.toLowerCase()).includes(lowerVar) &&
         lowerVar !== 'ebp' &&
         lowerVar !== 'esp' &&
         lowerVar !== 'rbp' &&
         lowerVar !== 'rsp' &&
-        (lowerVar.startsWith('local_') || lowerVar.match(/^(r|e)?[a-d]x$|^esi$|^edi$/))
+        (lowerVar.startsWith('local_') ||
+          lowerVar.match(/^(r|e)?[a-d]x$|^esi$|^edi$/))
       ) {
         localVars.push(`  ${this.formatType(varType)} ${varName};`);
       }
     }
-    
-    const renderedBody = this.renderAST(ast, 1);
-    
+
+    const renderedBody = new ASTPrinter().render(ast, 1);
+
     // Format the function signature
     const argList = args
       .map((arg) => {
@@ -203,7 +430,12 @@ export class Decompiler {
       const expr = opStr.slice(1, -1).trim();
 
       // Check stack pointer bases
-      if (expr.includes('ebp') || expr.includes('esp') || expr.includes('rbp') || expr.includes('rsp')) {
+      if (
+        expr.includes('ebp') ||
+        expr.includes('esp') ||
+        expr.includes('rbp') ||
+        expr.includes('rsp')
+      ) {
         const match = expr.match(/(ebp|esp|rbp|rsp)\s*([+-])\s*(\d+)/i);
         if (match) {
           const baseReg = match[1];
@@ -269,7 +501,24 @@ export class Decompiler {
     }
 
     // Default register types
-    const registers = ['eax', 'ebx', 'ecx', 'edx', 'esi', 'edi', 'ebp', 'esp', 'rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'rsp'];
+    const registers = [
+      'eax',
+      'ebx',
+      'ecx',
+      'edx',
+      'esi',
+      'edi',
+      'ebp',
+      'esp',
+      'rax',
+      'rbx',
+      'rcx',
+      'rdx',
+      'rsi',
+      'rdi',
+      'rbp',
+      'rsp',
+    ];
     for (const reg of registers) {
       if (!this.typeMap.has(reg)) {
         this.typeMap.set(reg, { type: 'unknown' });
@@ -302,14 +551,20 @@ export class Decompiler {
             if (parsedSrc.type === 'constant') {
               srcType = { type: 'int' };
             } else if (parsedSrc.type === 'register') {
-              srcType = this.typeMap.get(parsedSrc.raw.toLowerCase()) || { type: 'unknown' };
+              srcType = this.typeMap.get(parsedSrc.raw.toLowerCase()) || {
+                type: 'unknown',
+              };
             } else if (parsedSrc.type === 'stack') {
-              srcType = this.typeMap.get(`local_${Math.abs(parsedSrc.offset || 0)}`) || { type: 'unknown' };
+              srcType = this.typeMap.get(
+                `local_${Math.abs(parsedSrc.offset || 0)}`
+              ) || { type: 'unknown' };
             } else if (parsedSrc.type === 'memory') {
               // It is loading from memory [base + offset] or [base + index * scale]
               const baseLower = parsedSrc.baseReg?.toLowerCase() || '';
-              const baseType = this.typeMap.get(baseLower) || { type: 'unknown' };
-              
+              const baseType = this.typeMap.get(baseLower) || {
+                type: 'unknown',
+              };
+
               if (parsedSrc.indexReg && parsedSrc.scale) {
                 // E.g., [base + index * scale] => array access
                 if (baseType.type !== 'array') {
@@ -323,15 +578,27 @@ export class Decompiler {
               } else {
                 // E.g., [base + offset] => struct member dereference
                 let structName = '';
-                if (baseType.type === 'ptr' && baseType.target?.type === 'struct') {
+                if (
+                  baseType.type === 'ptr' &&
+                  baseType.target?.type === 'struct'
+                ) {
                   structName = baseType.target.name!;
                 } else {
                   // Infer a new struct type
                   this.structNameCounter++;
                   structName = `struct_${this.structNameCounter}`;
-                  const structType: DataType = { type: 'struct', name: structName };
-                  this.typeMap.set(baseLower, { type: 'ptr', target: structType });
-                  this.structDefinitions.set(structName, new Map<number, DataType>());
+                  const structType: DataType = {
+                    type: 'struct',
+                    name: structName,
+                  };
+                  this.typeMap.set(baseLower, {
+                    type: 'ptr',
+                    target: structType,
+                  });
+                  this.structDefinitions.set(
+                    structName,
+                    new Map<number, DataType>()
+                  );
                   changed = true;
                 }
 
@@ -350,8 +617,13 @@ export class Decompiler {
             if (parsedDest.type === 'register') {
               const destLower = parsedDest.raw.toLowerCase();
               const prevType = this.typeMap.get(destLower);
-              const newType: DataType = inst.op === 'LEA' ? { type: 'ptr', target: srcType } : srcType;
-              if (!prevType || prevType.type !== newType.type || (prevType.target?.type !== newType.target?.type)) {
+              const newType: DataType =
+                inst.op === 'LEA' ? { type: 'ptr', target: srcType } : srcType;
+              if (
+                !prevType ||
+                prevType.type !== newType.type ||
+                prevType.target?.type !== newType.target?.type
+              ) {
                 this.typeMap.set(destLower, newType);
                 changed = true;
               }
@@ -365,32 +637,54 @@ export class Decompiler {
             } else if (parsedDest.type === 'memory') {
               // Storing to memory [base + offset]
               const baseLower = parsedDest.baseReg?.toLowerCase() || '';
-              const baseType = this.typeMap.get(baseLower) || { type: 'unknown' };
+              const baseType = this.typeMap.get(baseLower) || {
+                type: 'unknown',
+              };
               if (parsedDest.indexReg && parsedDest.scale) {
                 if (baseType.type !== 'array') {
                   this.typeMap.set(baseLower, {
                     type: 'array',
-                    target: srcType.type !== 'unknown' ? srcType : { type: 'int' },
+                    target:
+                      srcType.type !== 'unknown' ? srcType : { type: 'int' },
                   });
                   changed = true;
                 }
               } else {
                 let structName = '';
-                if (baseType.type === 'ptr' && baseType.target?.type === 'struct') {
+                if (
+                  baseType.type === 'ptr' &&
+                  baseType.target?.type === 'struct'
+                ) {
                   structName = baseType.target.name!;
                 } else {
                   this.structNameCounter++;
                   structName = `struct_${this.structNameCounter}`;
-                  const structType: DataType = { type: 'struct', name: structName };
-                  this.typeMap.set(baseLower, { type: 'ptr', target: structType });
-                  this.structDefinitions.set(structName, new Map<number, DataType>());
+                  const structType: DataType = {
+                    type: 'struct',
+                    name: structName,
+                  };
+                  this.typeMap.set(baseLower, {
+                    type: 'ptr',
+                    target: structType,
+                  });
+                  this.structDefinitions.set(
+                    structName,
+                    new Map<number, DataType>()
+                  );
                   changed = true;
                 }
 
                 const fieldsMap = this.structDefinitions.get(structName)!;
                 const fieldOffset = parsedDest.offset || 0;
-                if (!fieldsMap.has(fieldOffset) || (srcType.type !== 'unknown' && fieldsMap.get(fieldOffset)!.type === 'unknown')) {
-                  fieldsMap.set(fieldOffset, srcType.type !== 'unknown' ? srcType : { type: 'int' });
+                if (
+                  !fieldsMap.has(fieldOffset) ||
+                  (srcType.type !== 'unknown' &&
+                    fieldsMap.get(fieldOffset)!.type === 'unknown')
+                ) {
+                  fieldsMap.set(
+                    fieldOffset,
+                    srcType.type !== 'unknown' ? srcType : { type: 'int' }
+                  );
                   changed = true;
                 }
               }
@@ -401,29 +695,38 @@ export class Decompiler {
     }
   }
 
-  /**
-   * Helper to reconstruct a statement expression or C-style access notation.
-   */
-  private reconstructExpression(opStr: string): string {
+  private reconstructExpressionNode(opStr: string): Expression {
     const parsed = this.parseOperand(opStr);
     if (parsed.type === 'constant') {
-      return parsed.raw;
+      return { type: 'Constant', value: parsed.raw };
     }
     if (parsed.type === 'stack') {
-      return `local_${Math.abs(parsed.offset || 0)}`;
+      return { type: 'Stack', offset: parsed.offset || 0 };
     }
     if (parsed.type === 'memory') {
       const baseLower = parsed.baseReg?.toLowerCase() || '';
       const baseType = this.typeMap.get(baseLower);
-      if (parsed.indexReg && parsed.scale) {
-        return `${parsed.baseReg}[${parsed.indexReg}]`;
-      }
-      if (baseType && baseType.type === 'ptr' && baseType.target?.type === 'struct') {
-        return `${parsed.baseReg}->field_${parsed.offset}`;
-      }
-      return `*( ${parsed.baseReg} + ${parsed.offset} )`;
+      const isStructAccess = !!(
+        baseType &&
+        baseType.type === 'ptr' &&
+        baseType.target?.type === 'struct'
+      );
+      return {
+        type: 'Memory',
+        base: parsed.baseReg || 'unknown',
+        index: parsed.indexReg,
+        scale: parsed.scale,
+        offset: parsed.offset || 0,
+        isStructAccess,
+        structName: isStructAccess ? baseType.target!.name : undefined,
+      };
     }
-    return parsed.raw;
+    return { type: 'Identifier', name: parsed.raw };
+  }
+
+  private reconstructExpression(opStr: string): string {
+    const expr = this.reconstructExpressionNode(opStr);
+    return new ASTPrinter().renderExpr(expr);
   }
 
   /**
@@ -544,7 +847,9 @@ export class Decompiler {
     const allBlockIds = Array.from(blockMap.keys());
     const exitBlocks = allBlockIds.filter((id) => {
       const b = blockMap.get(id)!;
-      return b.successors.length === 0 || b.instructions.some((i) => i.op === 'RET');
+      return (
+        b.successors.length === 0 || b.instructions.some((i) => i.op === 'RET')
+      );
     });
 
     const predecessors = new Map<string, string[]>();
@@ -777,41 +1082,73 @@ export class Decompiler {
 
     // 1. Process instructions inside this basic block
     const blockStatements: ASTNode[] = [];
-    let conditionCode = '';
-    let lastCmp: { op1: string; op2: string } | undefined = undefined;
+    let conditionCodeNode: Expression | undefined = undefined;
+    let lastCmp: { op1: Expression; op2: Expression } | undefined = undefined;
 
     for (const inst of block.instructions) {
       if (inst.op === 'CMP' || inst.op === 'TEST') {
         lastCmp = {
-          op1: this.reconstructExpression(inst.args[0]),
-          op2: this.reconstructExpression(inst.args[1]),
+          op1: this.reconstructExpressionNode(inst.args[0]),
+          op2: this.reconstructExpressionNode(inst.args[1]),
         };
         blockStatements.push({
           type: 'Statement',
-          code: `${inst.op.toLowerCase()}(${inst.args.map((a) => this.reconstructExpression(a)).join(', ')})`,
+          expr: {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: inst.args.map((a) => this.reconstructExpressionNode(a)),
+          },
         });
-      } else if (['JZ', 'JNZ', 'JE', 'JNE', 'JG', 'JL', 'JGE', 'JLE'].includes(inst.op)) {
+      } else if (
+        ['JZ', 'JNZ', 'JE', 'JNE', 'JG', 'JL', 'JGE', 'JLE'].includes(inst.op)
+      ) {
         if (lastCmp) {
-          conditionCode = `${inst.op.toLowerCase()}(${lastCmp.op1}, ${lastCmp.op2})`;
+          conditionCodeNode = {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: [lastCmp.op1, lastCmp.op2],
+          };
         } else {
-          conditionCode = `${inst.op.toLowerCase()}(${inst.args.map((a) => this.reconstructExpression(a)).join(', ')})`;
+          conditionCodeNode = {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: inst.args.map((a) => this.reconstructExpressionNode(a)),
+          };
         }
       } else if (inst.op === 'RET') {
         blockStatements.push({
           type: 'Return',
-          value: inst.args.map((a) => this.reconstructExpression(a)).join(' '),
+          value:
+            inst.args.length > 0
+              ? inst.args.length === 1
+                ? this.reconstructExpressionNode(inst.args[0])
+                : {
+                    type: 'Constant',
+                    value: inst.args
+                      .map((a) => this.reconstructExpression(a))
+                      .join(' '),
+                  }
+              : undefined,
         });
       } else if (inst.op === 'MOV' || inst.op === 'LEA') {
-        const destExpr = this.reconstructExpression(inst.args[0]);
-        const srcExpr = this.reconstructExpression(inst.args[1]);
+        const destExpr = this.reconstructExpressionNode(inst.args[0]);
+        const srcExpr = this.reconstructExpressionNode(inst.args[1]);
         blockStatements.push({
           type: 'Statement',
-          code: `${destExpr} = ${srcExpr}`,
+          expr: {
+            type: 'Assign',
+            left: destExpr,
+            right: srcExpr,
+          },
         });
       } else {
         blockStatements.push({
           type: 'Statement',
-          code: `${inst.op.toLowerCase()}(${inst.args.map((a) => this.reconstructExpression(a)).join(', ')})`,
+          expr: {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: inst.args.map((a) => this.reconstructExpressionNode(a)),
+          },
         });
       }
     }
@@ -846,19 +1183,19 @@ export class Decompiler {
       const nextId = outsideSuccessors[0];
 
       // Create Loop node (could be while/do-while depending on latch)
-      const isDoWhile = blockMap.get(loop.latch)?.instructions.some((i) =>
-        ['JZ', 'JNZ', 'JE', 'JNE'].includes(i.op)
-      );
+      const isDoWhile = blockMap
+        .get(loop.latch)
+        ?.instructions.some((i) => ['JZ', 'JNZ', 'JE', 'JNE'].includes(i.op));
 
       const loopNode: ASTNode = isDoWhile
         ? {
             type: 'DoWhile',
-            condition: conditionCode || 'true',
+            condition: conditionCodeNode || { type: 'Constant', value: 'true' },
             body: loopBodyAST,
           }
         : {
             type: 'While',
-            condition: conditionCode || 'true',
+            condition: conditionCodeNode || { type: 'Constant', value: 'true' },
             body: loopBodyAST,
           };
 
@@ -866,7 +1203,14 @@ export class Decompiler {
 
       if (nextId) {
         statements.push(
-          this.structureBlocks(blockMap, nextId, dominators, ipdom, loops, visited)
+          this.structureBlocks(
+            blockMap,
+            nextId,
+            dominators,
+            ipdom,
+            loops,
+            visited
+          )
         );
       }
 
@@ -903,7 +1247,7 @@ export class Decompiler {
 
       statements.push({
         type: 'If',
-        condition: conditionCode || 'true',
+        condition: conditionCodeNode || { type: 'Constant', value: 'true' },
         thenBranch,
         elseBranch,
       });
@@ -911,7 +1255,14 @@ export class Decompiler {
       // Continue structuring from merge block
       if (mergeId && blockMap.has(mergeId) && !visited.has(mergeId)) {
         statements.push(
-          this.structureBlocks(blockMap, mergeId, dominators, ipdom, loops, visited)
+          this.structureBlocks(
+            blockMap,
+            mergeId,
+            dominators,
+            ipdom,
+            loops,
+            visited
+          )
         );
       }
 
@@ -922,7 +1273,14 @@ export class Decompiler {
     if (block.successors.length === 1) {
       const nextId = block.successors[0];
       statements.push(
-        this.structureBlocks(blockMap, nextId, dominators, ipdom, loops, visited)
+        this.structureBlocks(
+          blockMap,
+          nextId,
+          dominators,
+          ipdom,
+          loops,
+          visited
+        )
       );
     }
 
@@ -955,41 +1313,73 @@ export class Decompiler {
 
     // Parse block instructions
     const blockStatements: ASTNode[] = [];
-    let conditionCode = '';
-    let lastCmp: { op1: string; op2: string } | undefined = undefined;
+    let conditionCodeNode: Expression | undefined = undefined;
+    let lastCmp: { op1: Expression; op2: Expression } | undefined = undefined;
 
     for (const inst of block.instructions) {
       if (inst.op === 'CMP' || inst.op === 'TEST') {
         lastCmp = {
-          op1: this.reconstructExpression(inst.args[0]),
-          op2: this.reconstructExpression(inst.args[1]),
+          op1: this.reconstructExpressionNode(inst.args[0]),
+          op2: this.reconstructExpressionNode(inst.args[1]),
         };
         blockStatements.push({
           type: 'Statement',
-          code: `${inst.op.toLowerCase()}(${inst.args.map((a) => this.reconstructExpression(a)).join(', ')})`,
+          expr: {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: inst.args.map((a) => this.reconstructExpressionNode(a)),
+          },
         });
-      } else if (['JZ', 'JNZ', 'JE', 'JNE', 'JG', 'JL', 'JGE', 'JLE'].includes(inst.op)) {
+      } else if (
+        ['JZ', 'JNZ', 'JE', 'JNE', 'JG', 'JL', 'JGE', 'JLE'].includes(inst.op)
+      ) {
         if (lastCmp) {
-          conditionCode = `${inst.op.toLowerCase()}(${lastCmp.op1}, ${lastCmp.op2})`;
+          conditionCodeNode = {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: [lastCmp.op1, lastCmp.op2],
+          };
         } else {
-          conditionCode = `${inst.op.toLowerCase()}(${inst.args.map((a) => this.reconstructExpression(a)).join(', ')})`;
+          conditionCodeNode = {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: inst.args.map((a) => this.reconstructExpressionNode(a)),
+          };
         }
       } else if (inst.op === 'RET') {
         blockStatements.push({
           type: 'Return',
-          value: inst.args.map((a) => this.reconstructExpression(a)).join(' '),
+          value:
+            inst.args.length > 0
+              ? inst.args.length === 1
+                ? this.reconstructExpressionNode(inst.args[0])
+                : {
+                    type: 'Constant',
+                    value: inst.args
+                      .map((a) => this.reconstructExpression(a))
+                      .join(' '),
+                  }
+              : undefined,
         });
       } else if (inst.op === 'MOV' || inst.op === 'LEA') {
-        const destExpr = this.reconstructExpression(inst.args[0]);
-        const srcExpr = this.reconstructExpression(inst.args[1]);
+        const destExpr = this.reconstructExpressionNode(inst.args[0]);
+        const srcExpr = this.reconstructExpressionNode(inst.args[1]);
         blockStatements.push({
           type: 'Statement',
-          code: `${destExpr} = ${srcExpr}`,
+          expr: {
+            type: 'Assign',
+            left: destExpr,
+            right: srcExpr,
+          },
         });
       } else {
         blockStatements.push({
           type: 'Statement',
-          code: `${inst.op.toLowerCase()}(${inst.args.map((a) => this.reconstructExpression(a)).join(', ')})`,
+          expr: {
+            type: 'Call',
+            callee: inst.op.toLowerCase(),
+            args: inst.args.map((a) => this.reconstructExpressionNode(a)),
+          },
         });
       }
     }
@@ -1005,7 +1395,15 @@ export class Decompiler {
       const nextId = block.successors[0];
       if (nextId !== endId) {
         statements.push(
-          this.structureBranch(blockMap, nextId, endId, dominators, ipdom, loops, visited)
+          this.structureBranch(
+            blockMap,
+            nextId,
+            endId,
+            dominators,
+            ipdom,
+            loops,
+            visited
+          )
         );
       }
     } else if (block.successors.length === 2) {
@@ -1036,59 +1434,26 @@ export class Decompiler {
 
       statements.push({
         type: 'If',
-        condition: conditionCode || 'true',
+        condition: conditionCodeNode || { type: 'Constant', value: 'true' },
         thenBranch,
         elseBranch,
       });
 
       if (branchMergeId && branchMergeId !== endId) {
         statements.push(
-          this.structureBranch(blockMap, branchMergeId, endId, dominators, ipdom, loops, visited)
+          this.structureBranch(
+            blockMap,
+            branchMergeId,
+            endId,
+            dominators,
+            ipdom,
+            loops,
+            visited
+          )
         );
       }
     }
 
     return { type: 'Block', statements };
-  }
-
-  /**
-   * Renders the control-flow AST into beautifully formatted pseudocode.
-   */
-  private renderAST(node: ASTNode, indentLevel: number): string {
-    const indent = '  '.repeat(indentLevel);
-    switch (node.type) {
-      case 'Block':
-        return node.statements
-          .map((s) => this.renderAST(s, indentLevel))
-          .filter((s) => s.trim().length > 0)
-          .join('\n');
-
-      case 'Statement':
-        return `${indent}${node.code};`;
-
-      case 'Return':
-        return `${indent}return${node.value ? ` ${node.value}` : ''};`;
-
-      case 'If': {
-        const cond = node.condition;
-        let result = `${indent}if (${cond}) {\n${this.renderAST(node.thenBranch, indentLevel + 1)}\n${indent}}`;
-        if (
-          node.elseBranch &&
-          node.elseBranch.type === 'Block' &&
-          node.elseBranch.statements.length > 0
-        ) {
-          result += ` else {\n${this.renderAST(node.elseBranch, indentLevel + 1)}\n${indent}}`;
-        }
-        return result;
-      }
-
-      case 'While': {
-        return `${indent}while (${node.condition}) {\n${this.renderAST(node.body, indentLevel + 1)}\n${indent}}`;
-      }
-
-      case 'DoWhile': {
-        return `${indent}do {\n${this.renderAST(node.body, indentLevel + 1)}\n${indent}} while (${node.condition});`;
-      }
-    }
   }
 }

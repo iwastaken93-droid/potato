@@ -5,7 +5,9 @@ import * as wasmParser from '../src/parser/wasm.js';
 describe('DisassemblerRouter Unit Tests', () => {
   describe('DEX/Dalvik Routing', () => {
     it('should detect DEX/Dalvik format by magic bytes', () => {
-      const data = new Uint8Array([0x64, 0x65, 0x78, 0x0a, 0x00, 0x00, 0x00, 0x00]);
+      const data = new Uint8Array([
+        0x64, 0x65, 0x78, 0x0a, 0x00, 0x00, 0x00, 0x00,
+      ]);
       const arch = DisassemblerRouter.detectArchitecture(data);
       expect(arch).toBe('dex');
     });
@@ -16,9 +18,12 @@ describe('DisassemblerRouter Unit Tests', () => {
       // - 0x00 (nop)
       // - 0x0e (return-void)
       const data = new Uint8Array([
-        0x64, 0x65, 0x78, 0x0a, // dex\n magic
-        0x00,                   // nop
-        0x0e,                   // return-void
+        0x64,
+        0x65,
+        0x78,
+        0x0a, // dex\n magic
+        0x00, // nop
+        0x0e, // return-void
       ]);
       const instructions = router.disassemble(data);
 
@@ -31,7 +36,11 @@ describe('DisassemblerRouter Unit Tests', () => {
 
   describe('Mach-O Routing', () => {
     // Helper to build thin Mach-O header
-    function makeThinMacho(magic: number, isLE: boolean, cputype: number): Uint8Array {
+    function makeThinMacho(
+      magic: number,
+      isLE: boolean,
+      cputype: number
+    ): Uint8Array {
       const header = new Uint8Array(28);
       const view = new DataView(header.buffer);
       view.setUint32(0, magic, isLE);
@@ -270,20 +279,29 @@ describe('DisassemblerRouter Unit Tests', () => {
     it('should route ELF format to x86_64 and arm based on machine ID', () => {
       // ELF magic: 7f 45 4c 46. 64-bit: offset 4 = 2. machine id at offset 18 is 62 (EM_X86_64)
       const dataX86 = new Uint8Array(64);
-      dataX86[0] = 0x7f; dataX86[1] = 0x45; dataX86[2] = 0x4c; dataX86[3] = 0x46;
+      dataX86[0] = 0x7f;
+      dataX86[1] = 0x45;
+      dataX86[2] = 0x4c;
+      dataX86[3] = 0x46;
       dataX86[4] = 2;
       dataX86[18] = 62; // EM_X86_64
       expect(DisassemblerRouter.detectArchitecture(dataX86)).toBe('x86_64');
 
       // ELF machine id 40 (EM_ARM)
       const dataArm32 = new Uint8Array(64);
-      dataArm32[0] = 0x7f; dataArm32[1] = 0x45; dataArm32[2] = 0x4c; dataArm32[3] = 0x46;
+      dataArm32[0] = 0x7f;
+      dataArm32[1] = 0x45;
+      dataArm32[2] = 0x4c;
+      dataArm32[3] = 0x46;
       dataArm32[18] = 40;
       expect(DisassemblerRouter.detectArchitecture(dataArm32)).toBe('arm');
 
       // ELF machine id 183 (EM_AARCH64)
       const dataArm64 = new Uint8Array(64);
-      dataArm64[0] = 0x7f; dataArm64[1] = 0x45; dataArm64[2] = 0x4c; dataArm64[3] = 0x46;
+      dataArm64[0] = 0x7f;
+      dataArm64[1] = 0x45;
+      dataArm64[2] = 0x4c;
+      dataArm64[3] = 0x46;
       dataArm64[18] = 183;
       expect(DisassemblerRouter.detectArchitecture(dataArm64)).toBe('arm');
     });
@@ -291,33 +309,44 @@ describe('DisassemblerRouter Unit Tests', () => {
     it('should route PE format correctly based on machine field', () => {
       // PE magic is MZ (4d 5a) at 0. Offset to PE signature is at 0x3c.
       const data = new Uint8Array(128);
-      data[0] = 0x5a; data[1] = 0x4d; // MZ
+      data[0] = 0x5a;
+      data[1] = 0x4d; // MZ
       const peOffset = 64;
       data[0x3c] = peOffset; // offset to PE signature
-      data[peOffset] = 0x50; data[peOffset + 1] = 0x45; // PE\0\0
+      data[peOffset] = 0x50;
+      data[peOffset + 1] = 0x45; // PE\0\0
       // machine 0x8664 at peOffset + 4
-      data[peOffset + 4] = 0x64; data[peOffset + 5] = 0x86;
+      data[peOffset + 4] = 0x64;
+      data[peOffset + 5] = 0x86;
       expect(DisassemblerRouter.detectArchitecture(data)).toBe('x86_64');
 
       // machine 0xaa64
-      data[peOffset + 4] = 0x64; data[peOffset + 5] = 0xaa;
+      data[peOffset + 4] = 0x64;
+      data[peOffset + 5] = 0xaa;
       expect(DisassemblerRouter.detectArchitecture(data)).toBe('arm');
 
       // machine 0x01c4
-      data[peOffset + 4] = 0xc4; data[peOffset + 5] = 0x01;
+      data[peOffset + 4] = 0xc4;
+      data[peOffset + 5] = 0x01;
       expect(DisassemblerRouter.detectArchitecture(data)).toBe('arm');
     });
 
     it('should route Mach-O using alternative detection branches', () => {
       // Alternative thin Mach-O detection at line 140
       const dataMacho = new Uint8Array(16);
-      dataMacho[0] = 0xcf; dataMacho[1] = 0xfa; dataMacho[2] = 0xed; dataMacho[3] = 0xfe; // magic
+      dataMacho[0] = 0xcf;
+      dataMacho[1] = 0xfa;
+      dataMacho[2] = 0xed;
+      dataMacho[3] = 0xfe; // magic
       dataMacho[4] = 12; // CPU_TYPE_ARM
       expect(DisassemblerRouter.detectArchitecture(dataMacho)).toBe('arm');
 
       // Alternative fat Mach-O detection at line 163
       const dataFat = new Uint8Array(16);
-      dataFat[0] = 0xca; dataFat[1] = 0xfe; dataFat[2] = 0xba; dataFat[3] = 0xbe;
+      dataFat[0] = 0xca;
+      dataFat[1] = 0xfe;
+      dataFat[2] = 0xba;
+      dataFat[3] = 0xbe;
       dataFat[11] = 12; // cputype is ARM (big endian, so at offset 11)
       expect(DisassemblerRouter.detectArchitecture(dataFat)).toBe('arm');
 
@@ -380,7 +409,8 @@ describe('DisassemblerRouter Unit Tests', () => {
       ];
 
       const instructions = [
-        0x41, ...encodeVarUint(42), // i32.const 42
+        0x41,
+        ...encodeVarUint(42), // i32.const 42
         0x0b, // end
       ];
 
@@ -393,8 +423,14 @@ describe('DisassemblerRouter Unit Tests', () => {
 
       // Combine sections
       const wasmBytes = new Uint8Array([
-        0x00, 0x61, 0x73, 0x6d, // Magic
-        0x01, 0x00, 0x00, 0x00, // Version
+        0x00,
+        0x61,
+        0x73,
+        0x6d, // Magic
+        0x01,
+        0x00,
+        0x00,
+        0x00, // Version
 
         1, // SectionId.Type
         ...encodeVarUint(typePayload.length),
@@ -419,18 +455,16 @@ describe('DisassemblerRouter Unit Tests', () => {
     it('should invoke fallback mock WASM disassembler for parsing failures', () => {
       // Provide partial/invalid WASM bytes to trigger the try-catch block and generate fallback
       const data = new Uint8Array([
-        0x00, 0x01, 0x02, 0x01, 0x03, 0x01, 0x04, 0x01,
-        0x05, 0x0b, 0x0c, 0x01, 0x0d, 0x01, 0x0f, 0x10,
-        0x01, 0x11, 0x01, 0x01, 0x1a, 0x1b, 0x20, 0x01,
-        0x21, 0x01, 0x22, 0x01, 0x23, 0x01, 0x24, 0x01,
-        0x28, 0x01, 0x02, 0x41, 0x05, 0x42, 0x05, 0x43,
-        0x00, 0x00, 0x00, 0x00, 0x44, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x02, 0x01, 0x03, 0x01, 0x04, 0x01, 0x05, 0x0b, 0x0c, 0x01,
+        0x0d, 0x01, 0x0f, 0x10, 0x01, 0x11, 0x01, 0x01, 0x1a, 0x1b, 0x20, 0x01,
+        0x21, 0x01, 0x22, 0x01, 0x23, 0x01, 0x24, 0x01, 0x28, 0x01, 0x02, 0x41,
+        0x05, 0x42, 0x05, 0x43, 0x00, 0x00, 0x00, 0x00, 0x44, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x45, 0x67, 0x7c,
       ]);
       const insts = router.disassemble(data, { arch: 'wasm' });
       expect(insts.length).toBeGreaterThan(0);
-      
-      const mnemonics = insts.map(i => i.mnemonic);
+
+      const mnemonics = insts.map((i) => i.mnemonic);
       expect(mnemonics).toContain('unreachable');
       expect(mnemonics).toContain('nop');
       expect(mnemonics).toContain('block');
@@ -467,13 +501,32 @@ describe('DisassemblerRouter Unit Tests', () => {
     it('should disassemble DEX move and const instructions', () => {
       // 0x01 (move), 0x12 (const/4), 0x26 (fill-array-data), 0x28 (goto), 0x32 (if-eq), 0x71 (invoke-static), 0x13 (const/16)
       const data = new Uint8Array([
-        0x01, 0x12, // move v2, v1 (depending on nibble)
-        0x12, 0x34, // const/4 v4, #3
-        0x26, 0x01, 0x05, 0x00, 0x00, 0x00, // fill-array-data
-        0x28, 0x02, // goto +2
-        0x32, 0x12, 0x04, 0x00, // if-eq v2, v1, +4
-        0x71, 0x20, 0x04, 0x00, 0x00, 0x00, // invoke-static
-        0x13, 0x02, 0x04, 0x00, // const/16 v2, #4
+        0x01,
+        0x12, // move v2, v1 (depending on nibble)
+        0x12,
+        0x34, // const/4 v4, #3
+        0x26,
+        0x01,
+        0x05,
+        0x00,
+        0x00,
+        0x00, // fill-array-data
+        0x28,
+        0x02, // goto +2
+        0x32,
+        0x12,
+        0x04,
+        0x00, // if-eq v2, v1, +4
+        0x71,
+        0x20,
+        0x04,
+        0x00,
+        0x00,
+        0x00, // invoke-static
+        0x13,
+        0x02,
+        0x04,
+        0x00, // const/16 v2, #4
       ]);
       const insts = router.disassemble(data, { arch: 'dex' });
       expect(insts.length).toBeGreaterThan(0);
@@ -493,26 +546,76 @@ describe('DisassemblerRouter Unit Tests', () => {
     it('should handle x86_64 rex prefixes, shifts, jumps and immediate instructions', () => {
       // rex prefixes, push/pop, jumps, movs, etc.
       const data = new Uint8Array([
-        0x48, 0x89, 0xc3, // REX.W mov rbx, rax
-        0x50,             // push rax
-        0x58,             // pop rax
-        0x6a, 0x05,       // push 5 (8-bit)
-        0x68, 0x00, 0x00, 0x00, 0x00, // push 0 (32-bit)
-        0xeb, 0x02,       // jmp short
-        0xe9, 0x00, 0x00, 0x00, 0x00, // jmp near
-        0x70, 0x02,       // jo short
-        0xe8, 0x00, 0x00, 0x00, 0x00, // call
-        0xc7, 0xc0, 0x05, 0x00, 0x00, 0x00, // mov rax, 5
-        0x48, 0xb8, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rax, 5 (64-bit imm)
-        0xb8, 0x05, 0x00, 0x00, 0x00, // mov eax, 5 (32-bit imm)
-        0x83, 0xc0, 0x05, // add eax, 5
-        0x8d, 0x00,       // lea eax, [eax]
-        0xc1, 0xe0, 0x02, // shl eax, 2
-        0xd1, 0xe0,       // shl eax, 1
-        0x9c,             // pushf
-        0x0f, 0x85, 0x00, 0x00, 0x00, 0x00, // jne near
-        0x0f, 0xaf, 0xc3, // imul rax, rbx
-        0x0f, 0xb6, 0xc3, // movzx rax, rbx
+        0x48,
+        0x89,
+        0xc3, // REX.W mov rbx, rax
+        0x50, // push rax
+        0x58, // pop rax
+        0x6a,
+        0x05, // push 5 (8-bit)
+        0x68,
+        0x00,
+        0x00,
+        0x00,
+        0x00, // push 0 (32-bit)
+        0xeb,
+        0x02, // jmp short
+        0xe9,
+        0x00,
+        0x00,
+        0x00,
+        0x00, // jmp near
+        0x70,
+        0x02, // jo short
+        0xe8,
+        0x00,
+        0x00,
+        0x00,
+        0x00, // call
+        0xc7,
+        0xc0,
+        0x05,
+        0x00,
+        0x00,
+        0x00, // mov rax, 5
+        0x48,
+        0xb8,
+        0x05,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00, // mov rax, 5 (64-bit imm)
+        0xb8,
+        0x05,
+        0x00,
+        0x00,
+        0x00, // mov eax, 5 (32-bit imm)
+        0x83,
+        0xc0,
+        0x05, // add eax, 5
+        0x8d,
+        0x00, // lea eax, [eax]
+        0xc1,
+        0xe0,
+        0x02, // shl eax, 2
+        0xd1,
+        0xe0, // shl eax, 1
+        0x9c, // pushf
+        0x0f,
+        0x85,
+        0x00,
+        0x00,
+        0x00,
+        0x00, // jne near
+        0x0f,
+        0xaf,
+        0xc3, // imul rax, rbx
+        0x0f,
+        0xb6,
+        0xc3, // movzx rax, rbx
       ]);
       const insts = router.disassemble(data, { arch: 'x86_64' });
       expect(insts.length).toBeGreaterThan(0);
@@ -526,27 +629,90 @@ describe('DisassemblerRouter Unit Tests', () => {
       // 0x54000040 (b.eq +8), 0x34000040 (cbz x0, +8), 0x91000800 (add x0, x0, #2), 0x8b010000 (add x0, x0, x1)
       // 0xd340fc00 (ubfx), 0x9340fc00 (sbfx), 0x1ac02000 (lsl), nzcv msr/mrs, orr logical, udiv/sdiv, ldr/str, ldp/stp
       const data = new Uint8Array([
-        0x1f, 0x20, 0x03, 0xd5, // nop
-        0xc0, 0x03, 0x5f, 0xd6, // ret
-        0x02, 0x00, 0x00, 0x14, // b +8
-        0x02, 0x00, 0x00, 0x94, // bl +8
-        0x20, 0x00, 0x1f, 0xd6, // br x1
-        0x20, 0x00, 0x3f, 0xd6, // blr x1
-        0x40, 0x00, 0x00, 0x54, // b.eq +8
-        0x40, 0x00, 0x00, 0x34, // cbz x0, +8
-        0x00, 0x08, 0x00, 0x91, // add x0, x0, #2
-        0x00, 0x00, 0x01, 0x8b, // add x0, x0, x1
-        0x00, 0xfc, 0x40, 0xd3, // ubfx x0, x0, #0, #64
-        0x00, 0xfc, 0x40, 0x93, // sbfx x0, x0, #0, #64
-        0x00, 0x20, 0xc0, 0x1a, // lsl x0, x0, x0
-        0x00, 0x42, 0x1b, 0xd5, // msr nzcv, x0
-        0x00, 0x00, 0x02, 0x0a, // and x0, x0, x2
-        0x00, 0x00, 0x22, 0x0a, // orr x0, x0, x2 (with neg/move check)
-        0x00, 0x04, 0xc2, 0x1a, // sdiv x0, x1, x2 (incorrect instruction but checks pattern)
-        0x00, 0x00, 0x40, 0xf9, // ldr x0, [x0, #0]
-        0x00, 0x00, 0x00, 0x29, // stp x0, x0, [x0, #0]
-        0xfe, 0x0f, 0x1f, 0xf8, // push x0
-        0xfe, 0x07, 0x40, 0xf8, // pop x0
+        0x1f,
+        0x20,
+        0x03,
+        0xd5, // nop
+        0xc0,
+        0x03,
+        0x5f,
+        0xd6, // ret
+        0x02,
+        0x00,
+        0x00,
+        0x14, // b +8
+        0x02,
+        0x00,
+        0x00,
+        0x94, // bl +8
+        0x20,
+        0x00,
+        0x1f,
+        0xd6, // br x1
+        0x20,
+        0x00,
+        0x3f,
+        0xd6, // blr x1
+        0x40,
+        0x00,
+        0x00,
+        0x54, // b.eq +8
+        0x40,
+        0x00,
+        0x00,
+        0x34, // cbz x0, +8
+        0x00,
+        0x08,
+        0x00,
+        0x91, // add x0, x0, #2
+        0x00,
+        0x00,
+        0x01,
+        0x8b, // add x0, x0, x1
+        0x00,
+        0xfc,
+        0x40,
+        0xd3, // ubfx x0, x0, #0, #64
+        0x00,
+        0xfc,
+        0x40,
+        0x93, // sbfx x0, x0, #0, #64
+        0x00,
+        0x20,
+        0xc0,
+        0x1a, // lsl x0, x0, x0
+        0x00,
+        0x42,
+        0x1b,
+        0xd5, // msr nzcv, x0
+        0x00,
+        0x00,
+        0x02,
+        0x0a, // and x0, x0, x2
+        0x00,
+        0x00,
+        0x22,
+        0x0a, // orr x0, x0, x2 (with neg/move check)
+        0x00,
+        0x04,
+        0xc2,
+        0x1a, // sdiv x0, x1, x2 (incorrect instruction but checks pattern)
+        0x00,
+        0x00,
+        0x40,
+        0xf9, // ldr x0, [x0, #0]
+        0x00,
+        0x00,
+        0x00,
+        0x29, // stp x0, x0, [x0, #0]
+        0xfe,
+        0x0f,
+        0x1f,
+        0xf8, // push x0
+        0xfe,
+        0x07,
+        0x40,
+        0xf8, // pop x0
       ]);
       const insts = router.disassemble(data, { arch: 'arm' });
       expect(insts.length).toBeGreaterThan(0);
@@ -589,38 +755,46 @@ describe('DisassemblerRouter Unit Tests', () => {
               { offset: 0, opcode: 0x41, mnemonic: 'i32.const', args: 100 },
               { offset: 2, opcode: 0x42, mnemonic: 'i64.const', args: 500n },
               { offset: 4, opcode: 0x20, mnemonic: 'local.get', args: [1, 2] },
-              { offset: 6, opcode: 0x03, mnemonic: 'loop', args: { blockType: 0x40 } },
-              { offset: 8, opcode: 0x0b, mnemonic: 'end', args: 'some-string' }
-            ]
-          }
-        ]
+              {
+                offset: 6,
+                opcode: 0x03,
+                mnemonic: 'loop',
+                args: { blockType: 0x40 },
+              },
+              { offset: 8, opcode: 0x0b, mnemonic: 'end', args: 'some-string' },
+            ],
+          },
+        ],
       };
 
-      const spy = vi.spyOn(wasmParser, 'parseWasm').mockReturnValueOnce(mockModule as any);
+      const spy = vi
+        .spyOn(wasmParser, 'parseWasm')
+        .mockReturnValueOnce(mockModule as any);
 
-      const wasmBytes = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+      const wasmBytes = new Uint8Array([
+        0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+      ]);
       const insts = router.disassemble(wasmBytes);
-      
+
       expect(spy).toHaveBeenCalled();
       expect(insts.length).toBe(5);
-      
+
       expect(insts[0].mnemonic).toBe('i32.const');
       expect(insts[0].opStr).toBe('100');
-      
+
       expect(insts[1].mnemonic).toBe('i64.const');
       expect(insts[1].opStr).toBe('500');
-      
+
       expect(insts[2].mnemonic).toBe('local.get');
       expect(insts[2].opStr).toBe('1, 2');
-      
+
       expect(insts[3].mnemonic).toBe('loop');
       expect(insts[3].opStr).toBe('{"blockType":64}');
-      
+
       expect(insts[4].mnemonic).toBe('end');
       expect(insts[4].opStr).toBe('some-string');
-      
+
       spy.mockRestore();
     });
   });
 });
-

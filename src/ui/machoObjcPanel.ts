@@ -1,7 +1,15 @@
-import { ParsedObjcMetadata, ObjcClass, ObjcProtocol, ObjcMethod } from '../parser/machoObjc.js';
+import {
+  ParsedObjcMetadata,
+  ObjcClass,
+  ObjcProtocol,
+  ObjcMethod,
+} from '../parser/machoObjc.js';
 
 export interface MachoObjcPanelOptions {
-  onNavigate?: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate?: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export class MachoObjcPanel {
@@ -31,6 +39,8 @@ export class MachoObjcPanel {
     this.options = options;
     this.injectStyles();
     this.initDOM();
+    this.updateStats();
+    this.render();
   }
 
   /**
@@ -392,13 +402,17 @@ export class MachoObjcPanel {
 
     this.classesTabBtn = document.createElement('button');
     this.classesTabBtn.className = 'objc-tab-btn active';
-    this.classesTabBtn.innerText = 'Classes';
-    this.classesTabBtn.addEventListener('click', () => this.switchTab('classes'));
+    this.classesTabBtn.textContent = 'Classes';
+    this.classesTabBtn.addEventListener('click', () =>
+      this.switchTab('classes')
+    );
 
     this.protocolsTabBtn = document.createElement('button');
     this.protocolsTabBtn.className = 'objc-tab-btn';
-    this.protocolsTabBtn.innerText = 'Protocols';
-    this.protocolsTabBtn.addEventListener('click', () => this.switchTab('protocols'));
+    this.protocolsTabBtn.textContent = 'Protocols';
+    this.protocolsTabBtn.addEventListener('click', () =>
+      this.switchTab('protocols')
+    );
 
     tabSwitcher.appendChild(this.classesTabBtn);
     tabSwitcher.appendChild(this.protocolsTabBtn);
@@ -410,7 +424,8 @@ export class MachoObjcPanel {
     this.searchInput = document.createElement('input');
     this.searchInput.type = 'text';
     this.searchInput.className = 'objc-search-input';
-    this.searchInput.placeholder = 'Search classes, protocols, methods, properties...';
+    this.searchInput.placeholder =
+      'Search classes, protocols, methods, properties...';
     this.searchInput.addEventListener('input', (e) => {
       this.searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
       this.selectedIndex = 0;
@@ -453,10 +468,10 @@ export class MachoObjcPanel {
 
   private updateStats() {
     if (!this.metadata) {
-      this.statsClassesEl.innerText = '0';
-      this.statsProtocolsEl.innerText = '0';
-      this.statsMethodsEl.innerText = '0';
-      this.statsPropsEl.innerText = '0';
+      this.statsClassesEl.textContent = '0';
+      this.statsProtocolsEl.textContent = '0';
+      this.statsMethodsEl.textContent = '0';
+      this.statsPropsEl.textContent = '0';
       return;
     }
 
@@ -467,54 +482,70 @@ export class MachoObjcPanel {
     let propsCount = 0;
 
     for (const cls of this.metadata.classes) {
-      methodsCount += (cls.methods?.length || 0);
-      propsCount += (cls.properties?.length || 0);
+      methodsCount += cls.methods?.length || 0;
+      propsCount += cls.properties?.length || 0;
     }
 
     for (const proto of this.metadata.protocols) {
-      methodsCount += ((proto.instanceMethods?.length || 0) + (proto.classMethods?.length || 0));
-      propsCount += (proto.properties?.length || 0);
+      methodsCount +=
+        (proto.instanceMethods?.length || 0) +
+        (proto.classMethods?.length || 0);
+      propsCount += proto.properties?.length || 0;
     }
 
-    this.statsClassesEl.innerText = classesCount.toString();
-    this.statsProtocolsEl.innerText = protocolsCount.toString();
-    this.statsMethodsEl.innerText = methodsCount.toString();
-    this.statsPropsEl.innerText = propsCount.toString();
+    this.statsClassesEl.textContent = classesCount.toString();
+    this.statsProtocolsEl.textContent = protocolsCount.toString();
+    this.statsMethodsEl.textContent = methodsCount.toString();
+    this.statsPropsEl.textContent = propsCount.toString();
   }
 
   private getFilteredData(): (ObjcClass | ObjcProtocol)[] {
     if (!this.metadata) return [];
 
     if (this.activeTab === 'classes') {
-      return this.metadata.classes.filter(cls => {
+      return this.metadata.classes.filter((cls) => {
         if (!this.searchQuery) return true;
-        const matchesClass = cls.name.toLowerCase().includes(this.searchQuery) ||
-          (cls.superclassName && cls.superclassName.toLowerCase().includes(this.searchQuery));
+        const matchesClass =
+          cls.name.toLowerCase().includes(this.searchQuery) ||
+          (cls.superclassName &&
+            cls.superclassName.toLowerCase().includes(this.searchQuery));
         if (matchesClass) return true;
 
         // Check if any method matches
-        const matchesMethod = cls.methods?.some(m => m.name.toLowerCase().includes(this.searchQuery));
+        const matchesMethod = cls.methods?.some((m) =>
+          m.name.toLowerCase().includes(this.searchQuery)
+        );
         if (matchesMethod) return true;
 
         // Check if any property matches
-        const matchesProp = cls.properties?.some(p => p.name.toLowerCase().includes(this.searchQuery));
+        const matchesProp = cls.properties?.some((p) =>
+          p.name.toLowerCase().includes(this.searchQuery)
+        );
         if (matchesProp) return true;
 
         return false;
       });
     } else {
-      return this.metadata.protocols.filter(proto => {
+      return this.metadata.protocols.filter((proto) => {
         if (!this.searchQuery) return true;
-        const matchesProto = proto.name.toLowerCase().includes(this.searchQuery);
+        const matchesProto = proto.name
+          .toLowerCase()
+          .includes(this.searchQuery);
         if (matchesProto) return true;
 
         // Check instance or class methods
-        const matchesInstanceMeth = proto.instanceMethods?.some(m => m.name.toLowerCase().includes(this.searchQuery));
-        const matchesClassMeth = proto.classMethods?.some(m => m.name.toLowerCase().includes(this.searchQuery));
+        const matchesInstanceMeth = proto.instanceMethods?.some((m) =>
+          m.name.toLowerCase().includes(this.searchQuery)
+        );
+        const matchesClassMeth = proto.classMethods?.some((m) =>
+          m.name.toLowerCase().includes(this.searchQuery)
+        );
         if (matchesInstanceMeth || matchesClassMeth) return true;
 
         // Check properties
-        const matchesProp = proto.properties?.some(p => p.name.toLowerCase().includes(this.searchQuery));
+        const matchesProp = proto.properties?.some((p) =>
+          p.name.toLowerCase().includes(this.searchQuery)
+        );
         if (matchesProp) return true;
 
         return false;
@@ -527,16 +558,20 @@ export class MachoObjcPanel {
     this.detailEl.innerHTML = '';
 
     if (!this.metadata) {
-      this.sidebarEl.innerHTML = '<div class="objc-no-data">No binary metadata loaded</div>';
-      this.detailEl.innerHTML = '<div class="objc-no-data">Select a class or protocol to inspect metadata</div>';
+      this.sidebarEl.innerHTML =
+        '<div class="objc-no-data">No binary metadata loaded</div>';
+      this.detailEl.innerHTML =
+        '<div class="objc-no-data">Select a class or protocol to inspect metadata</div>';
       return;
     }
 
     const list = this.getFilteredData();
 
     if (list.length === 0) {
-      this.sidebarEl.innerHTML = '<div class="objc-no-data">No matches found</div>';
-      this.detailEl.innerHTML = '<div class="objc-no-data">Try a different search query</div>';
+      this.sidebarEl.innerHTML =
+        '<div class="objc-no-data">No matches found</div>';
+      this.detailEl.innerHTML =
+        '<div class="objc-no-data">Try a different search query</div>';
       return;
     }
 
@@ -555,12 +590,12 @@ export class MachoObjcPanel {
       });
 
       const nameSpan = document.createElement('span');
-      nameSpan.innerText = item.name;
+      nameSpan.textContent = item.name;
       button.appendChild(nameSpan);
 
       const badge = document.createElement('span');
       badge.className = `objc-badge ${this.activeTab === 'classes' ? 'badge-class' : 'badge-protocol'}`;
-      badge.innerText = this.activeTab === 'classes' ? 'Class' : 'Protocol';
+      badge.textContent = this.activeTab === 'classes' ? 'Class' : 'Protocol';
       button.appendChild(badge);
 
       this.sidebarEl.appendChild(button);
@@ -582,7 +617,7 @@ export class MachoObjcPanel {
     header.innerHTML = `
       <h3>${cls.name}</h3>
       <p>Superclass: <span style="color: var(--accent-end); font-weight: 600;">${cls.superclassName || 'NSObject (or root)'}</span></p>
-      ${cls.protocols && cls.protocols.length > 0 ? `<p style="margin-top: 0.35rem;">Adopts Protocols: ${cls.protocols.map(p => `<span class="objc-badge badge-protocol">${p}</span>`).join(' ')}</p>` : ''}
+      ${cls.protocols && cls.protocols.length > 0 ? `<p style="margin-top: 0.35rem;">Adopts Protocols: ${cls.protocols.map((p) => `<span class="objc-badge badge-protocol">${p}</span>`).join(' ')}</p>` : ''}
     `;
     this.detailEl.appendChild(header);
 
@@ -604,28 +639,28 @@ export class MachoObjcPanel {
         </thead>
       `;
       const tbody = document.createElement('tbody');
-      cls.methods.forEach(m => {
+      cls.methods.forEach((m) => {
         const tr = document.createElement('tr');
-        
+
         const tdName = document.createElement('td');
         tdName.style.color = 'var(--accent-end)';
         tdName.style.fontWeight = '600';
-        tdName.innerText = m.name;
+        tdName.textContent = m.name;
         tr.appendChild(tdName);
 
         const tdType = document.createElement('td');
         tdType.style.color = 'var(--text-muted)';
-        tdType.innerText = m.types || '';
+        tdType.textContent = m.types || '';
         tr.appendChild(tdType);
 
         const tdImp = document.createElement('td');
         if (m.imp !== undefined && m.imp !== null) {
           const addrNum = typeof m.imp === 'bigint' ? Number(m.imp) : m.imp;
           const formattedAddr = '0x' + addrNum.toString(16).toUpperCase();
-          
+
           const btn = document.createElement('button');
           btn.className = 'objc-addr-btn';
-          btn.innerText = formattedAddr;
+          btn.textContent = formattedAddr;
           btn.addEventListener('click', () => {
             if (this.options.onNavigate) {
               this.options.onNavigate('assembly', addrNum);
@@ -633,7 +668,7 @@ export class MachoObjcPanel {
           });
           tdImp.appendChild(btn);
         } else {
-          tdImp.innerText = 'N/A';
+          tdImp.textContent = 'N/A';
           tdImp.style.color = 'var(--text-muted)';
         }
         tr.appendChild(tdImp);
@@ -642,7 +677,8 @@ export class MachoObjcPanel {
       table.appendChild(tbody);
       methodsSection.appendChild(table);
     } else {
-      methodsSection.innerHTML += '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No recovered methods found</div>';
+      methodsSection.innerHTML +=
+        '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No recovered methods found</div>';
     }
     this.detailEl.appendChild(methodsSection);
 
@@ -663,17 +699,17 @@ export class MachoObjcPanel {
         </thead>
       `;
       const tbody = document.createElement('tbody');
-      cls.properties.forEach(p => {
+      cls.properties.forEach((p) => {
         const tr = document.createElement('tr');
-        
+
         const tdName = document.createElement('td');
         tdName.style.color = 'var(--text-secondary)';
-        tdName.innerText = p.name;
+        tdName.textContent = p.name;
         tr.appendChild(tdName);
 
         const tdAttr = document.createElement('td');
         tdAttr.style.color = 'var(--text-muted)';
-        tdAttr.innerText = p.attributes || '';
+        tdAttr.textContent = p.attributes || '';
         tr.appendChild(tdAttr);
 
         tbody.appendChild(tr);
@@ -681,7 +717,8 @@ export class MachoObjcPanel {
       table.appendChild(tbody);
       propsSection.appendChild(table);
     } else {
-      propsSection.innerHTML += '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No recovered properties found</div>';
+      propsSection.innerHTML +=
+        '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No recovered properties found</div>';
     }
     this.detailEl.appendChild(propsSection);
 
@@ -704,27 +741,28 @@ export class MachoObjcPanel {
         </thead>
       `;
       const tbody = document.createElement('tbody');
-      cls.ivars.forEach(iv => {
+      cls.ivars.forEach((iv) => {
         const tr = document.createElement('tr');
-        
+
         const tdName = document.createElement('td');
         tdName.style.color = 'var(--text-primary)';
-        tdName.innerText = iv.name;
+        tdName.textContent = iv.name;
         tr.appendChild(tdName);
 
         const tdType = document.createElement('td');
         tdType.style.color = 'var(--text-muted)';
-        tdType.innerText = iv.type || '';
+        tdType.textContent = iv.type || '';
         tr.appendChild(tdType);
 
         const tdOffset = document.createElement('td');
         tdOffset.style.color = 'var(--text-secondary)';
-        tdOffset.innerText = iv.offset !== undefined ? `+${iv.offset}` : 'N/A';
+        tdOffset.textContent =
+          iv.offset !== undefined ? `+${iv.offset}` : 'N/A';
         tr.appendChild(tdOffset);
 
         const tdSize = document.createElement('td');
         tdSize.style.color = 'var(--text-secondary)';
-        tdSize.innerText = iv.size !== undefined ? `${iv.size} bytes` : 'N/A';
+        tdSize.textContent = iv.size !== undefined ? `${iv.size} bytes` : 'N/A';
         tr.appendChild(tdSize);
 
         tbody.appendChild(tr);
@@ -732,7 +770,8 @@ export class MachoObjcPanel {
       table.appendChild(tbody);
       ivarsSection.appendChild(table);
     } else {
-      ivarsSection.innerHTML += '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No instance variables found</div>';
+      ivarsSection.innerHTML +=
+        '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No instance variables found</div>';
     }
     this.detailEl.appendChild(ivarsSection);
   }
@@ -764,18 +803,18 @@ export class MachoObjcPanel {
         </thead>
       `;
       const tbody = document.createElement('tbody');
-      proto.instanceMethods.forEach(m => {
+      proto.instanceMethods.forEach((m) => {
         const tr = document.createElement('tr');
-        
+
         const tdName = document.createElement('td');
         tdName.style.color = 'var(--accent-end)';
         tdName.style.fontWeight = '600';
-        tdName.innerText = m.name;
+        tdName.textContent = m.name;
         tr.appendChild(tdName);
 
         const tdType = document.createElement('td');
         tdType.style.color = 'var(--text-muted)';
-        tdType.innerText = m.types || '';
+        tdType.textContent = m.types || '';
         tr.appendChild(tdType);
 
         tbody.appendChild(tr);
@@ -783,7 +822,8 @@ export class MachoObjcPanel {
       table.appendChild(tbody);
       instMethodsSection.appendChild(table);
     } else {
-      instMethodsSection.innerHTML += '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No instance methods defined</div>';
+      instMethodsSection.innerHTML +=
+        '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No instance methods defined</div>';
     }
     this.detailEl.appendChild(instMethodsSection);
 
@@ -804,18 +844,18 @@ export class MachoObjcPanel {
         </thead>
       `;
       const tbody = document.createElement('tbody');
-      proto.classMethods.forEach(m => {
+      proto.classMethods.forEach((m) => {
         const tr = document.createElement('tr');
-        
+
         const tdName = document.createElement('td');
         tdName.style.color = 'var(--accent-end)';
         tdName.style.fontWeight = '600';
-        tdName.innerText = m.name;
+        tdName.textContent = m.name;
         tr.appendChild(tdName);
 
         const tdType = document.createElement('td');
         tdType.style.color = 'var(--text-muted)';
-        tdType.innerText = m.types || '';
+        tdType.textContent = m.types || '';
         tr.appendChild(tdType);
 
         tbody.appendChild(tr);
@@ -823,7 +863,8 @@ export class MachoObjcPanel {
       table.appendChild(tbody);
       classMethodsSection.appendChild(table);
     } else {
-      classMethodsSection.innerHTML += '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No class methods defined</div>';
+      classMethodsSection.innerHTML +=
+        '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No class methods defined</div>';
     }
     this.detailEl.appendChild(classMethodsSection);
 
@@ -844,17 +885,17 @@ export class MachoObjcPanel {
         </thead>
       `;
       const tbody = document.createElement('tbody');
-      proto.properties.forEach(p => {
+      proto.properties.forEach((p) => {
         const tr = document.createElement('tr');
-        
+
         const tdName = document.createElement('td');
         tdName.style.color = 'var(--text-secondary)';
-        tdName.innerText = p.name;
+        tdName.textContent = p.name;
         tr.appendChild(tdName);
 
         const tdAttr = document.createElement('td');
         tdAttr.style.color = 'var(--text-muted)';
-        tdAttr.innerText = p.attributes || '';
+        tdAttr.textContent = p.attributes || '';
         tr.appendChild(tdAttr);
 
         tbody.appendChild(tr);
@@ -862,7 +903,8 @@ export class MachoObjcPanel {
       table.appendChild(tbody);
       propsSection.appendChild(table);
     } else {
-      propsSection.innerHTML += '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No properties defined</div>';
+      propsSection.innerHTML +=
+        '<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding-left: 0.5rem;">No properties defined</div>';
     }
     this.detailEl.appendChild(propsSection);
   }

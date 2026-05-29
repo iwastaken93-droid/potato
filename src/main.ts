@@ -17,7 +17,7 @@ import {
 } from './disassembler/decompiler.js';
 import { HexViewer } from './ui/hexViewer.js';
 import { AssemblyView } from './ui/assemblyView.js';
-import { CFGVisualizer } from './ui/cfgVisualizer.js';
+import type { CFGVisualizer } from './ui/cfgVisualizer.js';
 import { DependencyGraph } from './ui/dependencyGraph.js';
 import { Instruction, Section, Symbol } from './disassembler/types.js';
 import { MemoryMapOverlay } from './ui/memoryMap.js';
@@ -26,7 +26,7 @@ import { StringsView } from './ui/stringsView.js';
 import { SearchPanel } from './ui/searchPanel.js';
 import { SignaturePanel } from './ui/signaturePanel.js';
 import { ReportPanel } from './ui/reportPanel.js';
-import { EmulatorPanel } from './ui/emulatorPanel.js';
+import type { EmulatorPanel } from './ui/emulatorPanel.js';
 import { XRefsPanel } from './ui/xrefsPanel.js';
 import { ImportsExportsPanel } from './ui/importsExportsPanel.js';
 import { AIPanel } from './ui/aiPanel.js';
@@ -34,13 +34,17 @@ import { BinaryPatcher, PatchRecord } from './analyzer/patcher.js';
 import { PatcherPanel } from './ui/patcherPanel.js';
 import { buildFCG } from './analyzer/fcg.js';
 import { FCGVisualizer } from './ui/fcgVisualizer.js';
-import { CollabPanel } from './ui/collabPanel.js';
+import type { CollabPanel } from './ui/collabPanel.js';
 import { YaraPanel } from './ui/yaraPanel.js';
 import { TypeSystemPanel } from './ui/typeSystemPanel.js';
 import { MetadataPanel } from './ui/metadataPanel.js';
 import { DemanglerPanel } from './ui/demanglerPanel.js';
 import { DiffPanel } from './ui/diffPanel.js';
-import { PluginsPanel } from './ui/pluginsPanel.js';
+import type { PluginsPanel } from './ui/pluginsPanel.js';
+import { GDBPanel } from './ui/gdbPanel.js';
+import { MachoObjcPanel } from './ui/machoObjcPanel.js';
+import { TabManager, TabName } from './ui/tabManager.js';
+import { BinaryLoader } from './ui/binaryLoader.js';
 
 // App state management
 interface AppState {
@@ -53,7 +57,7 @@ interface AppState {
   symbols: Symbol[];
   instructions: Instruction[];
   cfgBlocks: CoreBasicBlock[];
-  activeTab: 'hex' | 'assembly' | 'cfg' | 'decompiler' | 'strings' | 'search' | 'dependencies' | 'signatures' | 'emulator' | 'report' | 'xrefs' | 'importsExports' | 'patcher' | 'fcg' | 'collab' | 'yara' | 'typeSystem' | 'metadata' | 'demangler' | 'diff' | 'plugins';
+  activeTab: TabName;
   selectedSymbol: Symbol | null;
   searchQuery: string;
   extractedStrings: ExtractedString[];
@@ -70,6 +74,10 @@ interface AppState {
 export class ApplicationCoordinator {
   private state!: AppState;
   private patcher: BinaryPatcher | null = null;
+  private cfgNeedsUpdate = true;
+  private emulatorNeedsUpdate = true;
+  private collabNeedsUpdate = true;
+  private pluginsNeedsUpdate = true;
 
   // UI Components
   private hexViewer: HexViewer | null = null;
@@ -81,6 +89,7 @@ export class ApplicationCoordinator {
   private searchPanel: SearchPanel | null = null;
   private signaturePanel: SignaturePanel | null = null;
   private emulatorPanel: EmulatorPanel | null = null;
+  private gdbPanel: GDBPanel | null = null;
   private reportPanel: ReportPanel | null = null;
   private xrefsPanel: XRefsPanel | null = null;
   private importsExportsPanel: ImportsExportsPanel | null = null;
@@ -94,16 +103,14 @@ export class ApplicationCoordinator {
   private demanglerPanel: DemanglerPanel | null = null;
   private diffPanel: DiffPanel | null = null;
   private pluginsPanel: PluginsPanel | null = null;
+  private machoObjcPanel: MachoObjcPanel | null = null;
 
   // DOM elements cache
   private appContainer!: HTMLDivElement;
-  private fileInput!: HTMLInputElement;
-  private uploadBtn!: HTMLButtonElement;
-  private fileDropzone!: HTMLDivElement;
   private searchInput!: HTMLInputElement;
   private sidebarList!: HTMLDivElement;
-  private tabButtons: Map<string, HTMLButtonElement> = new Map();
-  private tabPanels: Map<string, HTMLElement> = new Map();
+  private tabManager!: TabManager;
+  private binaryLoader!: BinaryLoader;
 
   // Header status elements
   private statusFileName!: HTMLSpanElement;
@@ -116,6 +123,18 @@ export class ApplicationCoordinator {
     this.createLayout();
     this.cacheElements();
     this.setupEventListeners();
+
+    this.tabManager = new TabManager({
+      initialTab: 'hex',
+      onTabChange: (tabName) => this.handleTabChange(tabName),
+    });
+
+    this.binaryLoader = new BinaryLoader({
+      onBinaryLoaded: (fileName, arrayBuffer, lastModified) => {
+        this.processBinary(fileName, arrayBuffer, lastModified);
+      },
+    });
+
     this.loadSampleBinary();
   }
 
@@ -326,6 +345,7 @@ export class ApplicationCoordinator {
               <button class="tab-btn" data-tab="signatures">Signatures</button>
               <button class="tab-btn" data-tab="dependencies">Dependency Graph</button>
               <button class="tab-btn" data-tab="emulator">Emulator</button>
+              <button class="tab-btn" data-tab="gdb">GDB Debugger</button>
               <button class="tab-btn" data-tab="report">Report</button>
               <button class="tab-btn" data-tab="xrefs">XRefs</button>
               <button class="tab-btn" data-tab="metadata">Metadata</button>
@@ -336,6 +356,9 @@ export class ApplicationCoordinator {
               <button class="tab-btn" data-tab="demangler">Demangler</button>
               <button class="tab-btn" data-tab="diff">Diff Viewer</button>
               <button class="tab-btn" data-tab="plugins">Plugins</button>
+              <button class="tab-btn" data-tab="machoObjc">Mach-O ObjC</button>
+              <button class="tab-btn" data-tab="importsExports">Imports/Exports</button>
+              <button class="tab-btn" data-tab="patcher">Patcher</button>
             </div>
             <button class="btn btn-secondary" id="open-mem-map-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem; border-radius: var(--radius-md);">
               🗺️ Memory Map
@@ -394,6 +417,11 @@ export class ApplicationCoordinator {
           <!-- Emulator Tab Panel -->
           <div class="tab-content" id="panel-emulator" style="display: none;">
             <div id="emulator-panel-container" style="height: 100%;"></div>
+          </div>
+
+          <!-- GDB Tab Panel -->
+          <div class="tab-content" id="panel-gdb" style="display: none;">
+            <div id="gdb-panel-container" style="height: 100%;"></div>
           </div>
 
           <!-- Report Tab Panel -->
@@ -455,6 +483,11 @@ export class ApplicationCoordinator {
           <div class="tab-content" id="panel-plugins" style="display: none;">
             <div id="plugins-panel-container" style="height: 100%;"></div>
           </div>
+
+          <!-- Mach-O ObjC Tab Panel -->
+          <div class="tab-content" id="panel-machoObjc" style="display: none;">
+            <div id="macho-objc-container" style="height: 100%;"></div>
+          </div>
         </main>
       </div>
     `;
@@ -464,30 +497,12 @@ export class ApplicationCoordinator {
     this.appContainer = document.querySelector(
       '.app-container'
     ) as HTMLDivElement;
-    this.fileInput = document.getElementById('file-input') as HTMLInputElement;
-    this.uploadBtn = document.getElementById('upload-btn') as HTMLButtonElement;
-    this.fileDropzone = document.getElementById(
-      'file-dropzone'
-    ) as HTMLDivElement;
     this.searchInput = document.getElementById(
       'sidebar-search'
     ) as HTMLInputElement;
     this.sidebarList = document.getElementById(
       'sidebar-list'
     ) as HTMLDivElement;
-
-    // Tab buttons and panel elements cache
-    document.querySelectorAll('.tab-btn').forEach((btn) => {
-      const b = btn as HTMLButtonElement;
-      const tabName = b.dataset.tab;
-      if (tabName) {
-        this.tabButtons.set(tabName, b);
-        this.tabPanels.set(
-          tabName,
-          document.getElementById(`panel-${tabName}`)!
-        );
-      }
-    });
 
     this.statusFileName = document.getElementById(
       'status-filename'
@@ -504,40 +519,6 @@ export class ApplicationCoordinator {
   }
 
   private setupEventListeners() {
-    // File upload click
-    this.uploadBtn.addEventListener('click', () => this.fileInput.click());
-    this.fileDropzone.addEventListener('click', (e) => {
-      if (e.target !== this.uploadBtn) {
-        this.fileInput.click();
-      }
-    });
-
-    // File input change
-    this.fileInput.addEventListener('change', (e) => {
-      const target = e.target as HTMLInputElement;
-      if (target.files && target.files.length > 0) {
-        this.handleUploadedFile(target.files[0]);
-      }
-    });
-
-    // Drag-and-drop support
-    this.fileDropzone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      this.fileDropzone.classList.add('dragover');
-    });
-
-    this.fileDropzone.addEventListener('dragleave', () => {
-      this.fileDropzone.classList.remove('dragover');
-    });
-
-    this.fileDropzone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      this.fileDropzone.classList.remove('dragover');
-      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
-        this.handleUploadedFile(e.dataTransfer.files[0]);
-      }
-    });
-
     // Search bar functionality
     this.searchInput.addEventListener('input', (e) => {
       const value = (e.target as HTMLInputElement).value;
@@ -545,15 +526,10 @@ export class ApplicationCoordinator {
       this.renderSidebarList();
     });
 
-    // Tab buttons hookup
-    this.tabButtons.forEach((btn, tabName: string) => {
-      btn.addEventListener('click', () => {
-        this.switchTab(tabName as any);
-      });
-    });
-
     // Memory map button hookup
-    const openMemMapBtn = document.getElementById('open-mem-map-btn') as HTMLButtonElement;
+    const openMemMapBtn = document.getElementById(
+      'open-mem-map-btn'
+    ) as HTMLButtonElement;
     openMemMapBtn?.addEventListener('click', () => {
       if (this.state && this.state.binaryData) {
         if (!this.memoryMapOverlay) {
@@ -569,10 +545,13 @@ export class ApplicationCoordinator {
                   this.assemblyView.navigateToAddress(address);
                 }
                 // Switch to assembly tab if currently in another tab
-                if (this.state.activeTab !== 'hex' && this.state.activeTab !== 'assembly') {
+                if (
+                  this.state.activeTab !== 'hex' &&
+                  this.state.activeTab !== 'assembly'
+                ) {
                   this.switchTab('assembly');
                 }
-              }
+              },
             }
           );
         }
@@ -581,28 +560,13 @@ export class ApplicationCoordinator {
     });
   }
 
-  private switchTab(tabName: 'hex' | 'assembly' | 'cfg' | 'decompiler' | 'strings' | 'search' | 'dependencies' | 'signatures' | 'emulator' | 'report' | 'xrefs' | 'importsExports' | 'patcher' | 'fcg' | 'collab' | 'yara' | 'typeSystem' | 'metadata' | 'demangler' | 'diff' | 'plugins') {
-    if (this.state.activeTab === tabName) return;
+  private switchTab(tabName: TabName) {
+    this.tabManager.switchTab(tabName);
+  }
 
-    // Toggle button active classes
-    this.tabButtons.forEach((btn, name: string) => {
-      if (name === tabName) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-
-    // Toggle panels visible style
-    this.tabPanels.forEach((panel, name: string) => {
-      if (name === tabName) {
-        panel.style.display = 'block';
-      } else {
-        panel.style.display = 'none';
-      }
-    });
-
+  private handleTabChange(tabName: TabName) {
     this.state.activeTab = tabName;
+    this.updateActiveTabPanel();
 
     // Trigger components updates or re-render if needed
     if (tabName === 'hex' && this.hexViewer) {
@@ -631,17 +595,29 @@ export class ApplicationCoordinator {
     }
   }
 
-  private handleUploadedFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target && event.target.result instanceof ArrayBuffer) {
-        this.processBinary(file.name, event.target.result, file.lastModified);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+  private updateActiveTabPanel() {
+    if (!this.state) return;
+    const tabName = this.state.activeTab;
+    if (tabName === 'cfg' && this.cfgNeedsUpdate) {
+      this.initCFGViewer();
+      this.cfgNeedsUpdate = false;
+    } else if (tabName === 'emulator' && this.emulatorNeedsUpdate) {
+      this.initEmulatorPanel();
+      this.emulatorNeedsUpdate = false;
+    } else if (tabName === 'collab' && this.collabNeedsUpdate) {
+      this.initCollabPanel();
+      this.collabNeedsUpdate = false;
+    } else if (tabName === 'plugins' && this.pluginsNeedsUpdate) {
+      this.initPluginsPanel();
+      this.pluginsNeedsUpdate = false;
+    }
   }
 
-  private processBinary(fileName: string, arrayBuffer: ArrayBuffer, lastModified?: number) {
+  private processBinary(
+    fileName: string,
+    arrayBuffer: ArrayBuffer,
+    lastModified?: number
+  ) {
     const data = new Uint8Array(arrayBuffer);
     const fileSize = arrayBuffer.byteLength;
 
@@ -652,7 +628,8 @@ export class ApplicationCoordinator {
     let entryPoint = 0;
     let sections: Section[] = [];
     let symbols: Symbol[] = [];
-    let graphImports: { library: string; name: string; address?: number }[] = [];
+    let graphImports: { library: string; name: string; address?: number }[] =
+      [];
     let graphExports: { name: string; address?: number }[] = [];
     let objcMetadata: any = null;
 
@@ -720,11 +697,9 @@ export class ApplicationCoordinator {
           { library: 'libc.so.6', name: 'exit' },
           { library: 'libc.so.6', name: 'memcpy' },
           { library: 'libm.so.6', name: 'sin' },
-          { library: 'libm.so.6', name: 'cos' }
+          { library: 'libm.so.6', name: 'cos' },
         ];
-        graphExports = [
-          { name: '_start', address: entryPoint }
-        ];
+        graphExports = [{ name: '_start', address: entryPoint }];
       } else if (data[0] === 0x4d && data[1] === 0x5a) {
         // PE binary parsing
         const peParser = new PEParser(arrayBuffer);
@@ -780,12 +755,30 @@ export class ApplicationCoordinator {
           }));
         }
       } else if (
-        (data[0] === 0xcf && data[1] === 0xfa && data[2] === 0xed && data[3] === 0xfe) ||
-        (data[0] === 0xfe && data[1] === 0xed && data[2] === 0xfa && data[3] === 0xcf) ||
-        (data[0] === 0xce && data[1] === 0xfa && data[2] === 0xed && data[3] === 0xfe) ||
-        (data[0] === 0xfe && data[1] === 0xed && data[2] === 0xfa && data[3] === 0xce) ||
-        (data[0] === 0xca && data[1] === 0xfe && data[2] === 0xba && data[3] === 0xbe) ||
-        (data[0] === 0xbe && data[1] === 0xba && data[2] === 0xfe && data[3] === 0xca)
+        (data[0] === 0xcf &&
+          data[1] === 0xfa &&
+          data[2] === 0xed &&
+          data[3] === 0xfe) ||
+        (data[0] === 0xfe &&
+          data[1] === 0xed &&
+          data[2] === 0xfa &&
+          data[3] === 0xcf) ||
+        (data[0] === 0xce &&
+          data[1] === 0xfa &&
+          data[2] === 0xed &&
+          data[3] === 0xfe) ||
+        (data[0] === 0xfe &&
+          data[1] === 0xed &&
+          data[2] === 0xfa &&
+          data[3] === 0xce) ||
+        (data[0] === 0xca &&
+          data[1] === 0xfe &&
+          data[2] === 0xba &&
+          data[3] === 0xbe) ||
+        (data[0] === 0xbe &&
+          data[1] === 0xba &&
+          data[2] === 0xfe &&
+          data[3] === 0xca)
       ) {
         // Mach-O binary parsing
         const macho = parseMacho(arrayBuffer);
@@ -859,7 +852,7 @@ export class ApplicationCoordinator {
             fileOffset: dex.header.dataOff || 0,
             fileSize: dex.header.dataSize || data.length,
             flags: { read: true, write: false, execute: true },
-          }
+          },
         ];
 
         let currentMethodAddr = 0x1000;
@@ -870,7 +863,7 @@ export class ApplicationCoordinator {
           if (cDef.classData) {
             const allMethods = [
               ...(cDef.classData.directMethods || []),
-              ...(cDef.classData.virtualMethods || [])
+              ...(cDef.classData.virtualMethods || []),
             ];
             allMethods.forEach((m: any) => {
               const fullMethodName = `${m.method.className}.${m.method.methodName}`;
@@ -892,7 +885,9 @@ export class ApplicationCoordinator {
         }
 
         graphImports = dex.methodIds
-          .filter((m: any) => !symbols.some((s) => s.name.startsWith(m.className)))
+          .filter(
+            (m: any) => !symbols.some((s) => s.name.startsWith(m.className))
+          )
           .map((m: any) => ({
             library: m.className,
             name: m.methodName,
@@ -909,8 +904,6 @@ export class ApplicationCoordinator {
         err
       );
     }
-
-
 
     // Standard fallback routines
     if (sections.length === 0) {
@@ -945,8 +938,6 @@ export class ApplicationCoordinator {
       entryPoint,
     });
 
-
-
     // Populate extra symbols based on branch/calls targets to make it look full
     const additionalFuncs = new Set<number>();
     instructions.forEach((inst: Instruction) => {
@@ -965,7 +956,7 @@ export class ApplicationCoordinator {
       }
     });
 
-    const existingAddresses = new Set(symbols.map(s => s.address));
+    const existingAddresses = new Set(symbols.map((s) => s.address));
     additionalFuncs.forEach((addr: number) => {
       if (!existingAddresses.has(addr)) {
         symbols.push({
@@ -983,33 +974,36 @@ export class ApplicationCoordinator {
     // Build Control Flow Graph (CFG)
     const cfgBlocks = buildCFG(instructions);
 
-
-
     if (graphImports.length === 0) {
       graphImports = [
         { library: 'libc.so.6', name: 'printf' },
         { library: 'libc.so.6', name: 'malloc' },
         { library: 'libc.so.6', name: 'free' },
-        { library: 'libc.so.6', name: 'exit' }
+        { library: 'libc.so.6', name: 'exit' },
       ];
     }
     if (graphExports.length === 0) {
-      graphExports = symbols.filter(s => s.binding === 'global').map(s => ({
-        name: s.name,
-        address: s.address,
-      }));
+      graphExports = symbols
+        .filter((s) => s.binding === 'global')
+        .map((s) => ({
+          name: s.name,
+          address: s.address,
+        }));
     }
 
     // Resolve local calls in O(S + I)
     const symbolMap = new Map<number, Symbol>();
-    symbols.forEach(s => symbolMap.set(s.address, s));
+    symbols.forEach((s) => symbolMap.set(s.address, s));
 
     const symbolInsts = new Map<number, Instruction[]>();
-    symbols.forEach(sym => symbolInsts.set(sym.address, []));
-    
+    symbols.forEach((sym) => symbolInsts.set(sym.address, []));
+
     let symIdx = 0;
     for (const inst of instructions) {
-      while (symIdx + 1 < symbols.length && symbols[symIdx + 1].address <= inst.address) {
+      while (
+        symIdx + 1 < symbols.length &&
+        symbols[symIdx + 1].address <= inst.address
+      ) {
         symIdx++;
       }
       if (symIdx < symbols.length && symbols[symIdx].address <= inst.address) {
@@ -1017,16 +1011,18 @@ export class ApplicationCoordinator {
       }
     }
 
-    const graphLocals = symbols.map(sym => {
+    const graphLocals = symbols.map((sym) => {
       const funcInsts = symbolInsts.get(sym.address) || [];
       const calls: string[] = [];
-      
-      funcInsts.forEach(inst => {
+
+      funcInsts.forEach((inst) => {
         if (
           inst.mnemonic.toLowerCase() === 'call' ||
           inst.mnemonic.toLowerCase().startsWith('j')
         ) {
-          const target = inst.operands?.find((op: any) => op.type === 'imm')?.imm;
+          const target = inst.operands?.find(
+            (op: any) => op.type === 'imm'
+          )?.imm;
           if (typeof target === 'number') {
             const targetSym = symbolMap.get(target);
             if (targetSym) {
@@ -1035,11 +1031,12 @@ export class ApplicationCoordinator {
           }
         }
       });
-      
+
       if (calls.length === 0 && graphImports.length > 0) {
         const numMockCalls = 1 + Math.floor(Math.random() * 2);
         for (let j = 0; j < numMockCalls; j++) {
-          const mockImp = graphImports[Math.floor(Math.random() * graphImports.length)];
+          const mockImp =
+            graphImports[Math.floor(Math.random() * graphImports.length)];
           if (!calls.includes(mockImp.name)) {
             calls.push(mockImp.name);
           }
@@ -1067,7 +1064,8 @@ export class ApplicationCoordinator {
         virtualAddress: s.virtualAddress,
         name: s.name,
       })),
-      baseAddress: sections.find((s: any) => s.flags.execute)?.virtualAddress || 0x1000,
+      baseAddress:
+        sections.find((s: any) => s.flags.execute)?.virtualAddress || 0x1000,
     });
 
     // Update global state
@@ -1098,27 +1096,31 @@ export class ApplicationCoordinator {
 
     this.searchInput.value = '';
 
+    this.cfgNeedsUpdate = true;
+    this.emulatorNeedsUpdate = true;
+    this.collabNeedsUpdate = true;
+    this.pluginsNeedsUpdate = true;
+
     // Initialize View Components
     this.initHexViewer();
     this.initAssemblyViewer();
-    this.initCFGViewer();
     this.initStringsViewer();
     this.initSearchPanel();
     this.initSignaturePanel();
     this.initDependencyGraph();
     this.initReportPanel();
-    this.initEmulatorPanel();
+    this.initGDBPanel();
     this.initXRefsPanel();
     this.initImportsExportsPanel();
     this.patcher = new BinaryPatcher(data);
     this.initPatcherPanel();
     this.initFCGViewer();
-    this.initCollabPanel();
     this.initYaraPanel();
-    this.initPluginsPanel();
     this.initMetadataPanel();
     this.initTypeSystemPanel();
     this.initDemanglerPanel();
+    this.initMachoObjcPanel();
+    this.updateActiveTabPanel();
     this.updateDecompiler();
 
     // Reset memory map overlay so it regenerates for new binary
@@ -1157,17 +1159,21 @@ export class ApplicationCoordinator {
     if (this.stringsView) {
       this.stringsView.setStrings(this.state.extractedStrings);
     } else {
-      this.stringsView = new StringsView(container, this.state.extractedStrings, {
-        onNavigate: (offset: number, address: number) => {
-          if (this.hexViewer) {
-            this.hexViewer.setSelectedOffset(offset);
-          }
-          if (this.assemblyView) {
-            this.assemblyView.navigateToAddress(address);
-          }
-          this.switchTab('assembly');
-        },
-      });
+      this.stringsView = new StringsView(
+        container,
+        this.state.extractedStrings,
+        {
+          onNavigate: (offset: number, address: number) => {
+            if (this.hexViewer) {
+              this.hexViewer.setSelectedOffset(offset);
+            }
+            if (this.assemblyView) {
+              this.assemblyView.navigateToAddress(address);
+            }
+            this.switchTab('assembly');
+          },
+        }
+      );
     }
   }
 
@@ -1183,7 +1189,10 @@ export class ApplicationCoordinator {
       );
     } else {
       this.searchPanel = new SearchPanel(container, {
-        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+        onNavigate: (
+          targetView: 'assembly' | 'hex' | 'decompiler',
+          address: number
+        ) => {
           if (targetView === 'assembly') {
             if (this.assemblyView) {
               this.assemblyView.navigateToAddress(address);
@@ -1191,8 +1200,12 @@ export class ApplicationCoordinator {
             this.switchTab('assembly');
           } else if (targetView === 'hex') {
             if (this.hexViewer) {
-              const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-              const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+              const executeSection = this.state.sections.find(
+                (s: any) => s.flags.execute
+              );
+              const textBaseAddress = executeSection
+                ? executeSection.virtualAddress
+                : 0x1000;
               const offset = address - textBaseAddress;
               if (offset >= 0 && offset < this.state.binaryData.length) {
                 this.hexViewer.setSelectedOffset(offset);
@@ -1202,9 +1215,9 @@ export class ApplicationCoordinator {
           } else if (targetView === 'decompiler') {
             // Find enclosing function symbol
             const funcSyms = this.state.symbols
-              .filter(s => s.type === 'function')
+              .filter((s) => s.type === 'function')
               .sort((a, b) => a.address - b.address);
-            
+
             let enclosingSym = funcSyms[0];
             for (let i = 0; i < funcSyms.length; i++) {
               if (funcSyms[i].address <= address) {
@@ -1213,13 +1226,13 @@ export class ApplicationCoordinator {
                 break;
               }
             }
-            
+
             if (enclosingSym) {
               this.selectSymbol(enclosingSym);
             }
             this.switchTab('decompiler');
           }
-        }
+        },
       });
       this.searchPanel.updateData(
         this.state.binaryData,
@@ -1240,7 +1253,10 @@ export class ApplicationCoordinator {
       );
     } else {
       this.signaturePanel = new SignaturePanel(container, {
-        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+        onNavigate: (
+          targetView: 'assembly' | 'hex' | 'decompiler',
+          address: number
+        ) => {
           if (targetView === 'assembly') {
             if (this.assemblyView) {
               this.assemblyView.navigateToAddress(address);
@@ -1248,8 +1264,12 @@ export class ApplicationCoordinator {
             this.switchTab('assembly');
           } else if (targetView === 'hex') {
             if (this.hexViewer) {
-              const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-              const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+              const executeSection = this.state.sections.find(
+                (s: any) => s.flags.execute
+              );
+              const textBaseAddress = executeSection
+                ? executeSection.virtualAddress
+                : 0x1000;
               const offset = address - textBaseAddress;
               if (offset >= 0 && offset < this.state.binaryData.length) {
                 this.hexViewer.setSelectedOffset(offset);
@@ -1259,9 +1279,9 @@ export class ApplicationCoordinator {
           } else if (targetView === 'decompiler') {
             // Find enclosing function symbol
             const funcSyms = this.state.symbols
-              .filter(s => s.type === 'function')
+              .filter((s) => s.type === 'function')
               .sort((a, b) => a.address - b.address);
-            
+
             let enclosingSym = funcSyms[0];
             for (let i = 0; i < funcSyms.length; i++) {
               if (funcSyms[i].address <= address) {
@@ -1270,13 +1290,13 @@ export class ApplicationCoordinator {
                 break;
               }
             }
-            
+
             if (enclosingSym) {
               this.selectSymbol(enclosingSym);
             }
             this.switchTab('decompiler');
           }
-        }
+        },
       });
       this.signaturePanel.updateData(
         this.state.binaryData,
@@ -1314,9 +1334,11 @@ export class ApplicationCoordinator {
     });
   }
 
-  private initCFGViewer() {
+  private async initCFGViewer() {
     const container = document.getElementById('cfg-viewer-container')!;
     container.innerHTML = '';
+
+    const { CFGVisualizer } = await import('./ui/cfgVisualizer.js');
 
     // Create visualization with state blocks
     this.cfgVisualizer = new CFGVisualizer(container, this.state.cfgBlocks, {
@@ -1339,13 +1361,17 @@ export class ApplicationCoordinator {
     }
 
     if (this.state.dependencies) {
-      this.dependencyGraph = new DependencyGraph(container, this.state.dependencies, {
-        onNodeSelect: (node) => {
-          if (node && node.address && this.assemblyView) {
-            this.assemblyView.navigateToAddress(node.address);
-          }
-        },
-      });
+      this.dependencyGraph = new DependencyGraph(
+        container,
+        this.state.dependencies,
+        {
+          onNodeSelect: (node) => {
+            if (node && node.address && this.assemblyView) {
+              this.assemblyView.navigateToAddress(node.address);
+            }
+          },
+        }
+      );
     }
   }
 
@@ -1377,8 +1403,9 @@ export class ApplicationCoordinator {
     }
   }
 
-  private initEmulatorPanel() {
+  private async initEmulatorPanel() {
     const container = document.getElementById('emulator-panel-container')!;
+    const { EmulatorPanel } = await import('./ui/emulatorPanel.js');
     if (this.emulatorPanel) {
       this.emulatorPanel.updateData(
         this.state.binaryData,
@@ -1397,9 +1424,40 @@ export class ApplicationCoordinator {
           if (this.assemblyView) {
             this.assemblyView.navigateToAddress(rip);
           }
-        }
+        },
       });
       this.emulatorPanel.updateData(
+        this.state.binaryData,
+        this.state.sections,
+        this.state.entryPoint,
+        this.state.instructions
+      );
+    }
+  }
+
+  private initGDBPanel() {
+    const container = document.getElementById('gdb-panel-container')!;
+    if (this.gdbPanel) {
+      this.gdbPanel.updateData(
+        this.state.binaryData,
+        this.state.sections,
+        this.state.entryPoint,
+        this.state.instructions
+      );
+    } else {
+      this.gdbPanel = new GDBPanel(container, {
+        onNavigate: (targetView, address) => {
+          if (targetView === 'assembly' && this.assemblyView) {
+            this.assemblyView.navigateToAddress(address);
+          }
+        },
+        onStep: (rip) => {
+          if (this.assemblyView) {
+            this.assemblyView.navigateToAddress(rip);
+          }
+        },
+      });
+      this.gdbPanel.updateData(
         this.state.binaryData,
         this.state.sections,
         this.state.entryPoint,
@@ -1420,7 +1478,10 @@ export class ApplicationCoordinator {
       );
     } else {
       this.xrefsPanel = new XRefsPanel(container, {
-        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+        onNavigate: (
+          targetView: 'assembly' | 'hex' | 'decompiler',
+          address: number
+        ) => {
           if (targetView === 'assembly') {
             if (this.assemblyView) {
               this.assemblyView.navigateToAddress(address);
@@ -1428,8 +1489,12 @@ export class ApplicationCoordinator {
             this.switchTab('assembly');
           } else if (targetView === 'hex') {
             if (this.hexViewer) {
-              const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-              const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+              const executeSection = this.state.sections.find(
+                (s: any) => s.flags.execute
+              );
+              const textBaseAddress = executeSection
+                ? executeSection.virtualAddress
+                : 0x1000;
               const offset = address - textBaseAddress;
               if (offset >= 0 && offset < this.state.binaryData.length) {
                 this.hexViewer.setSelectedOffset(offset);
@@ -1439,9 +1504,9 @@ export class ApplicationCoordinator {
           } else if (targetView === 'decompiler') {
             // Find enclosing function symbol
             const funcSyms = this.state.symbols
-              .filter(s => s.type === 'function')
+              .filter((s) => s.type === 'function')
               .sort((a, b) => a.address - b.address);
-            
+
             let enclosingSym = funcSyms[0];
             for (let i = 0; i < funcSyms.length; i++) {
               if (funcSyms[i].address <= address) {
@@ -1450,13 +1515,13 @@ export class ApplicationCoordinator {
                 break;
               }
             }
-            
+
             if (enclosingSym) {
               this.selectSymbol(enclosingSym);
             }
             this.switchTab('decompiler');
           }
-        }
+        },
       });
       this.xrefsPanel.updateData(
         this.state.binaryData,
@@ -1473,21 +1538,29 @@ export class ApplicationCoordinator {
     if (this.importsExportsPanel) {
       this.importsExportsPanel.updateData(this.state.dependencies);
     } else {
-      this.importsExportsPanel = new ImportsExportsPanel(container, this.state.dependencies, {
-        onNavigate: (targetView: 'assembly' | 'hex', address: number) => {
-          if (targetView === 'assembly' && this.assemblyView) {
-            this.assemblyView.navigateToAddress(address);
-          } else if (targetView === 'hex' && this.hexViewer) {
-            const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-            const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
-            const offset = address - textBaseAddress;
-            if (offset >= 0 && offset < this.state.binaryData.length) {
-              this.hexViewer.setSelectedOffset(offset);
+      this.importsExportsPanel = new ImportsExportsPanel(
+        container,
+        this.state.dependencies,
+        {
+          onNavigate: (targetView: 'assembly' | 'hex', address: number) => {
+            if (targetView === 'assembly' && this.assemblyView) {
+              this.assemblyView.navigateToAddress(address);
+            } else if (targetView === 'hex' && this.hexViewer) {
+              const executeSection = this.state.sections.find(
+                (s: any) => s.flags.execute
+              );
+              const textBaseAddress = executeSection
+                ? executeSection.virtualAddress
+                : 0x1000;
+              const offset = address - textBaseAddress;
+              if (offset >= 0 && offset < this.state.binaryData.length) {
+                this.hexViewer.setSelectedOffset(offset);
+              }
             }
-          }
-          this.switchTab(targetView);
+            this.switchTab(targetView);
+          },
         }
-      });
+      );
     }
   }
 
@@ -1510,7 +1583,8 @@ export class ApplicationCoordinator {
           const instructions = router.disassemble(patchedBinary, {
             arch: this.state.architecture,
             baseAddress:
-              this.state.sections.find((s: any) => s.flags.execute)?.virtualAddress || 0x1000,
+              this.state.sections.find((s: any) => s.flags.execute)
+                ?.virtualAddress || 0x1000,
             entryPoint: this.state.entryPoint,
           });
 
@@ -1538,13 +1612,21 @@ export class ApplicationCoordinator {
               instructions
             );
           }
+          if (this.gdbPanel) {
+            this.gdbPanel.updateData(
+              patchedBinary,
+              this.state.sections,
+              this.state.entryPoint,
+              instructions
+            );
+          }
           if (this.yaraPanel) {
             this.yaraPanel.updateData(patchedBinary, this.state.sections);
           }
           if (this.fcgVisualizer) {
             this.initFCGViewer();
           }
-        }
+        },
       });
     }
   }
@@ -1613,12 +1695,15 @@ export class ApplicationCoordinator {
                 this.assemblyView.navigateToAddress(address);
               }
               this.switchTab('assembly');
-            }
+            },
           });
         }
       }
       if (this.aiPanel) {
-        this.aiPanel.updateSymbolData(this.state.selectedSymbol, result.pseudocode);
+        this.aiPanel.updateSymbolData(
+          this.state.selectedSymbol,
+          result.pseudocode
+        );
       }
     } catch (err) {
       container.textContent = `// Decompilation failed: ${err}`;
@@ -1638,31 +1723,39 @@ export class ApplicationCoordinator {
           this.assemblyView.navigateToAddress(address);
         }
         this.switchTab('assembly');
-      }
+      },
     });
   }
 
-  private initCollabPanel() {
+  private async initCollabPanel() {
     const container = document.getElementById('collab-panel-container')!;
+    const { CollabPanel } = await import('./ui/collabPanel.js');
     if (this.collabPanel) {
       this.collabPanel.destroy();
     }
     this.collabPanel = new CollabPanel(container, {
-      onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+      onNavigate: (
+        targetView: 'assembly' | 'hex' | 'decompiler',
+        address: number
+      ) => {
         if (targetView === 'assembly' && this.assemblyView) {
           this.assemblyView.navigateToAddress(address);
         } else if (targetView === 'hex' && this.hexViewer) {
-          const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-          const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+          const executeSection = this.state.sections.find(
+            (s: any) => s.flags.execute
+          );
+          const textBaseAddress = executeSection
+            ? executeSection.virtualAddress
+            : 0x1000;
           const offset = address - textBaseAddress;
           if (offset >= 0 && offset < this.state.binaryData.length) {
             this.hexViewer.setSelectedOffset(offset);
           }
         } else if (targetView === 'decompiler') {
           const funcSyms = this.state.symbols
-            .filter(s => s.type === 'function')
+            .filter((s) => s.type === 'function')
             .sort((a, b) => a.address - b.address);
-          
+
           let enclosingSym = funcSyms[0];
           for (let i = 0; i < funcSyms.length; i++) {
             if (funcSyms[i].address <= address) {
@@ -1677,17 +1770,19 @@ export class ApplicationCoordinator {
         }
         this.switchTab(targetView);
       },
-      onCommentSynced: (address: number, comment: string) => {
-      },
-      onHighlightSynced: (address: number, color: string) => {
-      },
-      onRenameSynced: (oldName: string, newName: string, type: 'function' | 'variable') => {
-        const sym = this.state.symbols.find(s => s.name === oldName);
+      onCommentSynced: (address: number, comment: string) => {},
+      onHighlightSynced: (address: number, color: string) => {},
+      onRenameSynced: (
+        oldName: string,
+        newName: string,
+        type: 'function' | 'variable'
+      ) => {
+        const sym = this.state.symbols.find((s) => s.name === oldName);
         if (sym) {
           sym.name = newName;
           this.renderSidebarList();
         }
-      }
+      },
     });
   }
 
@@ -1697,21 +1792,28 @@ export class ApplicationCoordinator {
       this.yaraPanel.updateData(this.state.binaryData, this.state.sections);
     } else {
       this.yaraPanel = new YaraPanel(container, {
-        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+        onNavigate: (
+          targetView: 'assembly' | 'hex' | 'decompiler',
+          address: number
+        ) => {
           if (targetView === 'assembly' && this.assemblyView) {
             this.assemblyView.navigateToAddress(address);
           } else if (targetView === 'hex' && this.hexViewer) {
-            const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-            const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+            const executeSection = this.state.sections.find(
+              (s: any) => s.flags.execute
+            );
+            const textBaseAddress = executeSection
+              ? executeSection.virtualAddress
+              : 0x1000;
             const offset = address - textBaseAddress;
             if (offset >= 0 && offset < this.state.binaryData.length) {
               this.hexViewer.setSelectedOffset(offset);
             }
           } else if (targetView === 'decompiler') {
             const funcSyms = this.state.symbols
-              .filter(s => s.type === 'function')
+              .filter((s) => s.type === 'function')
               .sort((a, b) => a.address - b.address);
-            
+
             let enclosingSym = funcSyms[0];
             for (let i = 0; i < funcSyms.length; i++) {
               if (funcSyms[i].address <= address) {
@@ -1725,14 +1827,15 @@ export class ApplicationCoordinator {
             }
           }
           this.switchTab(targetView);
-        }
+        },
       });
       this.yaraPanel.updateData(this.state.binaryData, this.state.sections);
     }
   }
 
-  private initPluginsPanel() {
+  private async initPluginsPanel() {
     const container = document.getElementById('plugins-panel-container')!;
+    const { PluginsPanel } = await import('./ui/pluginsPanel.js');
     if (this.pluginsPanel) {
       this.pluginsPanel.updateData(
         this.state.binaryData,
@@ -1742,12 +1845,15 @@ export class ApplicationCoordinator {
       );
     } else {
       this.pluginsPanel = new PluginsPanel(container, {
-        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+        onNavigate: (
+          targetView: 'assembly' | 'hex' | 'decompiler',
+          address: number
+        ) => {
           if (targetView === 'assembly' && this.assemblyView) {
             this.assemblyView.navigateToAddress(address);
           }
           this.switchTab(targetView);
-        }
+        },
       });
       this.pluginsPanel.updateData(
         this.state.binaryData,
@@ -1771,7 +1877,7 @@ export class ApplicationCoordinator {
         sectionsCount: this.state.sections.length,
         symbolsCount: this.state.symbols.length,
         lastModified: this.state.lastModified,
-        objc: this.state.objc
+        objc: this.state.objc,
       });
     } else {
       this.metadataPanel = new MetadataPanel(container);
@@ -1784,7 +1890,7 @@ export class ApplicationCoordinator {
         sectionsCount: this.state.sections.length,
         symbolsCount: this.state.symbols.length,
         lastModified: this.state.lastModified,
-        objc: this.state.objc
+        objc: this.state.objc,
       });
     }
   }
@@ -1796,21 +1902,28 @@ export class ApplicationCoordinator {
         this.typeSystemPanel.updateArchitecture(this.state.architecture);
       } else {
         this.typeSystemPanel = new TypeSystemPanel(container, {
-          onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
+          onNavigate: (
+            targetView: 'assembly' | 'hex' | 'decompiler',
+            address: number
+          ) => {
             if (targetView === 'assembly' && this.assemblyView) {
               this.assemblyView.navigateToAddress(address);
             } else if (targetView === 'hex' && this.hexViewer) {
-              const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-              const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+              const executeSection = this.state.sections.find(
+                (s: any) => s.flags.execute
+              );
+              const textBaseAddress = executeSection
+                ? executeSection.virtualAddress
+                : 0x1000;
               const offset = address - textBaseAddress;
               if (offset >= 0 && offset < this.state.binaryData.length) {
                 this.hexViewer.setSelectedOffset(offset);
               }
             } else if (targetView === 'decompiler') {
               const funcSyms = this.state.symbols
-                .filter(s => s.type === 'function')
+                .filter((s) => s.type === 'function')
                 .sort((a, b) => a.address - b.address);
-              
+
               let enclosingSym = funcSyms[0];
               for (let i = 0; i < funcSyms.length; i++) {
                 if (funcSyms[i].address <= address) {
@@ -1824,10 +1937,62 @@ export class ApplicationCoordinator {
               }
             }
             this.switchTab(targetView);
-          }
+          },
         });
         this.typeSystemPanel.updateArchitecture(this.state.architecture);
       }
+    }
+  }
+
+  private initMachoObjcPanel() {
+    const container = document.getElementById('macho-objc-container')!;
+    if (!container) return;
+    if (this.machoObjcPanel) {
+      this.machoObjcPanel.updateData(this.state.objc || null);
+    } else {
+      this.machoObjcPanel = new MachoObjcPanel(container, {
+        onNavigate: (
+          targetView: 'assembly' | 'hex' | 'decompiler',
+          address: number
+        ) => {
+          if (targetView === 'assembly' && this.assemblyView) {
+            this.assemblyView.navigateToAddress(address);
+            this.switchTab('assembly');
+          } else if (targetView === 'hex' && this.hexViewer) {
+            const executeSection = this.state.sections.find(
+              (s: any) => s.flags.execute
+            );
+            const textBaseAddress = executeSection
+              ? executeSection.virtualAddress
+              : 0x1000;
+            const offset = address - textBaseAddress;
+            if (offset >= 0 && offset < this.state.binaryData.length) {
+              this.hexViewer.setSelectedOffset(offset);
+            }
+            this.switchTab('hex');
+          } else if (targetView === 'decompiler') {
+            // Find enclosing function symbol
+            const funcSyms = this.state.symbols
+              .filter((s) => s.type === 'function')
+              .sort((a, b) => a.address - b.address);
+
+            let enclosingSym = funcSyms[0];
+            for (let i = 0; i < funcSyms.length; i++) {
+              if (funcSyms[i].address <= address) {
+                enclosingSym = funcSyms[i];
+              } else {
+                break;
+              }
+            }
+
+            if (enclosingSym) {
+              this.selectSymbol(enclosingSym);
+            }
+            this.switchTab('decompiler');
+          }
+        },
+      });
+      this.machoObjcPanel.updateData(this.state.objc || null);
     }
   }
 
@@ -1919,155 +2084,27 @@ export class ApplicationCoordinator {
           if (targetView === 'assembly' && this.assemblyView) {
             this.assemblyView.navigateToAddress(address);
           } else if (targetView === 'hex' && this.hexViewer) {
-            const executeSection = this.state.sections.find((s: any) => s.flags.execute);
-            const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+            const executeSection = this.state.sections.find(
+              (s: any) => s.flags.execute
+            );
+            const textBaseAddress = executeSection
+              ? executeSection.virtualAddress
+              : 0x1000;
             const offset = address - textBaseAddress;
             if (offset >= 0 && offset < this.state.binaryData.length) {
               this.hexViewer.setSelectedOffset(offset);
             }
           }
           this.switchTab(targetView);
-        }
+        },
       });
     }
   }
 
   private loadSampleBinary() {
-    const textEncoder = new TextEncoder();
-    const stringsToAppend: number[] = [];
-    
-    // Helper to add null-terminated ASCII string
-    const addAscii = (str: string) => {
-      const bytes = textEncoder.encode(str);
-      stringsToAppend.push(...Array.from(bytes), 0);
-    };
-
-    // Helper to add null-terminated UTF-16LE string
-    const addUtf16Le = (str: string) => {
-      for (let i = 0; i < str.length; i++) {
-        const code = str.charCodeAt(i);
-        stringsToAppend.push(code & 0xff, (code >> 8) & 0xff);
-      }
-      stringsToAppend.push(0, 0); // null terminator
-    };
-
-    addAscii("GetProcAddress");
-    addAscii("VirtualAlloc");
-    addAscii("https://github.com/google/antigravity");
-    addAscii("/usr/local/bin/antigravity");
-    addAscii("Welcome to Universal RE Tool!");
-    addUtf16Le("ImportantUnicodeSecret");
-
-    const mockBytes = new Uint8Array([
-      0x7f,
-      0x45,
-      0x4c,
-      0x46, // ELF Magic
-      0x02, // 64-bit
-      0x01, // Little Endian
-      0x01, // Version 1
-      0x00, // OS ABI (System V)
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00, // Padding
-      0x02,
-      0x00, // Type (EXEC)
-      0x3e,
-      0x00, // Machine (AMD64)
-      0x01,
-      0x00,
-      0x00,
-      0x00, // Version
-      0x00,
-      0x10,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00, // Entry Point (0x1000)
-      0x40,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00, // PH Offset (64)
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00, // SH Offset
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x40,
-      0x00,
-      0x38,
-      0x00, // Flags + Sizes
-
-      // Instruction block at 0x1000
-      0x90, // nop
-      0x55, // push rbp
-      0x48,
-      0x89,
-      0xe5, // mov rbp, rsp
-      0x48,
-      0x83,
-      0xec,
-      0x10, // sub rsp, 16
-      0xc7,
-      0x45,
-      0xfc,
-      0x00,
-      0x00,
-      0x00,
-      0x00, // mov dword ptr [rbp - 4], 0
-      0x83,
-      0x7d,
-      0xfc,
-      0x0a, // cmp dword ptr [rbp - 4], 10
-      0x7f,
-      0x0c, // jg +12 (0x102b)
-      0x8b,
-      0x45,
-      0xfc, // mov eax, [rbp - 4]
-      0x01,
-      0xc0, // add eax, eax
-      0x89,
-      0x45,
-      0xf8, // mov [rbp - 8], eax
-      0xff,
-      0x45,
-      0xfc, // inc dword ptr [rbp - 4]
-      0xeb,
-      0xeb, // jmp -21 (0x1013)
-      0xb8,
-      0x2a,
-      0x00,
-      0x00,
-      0x00, // mov eax, 42
-      0xc9, // leave
-      0xc3, // ret
-
-      // Pad remaining to look like a realistic raw dump
-      ...Array.from({ length: 64 }, (_, i) => (i * 3) % 256),
-      ...stringsToAppend
-    ]);
-
-    // Create a mock File object
-    const sampleBuffer = mockBytes.buffer;
-    this.processBinary('sample_elf.bin', sampleBuffer);
+    BinaryLoader.loadSampleBinary((fileName, arrayBuffer) => {
+      this.processBinary(fileName, arrayBuffer);
+    });
   }
 }
 

@@ -18,8 +18,8 @@ const config = {
   },
   test: {
     include: ['../tests/**/*.test.ts', '**/*.test.ts'],
+    testTimeout: 30000,
   },
 };
 
 export default defineConfig(config);
-

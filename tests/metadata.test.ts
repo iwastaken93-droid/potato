@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { computeMD5, computeSHA1, computeSHA256 } from '../src/analyzer/hashes.js';
+import {
+  computeMD5,
+  computeSHA1,
+  computeSHA256,
+} from '../src/analyzer/hashes.js';
 import { MetadataPanel } from '../src/ui/metadataPanel.js';
 
 describe('Cryptographic Hashes Unit Tests', () => {
   it('should compute MD5 correctly', () => {
     // Test empty input
-    expect(computeMD5(new Uint8Array(0))).toBe('d41d8cd98f00b204e9800998ecf8427e');
+    expect(computeMD5(new Uint8Array(0))).toBe(
+      'd41d8cd98f00b204e9800998ecf8427e'
+    );
     // Test 'abc'
     const abc = new Uint8Array([97, 98, 99]);
     expect(computeMD5(abc)).toBe('900150983cd24fb0d6963f7d28e17f72');
@@ -14,7 +20,9 @@ describe('Cryptographic Hashes Unit Tests', () => {
 
   it('should compute SHA-1 correctly', () => {
     // Test empty input
-    expect(computeSHA1(new Uint8Array(0))).toBe('da39a3ee5e6b4b0d3255bfef95601890afd80709');
+    expect(computeSHA1(new Uint8Array(0))).toBe(
+      'da39a3ee5e6b4b0d3255bfef95601890afd80709'
+    );
     // Test 'abc'
     const abc = new Uint8Array([97, 98, 99]);
     expect(computeSHA1(abc)).toBe('a9993e364706816aba3e25717850c26c9cd0d89d');
@@ -22,10 +30,14 @@ describe('Cryptographic Hashes Unit Tests', () => {
 
   it('should compute SHA-256 correctly', () => {
     // Test empty input
-    expect(computeSHA256(new Uint8Array(0))).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    expect(computeSHA256(new Uint8Array(0))).toBe(
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    );
     // Test 'abc'
     const abc = new Uint8Array([97, 98, 99]);
-    expect(computeSHA256(abc)).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(computeSHA256(abc)).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+    );
   });
 });
 
@@ -41,10 +53,12 @@ describe('MetadataPanel Unit Tests', () => {
     // Mock clipboard API
     if (!navigator.clipboard) {
       (navigator as any).clipboard = {
-        writeText: vi.fn().mockImplementation(() => Promise.resolve())
+        writeText: vi.fn().mockImplementation(() => Promise.resolve()),
       };
     } else {
-      vi.spyOn(navigator.clipboard, 'writeText').mockImplementation(() => Promise.resolve());
+      vi.spyOn(navigator.clipboard, 'writeText').mockImplementation(() =>
+        Promise.resolve()
+      );
     }
   });
 
@@ -67,7 +81,7 @@ describe('MetadataPanel Unit Tests', () => {
       entryPoint: 0x1000,
       sectionsCount: 4,
       symbolsCount: 15,
-      lastModified: 1716825600000 // Fixed date
+      lastModified: 1716825600000, // Fixed date
     };
 
     panel.updateData(testData);
@@ -82,9 +96,18 @@ describe('MetadataPanel Unit Tests', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Verify hashes are calculated and populated
-    const md5Val = container.querySelector('[data-hash="md5"]')?.parentElement?.querySelector('.meta-hash-value')?.textContent?.trim();
-    const sha1Val = container.querySelector('[data-hash="sha1"]')?.parentElement?.querySelector('.meta-hash-value')?.textContent?.trim();
-    const sha256Val = container.querySelector('[data-hash="sha256"]')?.parentElement?.querySelector('.meta-hash-value')?.textContent?.trim();
+    const md5Val = container
+      .querySelector('[data-hash="md5"]')
+      ?.parentElement?.querySelector('.meta-hash-value')
+      ?.textContent?.trim();
+    const sha1Val = container
+      .querySelector('[data-hash="sha1"]')
+      ?.parentElement?.querySelector('.meta-hash-value')
+      ?.textContent?.trim();
+    const sha256Val = container
+      .querySelector('[data-hash="sha256"]')
+      ?.parentElement?.querySelector('.meta-hash-value')
+      ?.textContent?.trim();
 
     expect(md5Val).toBe(computeMD5(testData.binaryData));
     expect(sha1Val).toBe(computeSHA1(testData.binaryData));
@@ -99,7 +122,7 @@ describe('MetadataPanel Unit Tests', () => {
       architecture: 'elf',
       entryPoint: 0,
       sectionsCount: 1,
-      symbolsCount: 0
+      symbolsCount: 0,
     };
 
     panel.updateData(testData);
@@ -107,10 +130,14 @@ describe('MetadataPanel Unit Tests', () => {
     // Wait for hashes
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const copyBtn = container.querySelector('[data-hash="md5"]') as HTMLButtonElement;
+    const copyBtn = container.querySelector(
+      '[data-hash="md5"]'
+    ) as HTMLButtonElement;
     expect(copyBtn).not.toBeNull();
 
     copyBtn.click();
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('900150983cd24fb0d6963f7d28e17f72');
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      '900150983cd24fb0d6963f7d28e17f72'
+    );
   });
 });

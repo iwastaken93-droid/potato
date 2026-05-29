@@ -98,10 +98,11 @@ describe('CollabEngine & CollabPanel Sync Tests', () => {
     }
 
     // At least some callbacks should have been invoked
-    const totalCalls = commentCb.mock.calls.length +
-                       highlightCb.mock.calls.length +
-                       renameCb.mock.calls.length +
-                       peersCb.mock.calls.length;
+    const totalCalls =
+      commentCb.mock.calls.length +
+      highlightCb.mock.calls.length +
+      renameCb.mock.calls.length +
+      peersCb.mock.calls.length;
 
     expect(totalCalls).toBeGreaterThan(0);
   });
@@ -132,7 +133,7 @@ describe('CollabEngine & CollabPanel Sync Tests', () => {
     peerB.sendHighlight(0x3000, '#EF4444'); // Red
 
     // Wait for latency delivery (50ms + margin)
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     const colorA = peerA.getHighlights().get(0x3000)?.color;
     const colorB = peerB.getHighlights().get(0x3000)?.color;
@@ -153,7 +154,7 @@ describe('CollabEngine & CollabPanel Sync Tests', () => {
 
     // Sync initial comment
     peerA.sendComment(0x4000, 'BaseText');
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Ensure peerB has the initial state
     expect(peerB.getComments().get(0x4000)?.comment).toBe('BaseText');
@@ -169,7 +170,7 @@ describe('CollabEngine & CollabPanel Sync Tests', () => {
     peerB.sendComment(0x4000, 'BBaseText');
 
     // Wait for sync (100ms latency + margin)
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
     const commentA = peerA.getComments().get(0x4000)?.comment;
     const commentB = peerB.getComments().get(0x4000)?.comment;
@@ -217,9 +218,15 @@ describe('CollabPanel DOM Tests', () => {
   });
 
   it('should allow joining a room from the UI', () => {
-    const usernameInput = container.querySelector('#collab-username') as HTMLInputElement;
-    const roomInput = container.querySelector('#collab-room') as HTMLInputElement;
-    const connectBtn = container.querySelector('#collab-btn-connect') as HTMLButtonElement;
+    const usernameInput = container.querySelector(
+      '#collab-username'
+    ) as HTMLInputElement;
+    const roomInput = container.querySelector(
+      '#collab-room'
+    ) as HTMLInputElement;
+    const connectBtn = container.querySelector(
+      '#collab-btn-connect'
+    ) as HTMLButtonElement;
 
     usernameInput.value = 'TestExplorer';
     roomInput.value = 'test-room';

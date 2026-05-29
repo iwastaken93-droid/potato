@@ -32,11 +32,15 @@ export class PatcherPanel {
   private clearBtn!: HTMLButtonElement;
   private statusTextEl!: HTMLDivElement;
 
-  constructor(container: HTMLElement, patcher: BinaryPatcher, options: PatcherPanelOptions) {
+  constructor(
+    container: HTMLElement,
+    patcher: BinaryPatcher,
+    options: PatcherPanelOptions
+  ) {
     this.container = container;
     this.patcher = patcher;
     this.options = options;
-    
+
     if (options.architecture) {
       this.currentArchitecture = options.architecture;
     }
@@ -52,7 +56,11 @@ export class PatcherPanel {
   /**
    * Updates state data (sections, filename, architecture)
    */
-  public updateData(sections: Section[], filename: string, architecture: string) {
+  public updateData(
+    sections: Section[],
+    filename: string,
+    architecture: string
+  ) {
     this.sections = sections;
     this.currentFilename = filename;
     this.currentArchitecture = architecture;
@@ -334,14 +342,30 @@ export class PatcherPanel {
     this.container.appendChild(this.rootEl);
 
     // Cache elements
-    this.historyListEl = this.rootEl.querySelector('#patch-history-list') as HTMLDivElement;
-    this.patchAddressInput = this.rootEl.querySelector('#patch-addr-input') as HTMLInputElement;
-    this.patchBytesInput = this.rootEl.querySelector('#patch-bytes-input') as HTMLInputElement;
-    this.patchDescInput = this.rootEl.querySelector('#patch-desc-input') as HTMLInputElement;
-    this.applyBtn = this.rootEl.querySelector('#patcher-apply-btn') as HTMLButtonElement;
-    this.exportBtn = this.rootEl.querySelector('#patcher-export-btn') as HTMLButtonElement;
-    this.clearBtn = this.rootEl.querySelector('#patcher-clear-btn') as HTMLButtonElement;
-    this.statusTextEl = this.rootEl.querySelector('#patcher-status-text') as HTMLDivElement;
+    this.historyListEl = this.rootEl.querySelector(
+      '#patch-history-list'
+    ) as HTMLDivElement;
+    this.patchAddressInput = this.rootEl.querySelector(
+      '#patch-addr-input'
+    ) as HTMLInputElement;
+    this.patchBytesInput = this.rootEl.querySelector(
+      '#patch-bytes-input'
+    ) as HTMLInputElement;
+    this.patchDescInput = this.rootEl.querySelector(
+      '#patch-desc-input'
+    ) as HTMLInputElement;
+    this.applyBtn = this.rootEl.querySelector(
+      '#patcher-apply-btn'
+    ) as HTMLButtonElement;
+    this.exportBtn = this.rootEl.querySelector(
+      '#patcher-export-btn'
+    ) as HTMLButtonElement;
+    this.clearBtn = this.rootEl.querySelector(
+      '#patcher-clear-btn'
+    ) as HTMLButtonElement;
+    this.statusTextEl = this.rootEl.querySelector(
+      '#patcher-status-text'
+    ) as HTMLDivElement;
   }
 
   private setupEvents() {
@@ -353,7 +377,10 @@ export class PatcherPanel {
       if (confirm('Are you sure you want to clear all patches?')) {
         this.patcher.clearAll();
         this.renderHistory();
-        this.options.onPatchApplied(this.patcher.getPatchedBinary(), this.patcher.getHistory());
+        this.options.onPatchApplied(
+          this.patcher.getPatchedBinary(),
+          this.patcher.getHistory()
+        );
       }
     });
 
@@ -365,14 +392,26 @@ export class PatcherPanel {
       const patchId = item.getAttribute('data-id');
       if (!patchId) return;
 
-      if (target.classList.contains('toggle-btn') || target.closest('.toggle-btn')) {
+      if (
+        target.classList.contains('toggle-btn') ||
+        target.closest('.toggle-btn')
+      ) {
         this.patcher.togglePatch(patchId);
         this.renderHistory();
-        this.options.onPatchApplied(this.patcher.getPatchedBinary(), this.patcher.getHistory());
-      } else if (target.classList.contains('patch-btn-danger') || target.closest('.patch-btn-danger')) {
+        this.options.onPatchApplied(
+          this.patcher.getPatchedBinary(),
+          this.patcher.getHistory()
+        );
+      } else if (
+        target.classList.contains('patch-btn-danger') ||
+        target.closest('.patch-btn-danger')
+      ) {
         this.patcher.removePatch(patchId);
         this.renderHistory();
-        this.options.onPatchApplied(this.patcher.getPatchedBinary(), this.patcher.getHistory());
+        this.options.onPatchApplied(
+          this.patcher.getPatchedBinary(),
+          this.patcher.getHistory()
+        );
       }
     });
   }
@@ -393,7 +432,10 @@ export class PatcherPanel {
 
     try {
       // Parse address/offset
-      let address = parseInt(addrStr.startsWith('0x') ? addrStr : '0x' + addrStr, 16);
+      let address = parseInt(
+        addrStr.startsWith('0x') ? addrStr : '0x' + addrStr,
+        16
+      );
       if (isNaN(address)) {
         address = parseInt(addrStr, 10);
       }
@@ -404,11 +446,14 @@ export class PatcherPanel {
       // Convert virtual address to file offset
       let offset = address;
       let foundSection = false;
-      
+
       // If we have sections, we need to translate Virtual Address -> Offset
       if (this.sections.length > 0) {
         for (const s of this.sections) {
-          if (address >= s.virtualAddress && address < s.virtualAddress + s.fileSize) {
+          if (
+            address >= s.virtualAddress &&
+            address < s.virtualAddress + s.fileSize
+          ) {
             offset = address - s.virtualAddress + s.fileOffset;
             foundSection = true;
             break;
@@ -425,18 +470,29 @@ export class PatcherPanel {
         }
       }
 
-      const parsedBytes = BinaryPatcher.parseInput(bytesStr, this.currentArchitecture);
-      
-      const record = this.patcher.applyPatch(offset, parsedBytes, address, descStr);
-      
+      const parsedBytes = BinaryPatcher.parseInput(
+        bytesStr,
+        this.currentArchitecture
+      );
+
+      const record = this.patcher.applyPatch(
+        offset,
+        parsedBytes,
+        address,
+        descStr
+      );
+
       this.statusTextEl.textContent = `Applied patch ${record.id} at 0x${address.toString(16)}`;
       this.renderHistory();
-      
+
       // Reset input fields but keep address
       this.patchBytesInput.value = '';
       this.patchDescInput.value = '';
 
-      this.options.onPatchApplied(this.patcher.getPatchedBinary(), this.patcher.getHistory());
+      this.options.onPatchApplied(
+        this.patcher.getPatchedBinary(),
+        this.patcher.getHistory()
+      );
     } catch (err: any) {
       alert('Failed to apply patch: ' + err.message);
     }
@@ -461,8 +517,12 @@ export class PatcherPanel {
       item.className = 'patch-history-item';
       item.setAttribute('data-id', record.id);
 
-      const origHex = Array.from(record.originalBytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-      const patHex = Array.from(record.patchedBytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+      const origHex = Array.from(record.originalBytes)
+        .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
+        .join(' ');
+      const patHex = Array.from(record.patchedBytes)
+        .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
+        .join(' ');
 
       item.innerHTML = `
         <div class="patch-info">

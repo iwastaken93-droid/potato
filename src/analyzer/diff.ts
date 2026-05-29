@@ -344,7 +344,7 @@ export function diffBytes(a: Uint8Array, b: Uint8Array): ByteDiffResult[] {
 
   const entries = myersDiff(arrA, arrB, (x, y) => x === y);
 
-  return entries.map(e => ({
+  return entries.map((e) => ({
     type: e.type,
     offset1: e.originalIndex,
     offset2: e.revisedIndex,
@@ -386,7 +386,7 @@ export function diffInstructions(
     if (x.mnemonic !== y.mnemonic) return false;
     if (x.opStr !== y.opStr) return false;
     if (x.size !== y.size) return false;
-    
+
     // Compare bytes safely
     if (x.address !== undefined && y.address !== undefined) {
       if (Math.abs(x.address - y.address) > 0x2000) return false;
@@ -404,7 +404,7 @@ export function diffInstructions(
     return operandsEqual(x.operands, y.operands);
   });
 
-  return entries.map(e => ({
+  return entries.map((e) => ({
     type: e.type,
     address1: e.original ? e.original.address : null,
     address2: e.revised ? e.revised.address : null,

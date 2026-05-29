@@ -174,7 +174,7 @@ export function writeGeneralRegisters(cpu: any, hexData: string): boolean {
 export interface GDBPacket {
   type: 'packet' | 'ack' | 'nak';
   data?: string; // Decoded (unescaped) data payload
-  raw?: string;  // Raw payload string (escaped)
+  raw?: string; // Raw payload string (escaped)
 }
 
 /**
@@ -269,7 +269,9 @@ export function handleGDBCommand(command: string, emulator: Emulator): string {
     }
     const reg = X86_64_REGISTERS[regIdx];
     try {
-      const val = emulator.cpu.isValidRegister(reg.name) ? emulator.cpu.read(reg.name) : 0n;
+      const val = emulator.cpu.isValidRegister(reg.name)
+        ? emulator.cpu.read(reg.name)
+        : 0n;
       return toLittleEndianHex(val, reg.size);
     } catch {
       return 'E01';

@@ -61,8 +61,10 @@ describe('PE Resource Section Parser Unit Tests', () => {
     // 5. Section Header for ".rsrc" (offset = optionalOffset + 240 = 328)
     const sectionOffset = optionalOffset + sizeOfOptionalHeader; // 328
     // ".rsrc\0\0"
-    bytes[sectionOffset] = 0x2e; bytes[sectionOffset + 1] = 0x72;
-    bytes[sectionOffset + 2] = 0x73; bytes[sectionOffset + 3] = 0x72;
+    bytes[sectionOffset] = 0x2e;
+    bytes[sectionOffset + 1] = 0x72;
+    bytes[sectionOffset + 2] = 0x73;
+    bytes[sectionOffset + 3] = 0x72;
     bytes[sectionOffset + 4] = 0x63;
     view.setUint32(sectionOffset + 8, 0x1000, true); // VirtualSize
     view.setUint32(sectionOffset + 12, 0x2000, true); // VirtualAddress (matches directory)
@@ -151,7 +153,7 @@ describe('PE Resource Section Parser Unit Tests', () => {
 
     // Data Entry for Type 3 (Icon) (offset 240)
     // RVA = 0x21C0 (file offset 512 + 448 = 960), Size = 10
-    view.setUint32(rsrcFileOffset + 240, 0x21C0, true);
+    view.setUint32(rsrcFileOffset + 240, 0x21c0, true);
     view.setUint32(rsrcFileOffset + 240 + 4, 10, true);
 
     // Data Entry for Type 6 (String Table) (offset 256)

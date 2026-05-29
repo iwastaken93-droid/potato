@@ -171,7 +171,10 @@ describe('ELF Parser Unit Tests', () => {
     const bytes = new Uint8Array(buffer);
 
     // ELF Magic
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2; // 64-bit
     bytes[5] = 1; // Little Endian
     bytes[7] = 0x01; // HP-UX OSABI
@@ -236,13 +239,19 @@ describe('ELF Parser Unit Tests', () => {
     // Write String Table contents
     // shstrtabContentOffset + 1 = ".shstrtab"
     // shstrtabContentOffset + 11 = ".text"
-    const shstrtabBytes = new Uint8Array(buffer, shstrtabContentOffset, shstrtabSize);
+    const shstrtabBytes = new Uint8Array(
+      buffer,
+      shstrtabContentOffset,
+      shstrtabSize
+    );
     shstrtabBytes[0] = 0; // null byte
     const name1 = '.shstrtab';
-    for (let i = 0; i < name1.length; i++) shstrtabBytes[1 + i] = name1.charCodeAt(i);
+    for (let i = 0; i < name1.length; i++)
+      shstrtabBytes[1 + i] = name1.charCodeAt(i);
     shstrtabBytes[1 + name1.length] = 0;
     const name2 = '.text';
-    for (let i = 0; i < name2.length; i++) shstrtabBytes[11 + i] = name2.charCodeAt(i);
+    for (let i = 0; i < name2.length; i++)
+      shstrtabBytes[11 + i] = name2.charCodeAt(i);
     shstrtabBytes[11 + name2.length] = 0;
 
     const parsed = parseElf(buffer);
@@ -287,7 +296,10 @@ describe('ELF Parser Unit Tests', () => {
     const bytes = new Uint8Array(buffer);
 
     // ELF Magic
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 1; // 32-bit
     bytes[5] = 1; // Little Endian
     bytes[7] = 0x09; // FreeBSD
@@ -337,10 +349,15 @@ describe('ELF Parser Unit Tests', () => {
     view.setUint32(sh1 + 36, 0, true); // shEntsize
 
     // Write String Table
-    const shstrtabBytes = new Uint8Array(buffer, shstrtabContentOffset, shstrtabSize);
+    const shstrtabBytes = new Uint8Array(
+      buffer,
+      shstrtabContentOffset,
+      shstrtabSize
+    );
     shstrtabBytes[0] = 0;
     const name1 = '.shstrtab';
-    for (let i = 0; i < name1.length; i++) shstrtabBytes[1 + i] = name1.charCodeAt(i);
+    for (let i = 0; i < name1.length; i++)
+      shstrtabBytes[1 + i] = name1.charCodeAt(i);
     shstrtabBytes[1 + name1.length] = 0;
 
     const parsed = parseElf(buffer);
@@ -371,7 +388,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2; // 64-bit
     bytes[5] = 2; // Big Endian
     bytes[7] = 0x03; // Linux
@@ -401,10 +421,15 @@ describe('ELF Parser Unit Tests', () => {
     view.setBigUint64(sh1 + 32, BigInt(shstrtabSize), false);
 
     // String table
-    const shstrtabBytes = new Uint8Array(buffer, shstrtabContentOffset, shstrtabSize);
+    const shstrtabBytes = new Uint8Array(
+      buffer,
+      shstrtabContentOffset,
+      shstrtabSize
+    );
     shstrtabBytes[0] = 0;
     const name1 = '.shstrtab';
-    for (let i = 0; i < name1.length; i++) shstrtabBytes[1 + i] = name1.charCodeAt(i);
+    for (let i = 0; i < name1.length; i++)
+      shstrtabBytes[1 + i] = name1.charCodeAt(i);
 
     const parsed = parseElf(buffer);
     expect(parsed.header.class).toBe('64-bit');
@@ -427,7 +452,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 1; // 32-bit
     bytes[5] = 2; // Big Endian
     bytes[7] = 0x03; // Linux
@@ -456,10 +484,15 @@ describe('ELF Parser Unit Tests', () => {
     view.setUint32(sh1 + 20, shstrtabSize, false);
 
     // String table
-    const shstrtabBytes = new Uint8Array(buffer, shstrtabContentOffset, shstrtabSize);
+    const shstrtabBytes = new Uint8Array(
+      buffer,
+      shstrtabContentOffset,
+      shstrtabSize
+    );
     shstrtabBytes[0] = 0;
     const name1 = '.shstrtab';
-    for (let i = 0; i < name1.length; i++) shstrtabBytes[1 + i] = name1.charCodeAt(i);
+    for (let i = 0; i < name1.length; i++)
+      shstrtabBytes[1 + i] = name1.charCodeAt(i);
 
     const parsed = parseElf(buffer);
     expect(parsed.header.class).toBe('32-bit');
@@ -473,7 +506,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2; // 64-bit
     bytes[5] = 1; // Little Endian
     bytes[7] = 0x99; // Unknown OSABI
@@ -491,7 +527,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2; // 64-bit
     bytes[5] = 1; // Little
     view.setBigUint64(32, 1000n, true); // Program header offset out of bounds
@@ -518,7 +557,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2; // 64-bit
     bytes[5] = 1; // Little
     view.setBigUint64(40, BigInt(shOff), true);
@@ -540,7 +582,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2;
     bytes[5] = 1;
     view.setBigUint64(40, BigInt(shOff), true);
@@ -567,7 +612,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2;
     bytes[5] = 1;
     view.setBigUint64(40, BigInt(shOff), true);
@@ -599,7 +647,10 @@ describe('ELF Parser Unit Tests', () => {
     const view = new DataView(buffer);
     const bytes = new Uint8Array(buffer);
 
-    bytes[0] = 0x7f; bytes[1] = 0x45; bytes[2] = 0x4c; bytes[3] = 0x46;
+    bytes[0] = 0x7f;
+    bytes[1] = 0x45;
+    bytes[2] = 0x4c;
+    bytes[3] = 0x46;
     bytes[4] = 2;
     bytes[5] = 1;
     view.setBigUint64(32, BigInt(phOff), true);
@@ -621,4 +672,3 @@ describe('ELF Parser Unit Tests', () => {
     expect(parsed.sectionHeaders[0].typeName).toBe('SHT_UNKNOWN (34952)');
   });
 });
-

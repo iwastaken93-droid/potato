@@ -10,11 +10,11 @@ describe('Syscall and Windows API Emulation Tests', () => {
     emu.syscallHandler = handler;
 
     // Load custom text into memory
-    const message = "Hello from Emulator!";
+    const message = 'Hello from Emulator!';
     const msgAddr = 0x5000n;
     const encoder = new TextEncoder();
     const msgBytes = encoder.encode(message);
-    
+
     emu.memory.map(msgAddr, msgBytes.length, 'data');
     emu.memory.writeBuffer(msgAddr, msgBytes);
 
@@ -85,7 +85,7 @@ describe('Syscall and Windows API Emulation Tests', () => {
 
     const res = emu.step();
     expect(res.success).toBe(true);
-    
+
     const allocatedAddr = emu.cpu.read('rax');
     expect(allocatedAddr).toBeGreaterThan(0n);
 
@@ -144,7 +144,7 @@ describe('Syscall and Windows API Emulation Tests', () => {
     expect(vaHookAddr).toBeDefined();
 
     // Load "VirtualAlloc" string to memory
-    const procName = "VirtualAlloc";
+    const procName = 'VirtualAlloc';
     const nameAddr = 0x6000n;
     const encoder = new TextEncoder();
     const nameBytes = new Uint8Array([...encoder.encode(procName), 0]); // null-terminated
@@ -191,7 +191,7 @@ describe('Syscall and Windows API Emulation Tests', () => {
     expect(emu.cpu.read('rax')).toBe(0x77000000n);
 
     // 2. GMH with a module name
-    const modName = "kernel32.dll";
+    const modName = 'kernel32.dll';
     const modAddr = 0x6000n;
     const modBytes = new Uint8Array([...new TextEncoder().encode(modName), 0]);
     emu.memory.map(modAddr, modBytes.length, 'data');
@@ -232,9 +232,12 @@ describe('Syscall and Windows API Emulation Tests', () => {
     emu.syscallHandler = handler;
 
     let argsPassed: bigint[] = [];
-    const customHookAddr = handler.registerWindowsHook('TestHookFiveArgs', (e) => {
-      argsPassed = (handler as any).getWindowsArgs(e, 5);
-    });
+    const customHookAddr = handler.registerWindowsHook(
+      'TestHookFiveArgs',
+      (e) => {
+        argsPassed = (handler as any).getWindowsArgs(e, 5);
+      }
+    );
 
     // Call reset to initialize default stack map and initial RSP first
     emu.reset(0x1000);
@@ -246,7 +249,7 @@ describe('Syscall and Windows API Emulation Tests', () => {
     emu.cpu.write('r9', 44n);
 
     let rsp = emu.cpu.read('rsp');
-    
+
     // Simulate pushing return address: decrement RSP
     rsp -= 8n;
     emu.cpu.write('rsp', rsp);
@@ -310,7 +313,7 @@ describe('Syscall and Windows API Emulation Tests', () => {
     expect(emu.cpu.read('rax')).toBe(0n);
 
     // Non-existent hook name
-    const name = "NonExistentFunc";
+    const name = 'NonExistentFunc';
     const nameAddr = 0x6000n;
     const nameBytes = new Uint8Array([...new TextEncoder().encode(name), 0]);
     emu.memory.map(nameAddr, nameBytes.length, 'data');
@@ -330,7 +333,9 @@ describe('Syscall and Windows API Emulation Tests', () => {
   it('should throw error when executing non-existent hook address', () => {
     const emu = new Emulator();
     const handler = new SyscallHandler();
-    expect(() => handler.executeHook(0xdeadbeefn, emu)).toThrow('No hook registered at address');
+    expect(() => handler.executeHook(0xdeadbeefn, emu)).toThrow(
+      'No hook registered at address'
+    );
   });
 
   it('should register hook name only once and return existing hook address', () => {
@@ -346,7 +351,9 @@ describe('Syscall and Windows API Emulation Tests', () => {
     emu.syscallHandler = handler;
 
     emu.cpu.write('rax', 999n); // unsupported syscall
-    expect(() => handler.handleSyscall(emu)).toThrow('Unsupported Linux syscall: 999');
+    expect(() => handler.handleSyscall(emu)).toThrow(
+      'Unsupported Linux syscall: 999'
+    );
   });
 
   it('should write to stderr for sys_write fd=2', () => {
@@ -354,7 +361,7 @@ describe('Syscall and Windows API Emulation Tests', () => {
     const handler = new SyscallHandler();
     emu.syscallHandler = handler;
 
-    const message = "Error message!";
+    const message = 'Error message!';
     const msgAddr = 0x5000n;
     const msgBytes = new TextEncoder().encode(message);
     emu.memory.map(msgAddr, msgBytes.length, 'data');
@@ -384,4 +391,3 @@ describe('Syscall and Windows API Emulation Tests', () => {
     expect(emu.cpu.read('rax')).toBe(0n);
   });
 });
-

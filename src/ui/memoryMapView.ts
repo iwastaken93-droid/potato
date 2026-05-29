@@ -138,10 +138,13 @@ export class MemoryMapView {
     }
 
     // Compute Summary Stats
-    const totalVmsize = this.sections.reduce((acc, s) => acc + s.virtualSize, 0);
+    const totalVmsize = this.sections.reduce(
+      (acc, s) => acc + s.virtualSize,
+      0
+    );
     const totalFilesize = this.sections.reduce((acc, s) => acc + s.fileSize, 0);
-    const execSections = this.sections.filter(s => s.flags.execute);
-    const maxEntropy = Math.max(...this.sections.map(s => s.entropy ?? 0));
+    const execSections = this.sections.filter((s) => s.flags.execute);
+    const maxEntropy = Math.max(...this.sections.map((s) => s.entropy ?? 0));
 
     // Stats Cards
     const statsContainer = document.createElement('div');
@@ -169,7 +172,7 @@ export class MemoryMapView {
     // Create table
     const table = document.createElement('table');
     table.className = 'memory-map-grid';
-    
+
     let tableHtml = `
       <thead>
         <tr>
@@ -187,14 +190,21 @@ export class MemoryMapView {
 
     this.sections.forEach((sec) => {
       const perms: string[] = [];
-      if (sec.flags.read) perms.push('<span class="perm-badge perm-r">R</span>');
-      if (sec.flags.write) perms.push('<span class="perm-badge perm-w">W</span>');
-      if (sec.flags.execute) perms.push('<span class="perm-badge perm-x">X</span>');
-      if (perms.length === 0) perms.push('<span class="perm-badge" style="background: rgba(255,255,255,0.05); color: var(--text-disabled)">-</span>');
+      if (sec.flags.read)
+        perms.push('<span class="perm-badge perm-r">R</span>');
+      if (sec.flags.write)
+        perms.push('<span class="perm-badge perm-w">W</span>');
+      if (sec.flags.execute)
+        perms.push('<span class="perm-badge perm-x">X</span>');
+      if (perms.length === 0)
+        perms.push(
+          '<span class="perm-badge" style="background: rgba(255,255,255,0.05); color: var(--text-disabled)">-</span>'
+        );
 
       const ent = sec.entropy ?? 0;
       let barColor = '#10b981'; // Green
-      if (ent > 7.2) barColor = '#ef4444'; // Red (likely encrypted/compressed)
+      if (ent > 7.2)
+        barColor = '#ef4444'; // Red (likely encrypted/compressed)
       else if (ent > 6.0) barColor = '#f59e0b'; // Orange
 
       tableHtml += `
@@ -225,7 +235,9 @@ export class MemoryMapView {
     table.innerHTML = tableHtml;
 
     table.addEventListener('click', (e) => {
-      const row = (e.target as HTMLElement).closest('tr') as HTMLTableRowElement;
+      const row = (e.target as HTMLElement).closest(
+        'tr'
+      ) as HTMLTableRowElement;
       if (row && row.dataset.addr) {
         const addr = parseInt(row.dataset.addr, 10);
         this.onAddressSelect(addr);

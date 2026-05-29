@@ -5,8 +5,8 @@
 
 export interface PatchRecord {
   id: string;
-  address: number;      // Virtual address of the patch
-  offset: number;       // File offset in the binary
+  address: number; // Virtual address of the patch
+  offset: number; // File offset in the binary
   originalBytes: Uint8Array;
   patchedBytes: Uint8Array;
   timestamp: number;
@@ -18,7 +18,10 @@ export class BinaryPatcher {
   private originalBinary: Uint8Array;
   private patchedBinary: Uint8Array;
   private history: PatchRecord[] = [];
-  private listeners: ((patchedBinary: Uint8Array, history: PatchRecord[]) => void)[] = [];
+  private listeners: ((
+    patchedBinary: Uint8Array,
+    history: PatchRecord[]
+  ) => void)[] = [];
 
   constructor(originalBinary: Uint8Array) {
     this.originalBinary = new Uint8Array(originalBinary);
@@ -46,11 +49,19 @@ export class BinaryPatcher {
     address: number,
     description: string
   ): PatchRecord {
-    if (offset < 0 || offset + patchedBytes.length > this.originalBinary.length) {
-      throw new Error(`Patch out of bounds. Offset: ${offset}, length: ${patchedBytes.length}, binary size: ${this.originalBinary.length}`);
+    if (
+      offset < 0 ||
+      offset + patchedBytes.length > this.originalBinary.length
+    ) {
+      throw new Error(
+        `Patch out of bounds. Offset: ${offset}, length: ${patchedBytes.length}, binary size: ${this.originalBinary.length}`
+      );
     }
 
-    const originalBytes = this.patchedBinary.slice(offset, offset + patchedBytes.length);
+    const originalBytes = this.patchedBinary.slice(
+      offset,
+      offset + patchedBytes.length
+    );
 
     const record: PatchRecord = {
       id: 'patch_' + Math.random().toString(36).substring(2, 11),
@@ -117,7 +128,9 @@ export class BinaryPatcher {
   /**
    * Subscribes to changes to the binary or patch history.
    */
-  public subscribe(listener: (patchedBinary: Uint8Array, history: PatchRecord[]) => void): () => void {
+  public subscribe(
+    listener: (patchedBinary: Uint8Array, history: PatchRecord[]) => void
+  ): () => void {
     this.listeners.push(listener);
     return () => {
       this.listeners = this.listeners.filter((l) => l !== listener);
@@ -138,11 +151,18 @@ export class BinaryPatcher {
    * Exports/Downloads the patched binary.
    */
   public exportBinary(filename: string): void {
-    const blob = new Blob([this.patchedBinary.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+    const blob = new Blob([this.patchedBinary.buffer as ArrayBuffer], {
+      type: 'application/octet-stream',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename.replace(/\.[^/.]+$/, "") + "_patched" + (filename.includes('.') ? filename.substring(filename.lastIndexOf('.')) : '');
+    a.download =
+      filename.replace(/\.[^/.]+$/, '') +
+      '_patched' +
+      (filename.includes('.')
+        ? filename.substring(filename.lastIndexOf('.'))
+        : '');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -155,7 +175,7 @@ export class BinaryPatcher {
   public static parseInput(input: string, arch: string = 'x86_64'): Uint8Array {
     const cleaned = input.trim();
     if (!cleaned) {
-      throw new Error("Input is empty");
+      throw new Error('Input is empty');
     }
 
     // Try parsing as assembly instruction mnemonics (lightweight helper/mock assembler)
@@ -165,36 +185,39 @@ export class BinaryPatcher {
         return new Uint8Array([0x90]);
       }
       if (lowerInput === 'ret' || lowerInput === 'retn') {
-        return new Uint8Array([0xC3]);
+        return new Uint8Array([0xc3]);
       }
       if (lowerInput === 'int3') {
-        return new Uint8Array([0xCC]);
+        return new Uint8Array([0xcc]);
       }
       if (lowerInput === 'xor eax, eax') {
-        return new Uint8Array([0x31, 0xC0]);
+        return new Uint8Array([0x31, 0xc0]);
       }
       if (lowerInput === 'xor edi, edi') {
-        return new Uint8Array([0x31, 0xFF]);
+        return new Uint8Array([0x31, 0xff]);
       }
       if (lowerInput === 'xor esi, esi') {
-        return new Uint8Array([0x31, 0xF6]);
+        return new Uint8Array([0x31, 0xf6]);
       }
       if (lowerInput === 'xor ebx, ebx') {
-        return new Uint8Array([0x31, 0xDB]);
+        return new Uint8Array([0x31, 0xdb]);
       }
       if (lowerInput === 'xor ecx, ecx') {
-        return new Uint8Array([0x31, 0xC9]);
+        return new Uint8Array([0x31, 0xc9]);
       }
       if (lowerInput === 'xor edx, edx') {
-        return new Uint8Array([0x31, 0xD2]);
+        return new Uint8Array([0x31, 0xd2]);
       }
       // Jump short instructions
       if (lowerInput.startsWith('jmp ')) {
         const targetStr = lowerInput.substring(4).trim();
-        const numVal = parseInt(targetStr.startsWith('0x') ? targetStr : '0x' + targetStr, 16);
+        const numVal = parseInt(
+          targetStr.startsWith('0x') ? targetStr : '0x' + targetStr,
+          16
+        );
         if (!isNaN(numVal)) {
           // Return a placeholder jump instruction or mock jump instruction
-          return new Uint8Array([0xEB, 0xFE]); // jmp short $
+          return new Uint8Array([0xeb, 0xfe]); // jmp short $
         }
       }
     }
@@ -202,13 +225,17 @@ export class BinaryPatcher {
     // Otherwise, parse as Hex Bytes: e.g., "90 90" or "9090" or "\x90\x90"
     const hexCleaned = cleaned.replace(/(0x|\\x|\s|,)/gi, '');
     if (hexCleaned.length % 2 !== 0) {
-      throw new Error("Invalid hex string length (must be even number of characters)");
+      throw new Error(
+        'Invalid hex string length (must be even number of characters)'
+      );
     }
     const bytes = new Uint8Array(hexCleaned.length / 2);
     for (let i = 0; i < hexCleaned.length; i += 2) {
       const byteValue = parseInt(hexCleaned.substring(i, i + 2), 16);
       if (isNaN(byteValue)) {
-        throw new Error(`Invalid hex character: ${hexCleaned.substring(i, i + 2)}`);
+        throw new Error(
+          `Invalid hex character: ${hexCleaned.substring(i, i + 2)}`
+        );
       }
       bytes[i / 2] = byteValue;
     }

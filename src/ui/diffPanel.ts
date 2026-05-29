@@ -6,7 +6,12 @@
  */
 
 import { Instruction, Section } from '../disassembler/types.js';
-import { diffBytes, diffInstructions, ByteDiffResult, InstructionDiffResult } from '../analyzer/diff.js';
+import {
+  diffBytes,
+  diffInstructions,
+  ByteDiffResult,
+  InstructionDiffResult,
+} from '../analyzer/diff.js';
 import { parseElf } from '../parser/elf.js';
 import { PEParser } from '../parser/pe.js';
 import { parseWasm } from '../parser/wasm.js';
@@ -16,7 +21,7 @@ import { DisassemblerRouter } from '../disassembler/router.js';
 
 export class DiffPanel {
   private container: HTMLElement;
-  
+
   // Binary 1 Data (Loaded in primary workbench)
   private binaryData1: Uint8Array = new Uint8Array(0);
   private sections1: Section[] = [];
@@ -52,7 +57,12 @@ export class DiffPanel {
   /**
    * Update the primary binary data (from the workbench).
    */
-  public updateData(binaryData: Uint8Array, sections: Section[], instructions: Instruction[], fileName: string = 'Primary Binary') {
+  public updateData(
+    binaryData: Uint8Array,
+    sections: Section[],
+    instructions: Instruction[],
+    fileName: string = 'Primary Binary'
+  ) {
     this.binaryData1 = binaryData;
     this.sections1 = sections;
     this.instructions1 = instructions;
@@ -455,9 +465,13 @@ export class DiffPanel {
 
   private switchMode(mode: 'byte' | 'instruction') {
     this.mode = mode;
-    const buttons = this.modeSelectorContainer.querySelectorAll('.btn-mode-toggle');
+    const buttons =
+      this.modeSelectorContainer.querySelectorAll('.btn-mode-toggle');
     buttons.forEach((btn, idx) => {
-      if ((mode === 'byte' && idx === 0) || (mode === 'instruction' && idx === 1)) {
+      if (
+        (mode === 'byte' && idx === 0) ||
+        (mode === 'instruction' && idx === 1)
+      ) {
         btn.classList.add('active');
       } else {
         btn.classList.remove('active');
@@ -547,10 +561,22 @@ export class DiffPanel {
           },
         }));
       } else if (
-        (data[0] === 0xfe && data[1] === 0xed && data[2] === 0xfa && data[3] === 0xce) ||
-        (data[0] === 0xce && data[1] === 0xfa && data[2] === 0xed && data[3] === 0xfe) ||
-        (data[0] === 0xfe && data[1] === 0xed && data[2] === 0xfa && data[3] === 0xcf) ||
-        (data[0] === 0xcf && data[1] === 0xfa && data[2] === 0xed && data[3] === 0xfe)
+        (data[0] === 0xfe &&
+          data[1] === 0xed &&
+          data[2] === 0xfa &&
+          data[3] === 0xce) ||
+        (data[0] === 0xce &&
+          data[1] === 0xfa &&
+          data[2] === 0xed &&
+          data[3] === 0xfe) ||
+        (data[0] === 0xfe &&
+          data[1] === 0xed &&
+          data[2] === 0xfa &&
+          data[3] === 0xcf) ||
+        (data[0] === 0xcf &&
+          data[1] === 0xfa &&
+          data[2] === 0xed &&
+          data[3] === 0xfe)
       ) {
         const macho = parseMacho(arrayBuffer);
         sections = macho.sections.map((s: any) => ({
@@ -595,11 +621,14 @@ export class DiffPanel {
             fileOffset: dex.header.dataOff || 0,
             fileSize: dex.header.dataSize || data.length,
             flags: { read: true, write: false, execute: true },
-          }
+          },
         ];
       }
     } catch (e) {
-      console.warn("Failed to parse file structure, falling back to raw data", e);
+      console.warn(
+        'Failed to parse file structure, falling back to raw data',
+        e
+      );
     }
 
     this.sections2 = sections;
@@ -657,8 +686,12 @@ export class DiffPanel {
     this.diffViewportContainer.appendChild(paneLeft);
     this.diffViewportContainer.appendChild(paneRight);
 
-    const contentLeft = paneLeft.querySelector('#diff-pane-left') as HTMLDivElement;
-    const contentRight = paneRight.querySelector('#diff-pane-right') as HTMLDivElement;
+    const contentLeft = paneLeft.querySelector(
+      '#diff-pane-left'
+    ) as HTMLDivElement;
+    const contentRight = paneRight.querySelector(
+      '#diff-pane-right'
+    ) as HTMLDivElement;
 
     // Setup sync scroll
     const syncScroll = (src: HTMLDivElement, dest: HTMLDivElement) => {
@@ -680,7 +713,7 @@ export class DiffPanel {
       const diffs = diffBytes(this.binaryData1, this.binaryData2!);
 
       // Gather stats
-      diffs.forEach(d => {
+      diffs.forEach((d) => {
         stats[d.type]++;
       });
 
@@ -688,7 +721,7 @@ export class DiffPanel {
       const chunkSize = 16;
       for (let i = 0; i < diffs.length; i += chunkSize) {
         const chunk = diffs.slice(i, i + chunkSize);
-        
+
         // Rows
         const rowL = document.createElement('div');
         rowL.className = 'diff-row';
@@ -696,9 +729,12 @@ export class DiffPanel {
         rowR.className = 'diff-row';
 
         // Check if any element in chunk is modified
-        const isDelete = chunk.every(c => c.type === 'delete');
-        const isInsert = chunk.every(c => c.type === 'insert');
-        const isReplace = chunk.some(c => c.type === 'replace' || c.type === 'delete' || c.type === 'insert');
+        const isDelete = chunk.every((c) => c.type === 'delete');
+        const isInsert = chunk.every((c) => c.type === 'insert');
+        const isReplace = chunk.some(
+          (c) =>
+            c.type === 'replace' || c.type === 'delete' || c.type === 'insert'
+        );
 
         let rowClass = '';
         if (isDelete) rowClass = 'type-delete';
@@ -711,20 +747,29 @@ export class DiffPanel {
         }
 
         // Offsets
-        const firstWithOffset1 = chunk.find(c => c.offset1 !== null);
-        const offset1Str = firstWithOffset1 !== undefined ? firstWithOffset1.offset1!.toString(16).padStart(8, '0') : '';
-        const firstWithOffset2 = chunk.find(c => c.offset2 !== null);
-        const offset2Str = firstWithOffset2 !== undefined ? firstWithOffset2.offset2!.toString(16).padStart(8, '0') : '';
+        const firstWithOffset1 = chunk.find((c) => c.offset1 !== null);
+        const offset1Str =
+          firstWithOffset1 !== undefined
+            ? firstWithOffset1.offset1!.toString(16).padStart(8, '0')
+            : '';
+        const firstWithOffset2 = chunk.find((c) => c.offset2 !== null);
+        const offset2Str =
+          firstWithOffset2 !== undefined
+            ? firstWithOffset2.offset2!.toString(16).padStart(8, '0')
+            : '';
 
         // Left HTML content
         let bytesHtmlL = `<div class="diff-offset">${offset1Str}</div><div class="diff-bytes-col">`;
         let asciiL = '';
-        chunk.forEach(item => {
+        chunk.forEach((item) => {
           if (item.byte1 !== null) {
             const hex = item.byte1.toString(16).padStart(2, '0');
             const cls = item.type !== 'equal' ? 'diff-changed' : '';
             bytesHtmlL += `<span class="diff-byte ${cls}">${hex}</span>`;
-            asciiL += (item.byte1 >= 32 && item.byte1 <= 126) ? String.fromCharCode(item.byte1) : '.';
+            asciiL +=
+              item.byte1 >= 32 && item.byte1 <= 126
+                ? String.fromCharCode(item.byte1)
+                : '.';
           } else {
             bytesHtmlL += `<span class="diff-byte diff-empty"></span>`;
             asciiL += ' ';
@@ -736,12 +781,15 @@ export class DiffPanel {
         // Right HTML content
         let bytesHtmlR = `<div class="diff-offset">${offset2Str}</div><div class="diff-bytes-col">`;
         let asciiR = '';
-        chunk.forEach(item => {
+        chunk.forEach((item) => {
           if (item.byte2 !== null) {
             const hex = item.byte2.toString(16).padStart(2, '0');
             const cls = item.type !== 'equal' ? 'diff-changed' : '';
             bytesHtmlR += `<span class="diff-byte ${cls}">${hex}</span>`;
-            asciiR += (item.byte2 >= 32 && item.byte2 <= 126) ? String.fromCharCode(item.byte2) : '.';
+            asciiR +=
+              item.byte2 >= 32 && item.byte2 <= 126
+                ? String.fromCharCode(item.byte2)
+                : '.';
           } else {
             bytesHtmlR += `<span class="diff-byte diff-empty"></span>`;
             asciiR += ' ';
@@ -757,11 +805,11 @@ export class DiffPanel {
       // Instruction Diff Mode
       const diffs = diffInstructions(this.instructions1, this.instructions2);
 
-      diffs.forEach(d => {
+      diffs.forEach((d) => {
         stats[d.type]++;
       });
 
-      diffs.forEach(item => {
+      diffs.forEach((item) => {
         const rowL = document.createElement('div');
         rowL.className = 'diff-row';
         const rowR = document.createElement('div');
@@ -780,7 +828,9 @@ export class DiffPanel {
         // Left Pane Instruction
         if (item.inst1) {
           const addr = item.inst1.address.toString(16).toUpperCase();
-          const bytes = Array.from(item.inst1.bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+          const bytes = Array.from(item.inst1.bytes)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join(' ');
           rowL.innerHTML = `
             <div class="diff-offset" style="width: 80px;">${addr}</div>
             <div class="diff-inst-col">
@@ -796,7 +846,9 @@ export class DiffPanel {
         // Right Pane Instruction
         if (item.inst2) {
           const addr = item.inst2.address.toString(16).toUpperCase();
-          const bytes = Array.from(item.inst2.bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+          const bytes = Array.from(item.inst2.bytes)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join(' ');
           rowR.innerHTML = `
             <div class="diff-offset" style="width: 80px;">${addr}</div>
             <div class="diff-inst-col">

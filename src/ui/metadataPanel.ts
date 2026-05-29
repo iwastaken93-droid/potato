@@ -48,7 +48,7 @@ export class MetadataPanel {
     this.sha256Hash = '';
     this.selectedObjcType = 'class';
     this.selectedObjcIndex = 0;
-    
+
     // Async hash calculation to prevent blocking UI main thread
     this.calculateHashes(data.binaryData);
     this.render();
@@ -516,25 +516,28 @@ export class MetadataPanel {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   }
 
   private copyToClipboard(text: string, button: HTMLButtonElement) {
     if (!text || text === 'N/A' || this.isCalculatingHashes) return;
-    
-    navigator.clipboard.writeText(text).then(() => {
-      button.classList.add('copied');
-      const originalHTML = button.innerHTML;
-      button.innerHTML = '✓';
-      
-      setTimeout(() => {
-        button.classList.remove('copied');
-        button.innerHTML = originalHTML;
-      }, 1500);
-    }).catch(err => {
-      console.error('Failed to copy text: ', err);
-    });
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        button.classList.add('copied');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '✓';
+
+        setTimeout(() => {
+          button.classList.remove('copied');
+          button.innerHTML = originalHTML;
+        }, 1500);
+      })
+      .catch((err) => {
+        console.error('Failed to copy text: ', err);
+      });
   }
 
   private render() {
@@ -548,7 +551,16 @@ export class MetadataPanel {
       return;
     }
 
-    const { fileName, fileSize, architecture, entryPoint, sectionsCount, symbolsCount, lastModified, objc } = this.data;
+    const {
+      fileName,
+      fileSize,
+      architecture,
+      entryPoint,
+      sectionsCount,
+      symbolsCount,
+      lastModified,
+      objc,
+    } = this.data;
 
     const formattedSize = this.formatBytes(fileSize);
     const formattedEntryPoint = `0x${entryPoint.toString(16).toUpperCase()}`;
@@ -557,7 +569,12 @@ export class MetadataPanel {
     // Build PE Resources UI if it's a PE binary
     let peResourcesHtml = '';
     const binaryData = this.data.binaryData;
-    if (binaryData && binaryData.length > 64 && binaryData[0] === 0x4d && binaryData[1] === 0x5a) {
+    if (
+      binaryData &&
+      binaryData.length > 64 &&
+      binaryData[0] === 0x4d &&
+      binaryData[1] === 0x5a
+    ) {
       try {
         const peParser = new PEParser(binaryData.buffer);
         const pe = peParser.parse();
@@ -568,7 +585,7 @@ export class MetadataPanel {
             manifestSection = `
               <div style="margin-top: 1rem;">
                 <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-primary);">Manifest</h4>
-                <pre class="manifest-viewer">${r.manifests.map(m => m.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('\n\n')}</pre>
+                <pre class="manifest-viewer">${r.manifests.map((m) => m.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('\n\n')}</pre>
               </div>
             `;
           }
@@ -588,12 +605,16 @@ export class MetadataPanel {
                       </tr>
                     </thead>
                     <tbody>
-                      ${stringKeys.map(k => `
+                      ${stringKeys
+                        .map(
+                          (k) => `
                         <tr>
                           <td style="font-family: var(--font-mono); color: var(--text-muted);">${k}</td>
                           <td style="font-family: var(--font-sans); color: var(--text-secondary);">${r.strings[Number(k)]}</td>
                         </tr>
-                      `).join('')}
+                      `
+                        )
+                        .join('')}
                     </tbody>
                   </table>
                 </div>
@@ -615,13 +636,17 @@ export class MetadataPanel {
                     </tr>
                   </thead>
                   <tbody>
-                    ${r.icons.map(i => `
+                    ${r.icons
+                      .map(
+                        (i) => `
                       <tr>
                         <td style="color: var(--accent-end);">${i.type}</td>
                         <td style="font-family: var(--font-mono);">${i.size} B</td>
                         <td style="font-family: var(--font-mono);">0x${i.offset.toString(16).toUpperCase()}</td>
                       </tr>
-                    `).join('')}
+                    `
+                      )
+                      .join('')}
                   </tbody>
                 </table>
               </div>
@@ -645,7 +670,9 @@ export class MetadataPanel {
                       </tr>
                     </thead>
                     <tbody>
-                      ${r.all.map(res => `
+                      ${r.all
+                        .map(
+                          (res) => `
                         <tr>
                           <td><span class="badge" style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.4rem; border-radius: 3px;">${res.typeName}</span></td>
                           <td style="font-family: var(--font-mono);">${res.name}</td>
@@ -653,7 +680,9 @@ export class MetadataPanel {
                           <td style="font-family: var(--font-mono);">${res.size} B</td>
                           <td style="font-family: var(--font-mono);">0x${res.offset.toString(16).toUpperCase()}</td>
                         </tr>
-                      `).join('')}
+                      `
+                        )
+                        .join('')}
                     </tbody>
                   </table>
                 </div>
@@ -671,10 +700,12 @@ export class MetadataPanel {
 
     // Build ObjC UI if metadata exists
     let objcHTML = '';
-    const hasObjc = objc && (objc.classes.length > 0 || objc.protocols.length > 0);
+    const hasObjc =
+      objc && (objc.classes.length > 0 || objc.protocols.length > 0);
 
     if (hasObjc) {
-      const activeList = this.selectedObjcType === 'class' ? objc.classes : objc.protocols;
+      const activeList =
+        this.selectedObjcType === 'class' ? objc.classes : objc.protocols;
       const selectedItem = activeList[this.selectedObjcIndex];
 
       let sidebarItems = '';
@@ -795,7 +826,10 @@ export class MetadataPanel {
         } else {
           // Protocol detail view
           let methodsRows = '';
-          if (selectedItem.instanceMethods && selectedItem.instanceMethods.length > 0) {
+          if (
+            selectedItem.instanceMethods &&
+            selectedItem.instanceMethods.length > 0
+          ) {
             selectedItem.instanceMethods.forEach((m: any) => {
               methodsRows += `
                 <tr>
@@ -809,7 +843,10 @@ export class MetadataPanel {
           }
 
           let classMethodsRows = '';
-          if (selectedItem.classMethods && selectedItem.classMethods.length > 0) {
+          if (
+            selectedItem.classMethods &&
+            selectedItem.classMethods.length > 0
+          ) {
             selectedItem.classMethods.forEach((m: any) => {
               classMethodsRows += `
                 <tr>
@@ -1035,7 +1072,7 @@ export class MetadataPanel {
     `;
 
     // Hook up copy buttons
-    this.rootEl.querySelectorAll('.copy-btn').forEach(btn => {
+    this.rootEl.querySelectorAll('.copy-btn').forEach((btn) => {
       const b = btn as HTMLButtonElement;
       const type = b.dataset.hash;
       let text = '';
@@ -1068,7 +1105,7 @@ export class MetadataPanel {
       }
 
       // Hook up sidebar buttons
-      this.rootEl.querySelectorAll('.objc-item-btn').forEach(btn => {
+      this.rootEl.querySelectorAll('.objc-item-btn').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           const index = parseInt(btn.getAttribute('data-index') || '0', 10);
           this.selectedObjcIndex = index;

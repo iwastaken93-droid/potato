@@ -61,24 +61,37 @@ export class DisassemblerRouter {
 
     // Detect Mach-O Architecture
     if (data.length >= 4) {
-      const magicLE = (data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)) >>> 0;
-      const magicBE = ((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]) >>> 0;
+      const magicLE =
+        (data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)) >>> 0;
+      const magicBE =
+        ((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]) >>> 0;
 
       if (magicBE === 0xcafebabe || magicBE === 0xbebafeca) {
         // Fat/Universal binary
         const isFatBE = magicBE === 0xcafebabe;
         if (data.length >= 8) {
-          const nfat = (isFatBE
-            ? (data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7]
-            : data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24)) >>> 0;
-          
+          const nfat =
+            (isFatBE
+              ? (data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7]
+              : data[4] |
+                (data[5] << 8) |
+                (data[6] << 16) |
+                (data[7] << 24)) >>> 0;
+
           let offset = 8;
           for (let i = 0; i < nfat; i++) {
             if (offset + 20 <= data.length) {
-              const cputype = (isFatBE
-                ? (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]
-                : data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24)) >>> 0;
-              
+              const cputype =
+                (isFatBE
+                  ? (data[offset] << 24) |
+                    (data[offset + 1] << 16) |
+                    (data[offset + 2] << 8) |
+                    data[offset + 3]
+                  : data[offset] |
+                    (data[offset + 1] << 8) |
+                    (data[offset + 2] << 16) |
+                    (data[offset + 3] << 24)) >>> 0;
+
               if (cputype === 0x01000007 || cputype === 7) return 'x86_64';
               if (cputype === 0x0100000c || cputype === 12) return 'arm';
               offset += 20;
@@ -93,10 +106,14 @@ export class DisassemblerRouter {
       ) {
         const isLE = magicLE === 0xfeedface || magicLE === 0xfeedfacf;
         if (data.length >= 8) {
-          const cputype = (isLE
-            ? data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24)
-            : (data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7]) >>> 0;
-          
+          const cputype =
+            (isLE
+              ? data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24)
+              : (data[4] << 24) |
+                (data[5] << 16) |
+                (data[6] << 8) |
+                data[7]) >>> 0;
+
           if (cputype === 0x01000007 || cputype === 7) return 'x86_64';
           if (cputype === 0x0100000c || cputype === 12) return 'arm';
         }
@@ -137,12 +154,23 @@ export class DisassemblerRouter {
     }
 
     // Detect Mach-O Architecture
-    const isMacho = (
-      (data[0] === 0xcf && data[1] === 0xfa && data[2] === 0xed && data[3] === 0xfe) ||
-      (data[0] === 0xfe && data[1] === 0xed && data[2] === 0xfa && data[3] === 0xcf) ||
-      (data[0] === 0xce && data[1] === 0xfa && data[2] === 0xed && data[3] === 0xfe) ||
-      (data[0] === 0xfe && data[1] === 0xed && data[2] === 0xfa && data[3] === 0xce)
-    );
+    const isMacho =
+      (data[0] === 0xcf &&
+        data[1] === 0xfa &&
+        data[2] === 0xed &&
+        data[3] === 0xfe) ||
+      (data[0] === 0xfe &&
+        data[1] === 0xed &&
+        data[2] === 0xfa &&
+        data[3] === 0xcf) ||
+      (data[0] === 0xce &&
+        data[1] === 0xfa &&
+        data[2] === 0xed &&
+        data[3] === 0xfe) ||
+      (data[0] === 0xfe &&
+        data[1] === 0xed &&
+        data[2] === 0xfa &&
+        data[3] === 0xce);
     if (isMacho) {
       const isLittleEndian = data[0] === 0xcf || data[0] === 0xce;
       let cputype = 0;
@@ -161,17 +189,24 @@ export class DisassemblerRouter {
     }
 
     // Detect Mach-O Fat/Universal Architecture
-    const isFat = (
-      (data[0] === 0xca && data[1] === 0xfe && data[2] === 0xba && data[3] === 0xbe) ||
-      (data[0] === 0xbe && data[1] === 0xba && data[2] === 0xfe && data[3] === 0xca)
-    );
+    const isFat =
+      (data[0] === 0xca &&
+        data[1] === 0xfe &&
+        data[2] === 0xba &&
+        data[3] === 0xbe) ||
+      (data[0] === 0xbe &&
+        data[1] === 0xba &&
+        data[2] === 0xfe &&
+        data[3] === 0xca);
     if (isFat) {
       const isLittleEndian = data[0] === 0xbe;
       let cputype = 0;
       if (isLittleEndian) {
-        cputype = data[8] | (data[9] << 8) | (data[10] << 16) | (data[11] << 24);
+        cputype =
+          data[8] | (data[9] << 8) | (data[10] << 16) | (data[11] << 24);
       } else {
-        cputype = data[11] | (data[10] << 8) | (data[9] << 16) | (data[8] << 24);
+        cputype =
+          data[11] | (data[10] << 8) | (data[9] << 16) | (data[8] << 24);
       }
       const CPU_ARCH_ABI64 = 0x01000000;
       const CPU_TYPE_ARM = 12;
@@ -564,7 +599,10 @@ export class DisassemblerRouter {
       'r15',
     ];
 
-    const arithmeticOpcodes: Record<number, { mnemonic: string; isRegToRm: boolean }> = {
+    const arithmeticOpcodes: Record<
+      number,
+      { mnemonic: string; isRegToRm: boolean }
+    > = {
       0x00: { mnemonic: 'add', isRegToRm: true },
       0x01: { mnemonic: 'add', isRegToRm: true },
       0x02: { mnemonic: 'add', isRegToRm: false },
@@ -691,10 +729,28 @@ export class DisassemblerRouter {
             size = opSize + 4;
           }
           // Conditional Jumps (short 0x70 - 0x7f)
-          else if (opcode >= 0x70 && opcode <= 0x7f && nextByteIdx < data.length) {
+          else if (
+            opcode >= 0x70 &&
+            opcode <= 0x7f &&
+            nextByteIdx < data.length
+          ) {
             const conds = [
-              'jo', 'jno', 'jb', 'jae', 'je', 'jne', 'jbe', 'ja',
-              'js', 'jns', 'jp', 'jnp', 'jl', 'jge', 'jle', 'jg'
+              'jo',
+              'jno',
+              'jb',
+              'jae',
+              'je',
+              'jne',
+              'jbe',
+              'ja',
+              'js',
+              'jns',
+              'jp',
+              'jnp',
+              'jl',
+              'jge',
+              'jle',
+              'jg',
             ];
             mnemonic = conds[opcode - 0x70];
             const offset = this.signExtend8(data[nextByteIdx]);
@@ -718,14 +774,19 @@ export class DisassemblerRouter {
             const mod = (modrm & 0xc0) >> 6;
             const rm = (modrm & 0x07) + (rexB << 3);
             mnemonic = 'mov';
-            
+
             let dispSize = 0;
             if (mod === 1) dispSize = 1;
             else if (mod === 2) dispSize = 4;
             else if (mod === 0 && (rm & 7) === 5) dispSize = 4; // RIP-relative or disp32
 
             if (nextByteIdx + 1 + dispSize + 4 <= data.length) {
-              const disp = dispSize === 1 ? this.signExtend8(data[nextByteIdx + 1]) : dispSize === 4 ? this.readInt32LE(data, nextByteIdx + 1) : 0;
+              const disp =
+                dispSize === 1
+                  ? this.signExtend8(data[nextByteIdx + 1])
+                  : dispSize === 4
+                    ? this.readInt32LE(data, nextByteIdx + 1)
+                    : 0;
               const imm = this.readInt32LE(data, nextByteIdx + 1 + dispSize);
               if (mod === 3) {
                 const regName = regs[rm];
@@ -736,7 +797,9 @@ export class DisassemblerRouter {
                 ];
               } else {
                 const baseRegName = regs[rm];
-                const memStr = disp ? `${baseRegName} + 0x${disp.toString(16)}` : baseRegName;
+                const memStr = disp
+                  ? `${baseRegName} + 0x${disp.toString(16)}`
+                  : baseRegName;
                 opStr = `qword ptr [${memStr}], 0x${imm.toString(16)}`;
                 operands = [
                   { type: 'mem', mem: { base: baseRegName, disp } },
@@ -770,20 +833,28 @@ export class DisassemblerRouter {
             }
           }
           // MOV reg, reg or reg, mem (0x89 or 0x8b)
-          else if ((opcode === 0x89 || opcode === 0x8b) && nextByteIdx < data.length) {
+          else if (
+            (opcode === 0x89 || opcode === 0x8b) &&
+            nextByteIdx < data.length
+          ) {
             const modrm = data[nextByteIdx];
             const mod = (modrm & 0xc0) >> 6;
             const reg = ((modrm & 0x38) >> 3) + (rexR << 3);
             const rm = (modrm & 0x07) + (rexB << 3);
             mnemonic = 'mov';
-            
+
             let dispSize = 0;
             if (mod === 1) dispSize = 1;
             else if (mod === 2) dispSize = 4;
             else if (mod === 0 && (rm & 7) === 5) dispSize = 4;
 
             if (nextByteIdx + 1 + dispSize <= data.length) {
-              const disp = dispSize === 1 ? this.signExtend8(data[nextByteIdx + 1]) : dispSize === 4 ? this.readInt32LE(data, nextByteIdx + 1) : 0;
+              const disp =
+                dispSize === 1
+                  ? this.signExtend8(data[nextByteIdx + 1])
+                  : dispSize === 4
+                    ? this.readInt32LE(data, nextByteIdx + 1)
+                    : 0;
               const dstReg = regs[reg];
               const srcRM = regs[rm];
 
@@ -796,7 +867,9 @@ export class DisassemblerRouter {
                   { type: 'reg', reg: src },
                 ];
               } else {
-                const memStr = disp ? `${srcRM} + 0x${disp.toString(16)}` : srcRM;
+                const memStr = disp
+                  ? `${srcRM} + 0x${disp.toString(16)}`
+                  : srcRM;
                 const dst = opcode === 0x89 ? `qword ptr [${memStr}]` : dstReg;
                 const src = opcode === 0x89 ? dstReg : `qword ptr [${memStr}]`;
                 opStr = `${dst}, ${src}`;
@@ -813,7 +886,10 @@ export class DisassemblerRouter {
             }
           }
           // ADD / SUB / CMP / XOR / AND / OR immediate (0x83 / 0x81)
-          else if ((opcode === 0x83 || opcode === 0x81) && nextByteIdx < data.length) {
+          else if (
+            (opcode === 0x83 || opcode === 0x81) &&
+            nextByteIdx < data.length
+          ) {
             const modrm = data[nextByteIdx];
             const mod = (modrm & 0xc0) >> 6;
             const opType = (modrm & 0x38) >> 3;
@@ -861,34 +937,48 @@ export class DisassemblerRouter {
             else if (mod === 0 && (rm & 7) === 5) dispSize = 4;
 
             if (nextByteIdx + 1 + dispSize <= data.length) {
-              const disp = dispSize === 1 ? this.signExtend8(data[nextByteIdx + 1]) : dispSize === 4 ? this.readInt32LE(data, nextByteIdx + 1) : 0;
+              const disp =
+                dispSize === 1
+                  ? this.signExtend8(data[nextByteIdx + 1])
+                  : dispSize === 4
+                    ? this.readInt32LE(data, nextByteIdx + 1)
+                    : 0;
               const dstReg = regs[reg];
               const srcRM = regs[rm];
               const memStr = disp ? `${srcRM} + 0x${disp.toString(16)}` : srcRM;
               opStr = `${dstReg}, [${memStr}]`;
               operands = [
                 { type: 'reg', reg: dstReg },
-                { type: 'mem', mem: { base: srcRM, disp } }
+                { type: 'mem', mem: { base: srcRM, disp } },
               ];
               size = opSize + 1 + dispSize;
             }
           }
           // ADD / OR / AND / SUB / XOR / CMP (reg/reg or reg/mem)
-          else if (arithmeticOpcodes[opcode] !== undefined && nextByteIdx < data.length) {
-            const { mnemonic: opMnemonic, isRegToRm } = arithmeticOpcodes[opcode];
+          else if (
+            arithmeticOpcodes[opcode] !== undefined &&
+            nextByteIdx < data.length
+          ) {
+            const { mnemonic: opMnemonic, isRegToRm } =
+              arithmeticOpcodes[opcode];
             const modrm = data[nextByteIdx];
             const mod = (modrm & 0xc0) >> 6;
             const reg = ((modrm & 0x38) >> 3) + (rexR << 3);
             const rm = (modrm & 0x07) + (rexB << 3);
             mnemonic = opMnemonic;
-            
+
             let dispSize = 0;
             if (mod === 1) dispSize = 1;
             else if (mod === 2) dispSize = 4;
             else if (mod === 0 && (rm & 7) === 5) dispSize = 4;
 
             if (nextByteIdx + 1 + dispSize <= data.length) {
-              const disp = dispSize === 1 ? this.signExtend8(data[nextByteIdx + 1]) : dispSize === 4 ? this.readInt32LE(data, nextByteIdx + 1) : 0;
+              const disp =
+                dispSize === 1
+                  ? this.signExtend8(data[nextByteIdx + 1])
+                  : dispSize === 4
+                    ? this.readInt32LE(data, nextByteIdx + 1)
+                    : 0;
               const regName = regs[reg] || 'rax';
               const rmName = regs[rm] || 'rax';
 
@@ -898,10 +988,12 @@ export class DisassemblerRouter {
                 opStr = `${dst}, ${src}`;
                 operands = [
                   { type: 'reg', reg: dst },
-                  { type: 'reg', reg: src }
+                  { type: 'reg', reg: src },
                 ];
               } else {
-                const memStr = disp ? `${rmName} + 0x${disp.toString(16)}` : rmName;
+                const memStr = disp
+                  ? `${rmName} + 0x${disp.toString(16)}`
+                  : rmName;
                 const dst = isRegToRm ? `qword ptr [${memStr}]` : regName;
                 const src = isRegToRm ? regName : `qword ptr [${memStr}]`;
                 opStr = `${dst}, ${src}`;
@@ -911,7 +1003,7 @@ export class DisassemblerRouter {
                     : { type: 'reg', reg: dst },
                   isRegToRm
                     ? { type: 'reg', reg: src }
-                    : { type: 'mem', mem: { base: rmName, disp } }
+                    : { type: 'mem', mem: { base: rmName, disp } },
                 ];
               }
               size = opSize + 1 + dispSize;
@@ -928,7 +1020,7 @@ export class DisassemblerRouter {
             opStr = `${dst}, ${src}`;
             operands = [
               { type: 'reg', reg: dst },
-              { type: 'reg', reg: src }
+              { type: 'reg', reg: src },
             ];
             size = opSize + 1;
           }
@@ -938,7 +1030,7 @@ export class DisassemblerRouter {
             const opType = (modrm & 0x38) >> 3;
             const rm = (modrm & 0x07) + (rexB << 3);
             const mod = (modrm & 0xc0) >> 6;
-            
+
             const opMap: Record<number, string> = {
               0: 'test',
               2: 'not',
@@ -949,30 +1041,40 @@ export class DisassemblerRouter {
               7: 'idiv',
             };
             mnemonic = opMap[opType] || 'db';
-            
+
             if (mnemonic !== 'db') {
               let dispSize = 0;
               if (mod === 1) dispSize = 1;
               else if (mod === 2) dispSize = 4;
               else if (mod === 0 && (rm & 7) === 5) dispSize = 4;
-              
+
               const immSize = opType === 0 ? 4 : 0;
               if (nextByteIdx + 1 + dispSize + immSize <= data.length) {
-                const disp = dispSize === 1 ? this.signExtend8(data[nextByteIdx + 1]) : dispSize === 4 ? this.readInt32LE(data, nextByteIdx + 1) : 0;
+                const disp =
+                  dispSize === 1
+                    ? this.signExtend8(data[nextByteIdx + 1])
+                    : dispSize === 4
+                      ? this.readInt32LE(data, nextByteIdx + 1)
+                      : 0;
                 const rmName = regs[rm] || 'rax';
-                
+
                 let targetStr = '';
                 if (mod === 3) {
                   targetStr = rmName;
                   operands = [{ type: 'reg', reg: rmName }];
                 } else {
-                  const memStr = disp ? `${rmName} + 0x${disp.toString(16)}` : rmName;
+                  const memStr = disp
+                    ? `${rmName} + 0x${disp.toString(16)}`
+                    : rmName;
                   targetStr = `qword ptr [${memStr}]`;
                   operands = [{ type: 'mem', mem: { base: rmName, disp } }];
                 }
-                
+
                 if (opType === 0) {
-                  const imm = this.readInt32LE(data, nextByteIdx + 1 + dispSize);
+                  const imm = this.readInt32LE(
+                    data,
+                    nextByteIdx + 1 + dispSize
+                  );
                   opStr = `${targetStr}, 0x${imm.toString(16)}`;
                   operands.push({ type: 'imm', imm });
                 } else {
@@ -983,7 +1085,10 @@ export class DisassemblerRouter {
             }
           }
           // Shift and Rotate instructions (0xc1 / 0xd1 / 0xd3)
-          else if ((opcode === 0xc1 || opcode === 0xd1 || opcode === 0xd3) && nextByteIdx < data.length) {
+          else if (
+            (opcode === 0xc1 || opcode === 0xd1 || opcode === 0xd3) &&
+            nextByteIdx < data.length
+          ) {
             const modrm = data[nextByteIdx];
             const mod = (modrm & 0xc0) >> 6;
             const opType = (modrm & 0x38) >> 3;
@@ -1009,15 +1114,22 @@ export class DisassemblerRouter {
               const immSize = opcode === 0xc1 ? 1 : 0;
 
               if (nextByteIdx + 1 + dispSize + immSize <= data.length) {
-                const disp = dispSize === 1 ? this.signExtend8(data[nextByteIdx + 1]) : dispSize === 4 ? this.readInt32LE(data, nextByteIdx + 1) : 0;
+                const disp =
+                  dispSize === 1
+                    ? this.signExtend8(data[nextByteIdx + 1])
+                    : dispSize === 4
+                      ? this.readInt32LE(data, nextByteIdx + 1)
+                      : 0;
                 const rmName = regs[rm] || 'rax';
-                
+
                 let targetStr = '';
                 if (mod === 3) {
                   targetStr = rmName;
                   operands = [{ type: 'reg', reg: rmName }];
                 } else {
-                  const memStr = disp ? `${rmName} + 0x${disp.toString(16)}` : rmName;
+                  const memStr = disp
+                    ? `${rmName} + 0x${disp.toString(16)}`
+                    : rmName;
                   targetStr = `qword ptr [${memStr}]`;
                   operands = [{ type: 'mem', mem: { base: rmName, disp } }];
                 }
@@ -1039,9 +1151,16 @@ export class DisassemblerRouter {
           }
           // Flag instructions (0xf8 - 0xfd, 0x9c - 0x9f)
           else if (
-            opcode === 0xf8 || opcode === 0xf9 || opcode === 0xfa || opcode === 0xfb ||
-            opcode === 0xfc || opcode === 0xfd || opcode === 0x9c || opcode === 0x9d ||
-            opcode === 0x9e || opcode === 0x9f
+            opcode === 0xf8 ||
+            opcode === 0xf9 ||
+            opcode === 0xfa ||
+            opcode === 0xfb ||
+            opcode === 0xfc ||
+            opcode === 0xfd ||
+            opcode === 0x9c ||
+            opcode === 0x9d ||
+            opcode === 0x9e ||
+            opcode === 0x9f
           ) {
             const flagMnemonics: Record<number, string> = {
               0xf8: 'clc',
@@ -1063,10 +1182,28 @@ export class DisassemblerRouter {
         } else {
           // Two-byte opcode escape (0x0f opcode ...)
           // Conditional Jumps near (0x0f 0x80 - 0x0f 0x8f)
-          if (opcode >= 0x80 && opcode <= 0x8f && nextByteIdx + 3 < data.length) {
+          if (
+            opcode >= 0x80 &&
+            opcode <= 0x8f &&
+            nextByteIdx + 3 < data.length
+          ) {
             const conds = [
-              'jo', 'jno', 'jb', 'jae', 'je', 'jne', 'jbe', 'ja',
-              'js', 'jns', 'jp', 'jnp', 'jl', 'jge', 'jle', 'jg'
+              'jo',
+              'jno',
+              'jb',
+              'jae',
+              'je',
+              'jne',
+              'jbe',
+              'ja',
+              'js',
+              'jns',
+              'jp',
+              'jnp',
+              'jl',
+              'jge',
+              'jle',
+              'jg',
             ];
             mnemonic = conds[opcode - 0x80];
             const offset = this.readInt32LE(data, nextByteIdx);
@@ -1086,12 +1223,18 @@ export class DisassemblerRouter {
             opStr = `${dst}, ${src}`;
             operands = [
               { type: 'reg', reg: dst },
-              { type: 'reg', reg: src }
+              { type: 'reg', reg: src },
             ];
             size = opSize + 1;
           }
           // MOVZX / MOVSX (0x0f 0xb6 / 0x0f 0xb7 / 0x0f 0xbe / 0x0f 0xbf)
-          else if ((opcode === 0xb6 || opcode === 0xb7 || opcode === 0xbe || opcode === 0xbf) && nextByteIdx < data.length) {
+          else if (
+            (opcode === 0xb6 ||
+              opcode === 0xb7 ||
+              opcode === 0xbe ||
+              opcode === 0xbf) &&
+            nextByteIdx < data.length
+          ) {
             const modrm = data[nextByteIdx];
             const reg = ((modrm & 0x38) >> 3) + (rexR << 3);
             const rm = (modrm & 0x07) + (rexB << 3);
@@ -1101,15 +1244,33 @@ export class DisassemblerRouter {
             opStr = `${dst}, ${src}`;
             operands = [
               { type: 'reg', reg: dst },
-              { type: 'reg', reg: src }
+              { type: 'reg', reg: src },
             ];
             size = opSize + 1;
           }
           // CMOVcc (0x0f 0x40 - 0x0f 0x4f)
-          else if (opcode >= 0x40 && opcode <= 0x4f && nextByteIdx < data.length) {
+          else if (
+            opcode >= 0x40 &&
+            opcode <= 0x4f &&
+            nextByteIdx < data.length
+          ) {
             const conds = [
-              'cmovo', 'cmovno', 'cmovb', 'cmovae', 'cmove', 'cmovne', 'cmovbe', 'cmova',
-              'cmovs', 'cmovns', 'cmovp', 'cmovnp', 'cmovl', 'cmovge', 'cmovle', 'cmovg'
+              'cmovo',
+              'cmovno',
+              'cmovb',
+              'cmovae',
+              'cmove',
+              'cmovne',
+              'cmovbe',
+              'cmova',
+              'cmovs',
+              'cmovns',
+              'cmovp',
+              'cmovnp',
+              'cmovl',
+              'cmovge',
+              'cmovle',
+              'cmovg',
             ];
             mnemonic = conds[opcode - 0x40];
             const modrm = data[nextByteIdx];
@@ -1120,12 +1281,15 @@ export class DisassemblerRouter {
             opStr = `${dst}, ${src}`;
             operands = [
               { type: 'reg', reg: dst },
-              { type: 'reg', reg: src }
+              { type: 'reg', reg: src },
             ];
             size = opSize + 1;
           }
           // BSF / BSR (0x0f 0xbc / 0x0f 0xbd)
-          else if ((opcode === 0xbc || opcode === 0xbd) && nextByteIdx < data.length) {
+          else if (
+            (opcode === 0xbc || opcode === 0xbd) &&
+            nextByteIdx < data.length
+          ) {
             mnemonic = opcode === 0xbc ? 'bsf' : 'bsr';
             const modrm = data[nextByteIdx];
             const reg = ((modrm & 0x38) >> 3) + (rexR << 3);
@@ -1135,7 +1299,7 @@ export class DisassemblerRouter {
             opStr = `${dst}, ${src}`;
             operands = [
               { type: 'reg', reg: dst },
-              { type: 'reg', reg: src }
+              { type: 'reg', reg: src },
             ];
             size = opSize + 1;
           }
@@ -1185,12 +1349,12 @@ export class DisassemblerRouter {
     let i = 0;
     while (i + 3 < data.length) {
       const addr = baseAddress + i;
-      const val = (
+      const val =
         (data[i] |
-        (data[i + 1] << 8) |
-        (data[i + 2] << 16) |
-        (data[i + 3] << 24)) >>> 0
-      );
+          (data[i + 1] << 8) |
+          (data[i + 2] << 16) |
+          (data[i + 3] << 24)) >>>
+        0;
       let mnemonic = 'db';
       let opStr = `0x${val.toString(16).padStart(8, '0')}`;
       let operands: Operand[] = [];
@@ -1202,7 +1366,7 @@ export class DisassemblerRouter {
         opStr = '';
       }
       // RET (typically 0xd65f03c0 for x30)
-      else if (((val & 0xfffffc1f) >>> 0) === 0xd65f0000) {
+      else if ((val & 0xfffffc1f) >>> 0 === 0xd65f0000) {
         mnemonic = 'ret';
         const regId = (val >> 5) & 0x1f;
         const regName = regId === 30 ? '' : regs[regId];
@@ -1210,7 +1374,7 @@ export class DisassemblerRouter {
         operands = regName ? [{ type: 'reg', reg: regName }] : [];
       }
       // Branch / unconditional jump: b <offset> (0x14000000)
-      else if (((val & 0xfc000000) >>> 0) === 0x14000000) {
+      else if ((val & 0xfc000000) >>> 0 === 0x14000000) {
         mnemonic = 'b';
         const offset = this.signExtend26(val & 0x03ffffff) * 4;
         const dest = addr + offset;
@@ -1218,7 +1382,7 @@ export class DisassemblerRouter {
         operands = [{ type: 'imm', imm: dest }];
       }
       // Branch with link / call: bl <offset> (0x94000000)
-      else if (((val & 0xfc000000) >>> 0) === 0x94000000) {
+      else if ((val & 0xfc000000) >>> 0 === 0x94000000) {
         mnemonic = 'bl';
         const offset = this.signExtend26(val & 0x03ffffff) * 4;
         const dest = addr + offset;
@@ -1226,12 +1390,12 @@ export class DisassemblerRouter {
         operands = [{ type: 'imm', imm: dest }];
       }
       // Branch to register / indirect call
-      else if (((val & 0xfffffc1f) >>> 0) === 0xd61f0000) {
+      else if ((val & 0xfffffc1f) >>> 0 === 0xd61f0000) {
         mnemonic = 'br';
         const regId = (val >> 5) & 0x1f;
         opStr = regs[regId];
         operands = [{ type: 'reg', reg: regs[regId] }];
-      } else if (((val & 0xfffffc1f) >>> 0) === 0xd63f0000) {
+      } else if ((val & 0xfffffc1f) >>> 0 === 0xd63f0000) {
         mnemonic = 'blr';
         const regId = (val >> 5) & 0x1f;
         opStr = regs[regId];
@@ -1241,8 +1405,22 @@ export class DisassemblerRouter {
       else if ((val & 0xff000010) === 0x54000000) {
         const cond = val & 0xf;
         const condNames = [
-          'eq', 'ne', 'cs', 'cc', 'mi', 'pl', 'vs', 'vc',
-          'hi', 'ls', 'ge', 'lt', 'gt', 'le', 'al', 'nv'
+          'eq',
+          'ne',
+          'cs',
+          'cc',
+          'mi',
+          'pl',
+          'vs',
+          'vc',
+          'hi',
+          'ls',
+          'ge',
+          'lt',
+          'gt',
+          'le',
+          'al',
+          'nv',
         ];
         mnemonic = `b.${condNames[cond] || 'cond'}`;
         const offset = this.signExtend19((val >> 5) & 0x7ffff) * 4;
@@ -1251,8 +1429,11 @@ export class DisassemblerRouter {
         operands = [{ type: 'imm', imm: dest }];
       }
       // CBZ (0x34000000) / CBNZ (0x35000000)
-      else if ((val & 0xfe000000) === 0x34000000 || (val & 0xfe000000) === 0x35000000) {
-        mnemonic = (val & 0x01000000) ? 'cbnz' : 'cbz';
+      else if (
+        (val & 0xfe000000) === 0x34000000 ||
+        (val & 0xfe000000) === 0x35000000
+      ) {
+        mnemonic = val & 0x01000000 ? 'cbnz' : 'cbz';
         const rd = val & 0x1f;
         const offset = this.signExtend19((val >> 5) & 0x7ffff) * 4;
         const dest = addr + offset;
@@ -1265,8 +1446,8 @@ export class DisassemblerRouter {
       }
       // ADD / SUB (immediate)
       else if (
-        (((val & 0xff000000) >>> 0) === 0x91000000) ||
-        (((val & 0xff000000) >>> 0) === 0xd1000000)
+        (val & 0xff000000) >>> 0 === 0x91000000 ||
+        (val & 0xff000000) >>> 0 === 0xd1000000
       ) {
         mnemonic = val & 0x40000000 ? 'sub' : 'add';
         const rd = val & 0x1f;
@@ -1283,8 +1464,8 @@ export class DisassemblerRouter {
       }
       // ADD / SUB (shifted register)
       else if (
-        (((val & 0xff200000) >>> 0) === 0x8b000000) ||
-        (((val & 0xff200000) >>> 0) === 0xcb000000)
+        (val & 0xff200000) >>> 0 === 0x8b000000 ||
+        (val & 0xff200000) >>> 0 === 0xcb000000
       ) {
         mnemonic = val & 0x40000000 ? 'sub' : 'add';
         const rd = val & 0x1f;
@@ -1301,7 +1482,7 @@ export class DisassemblerRouter {
         ];
       }
       // CMP (subs immediate or register - mapped to cmp)
-      else if (((val & 0xff000000) >>> 0) === 0xf1000000) {
+      else if ((val & 0xff000000) >>> 0 === 0xf1000000) {
         // subs immediate
         mnemonic = 'cmp';
         const rn = (val >> 5) & 0x1f;
@@ -1314,7 +1495,7 @@ export class DisassemblerRouter {
         ];
       }
       // CMP (subs register / shifted register) / SUBS (shifted register)
-      else if (((val & 0xff200000) >>> 0) === 0xeb000000) {
+      else if ((val & 0xff200000) >>> 0 === 0xeb000000) {
         const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const rm = (val >> 16) & 0x1f;
@@ -1339,7 +1520,7 @@ export class DisassemblerRouter {
         }
       }
       // TST (ands shifted register) / ANDS (shifted register)
-      else if (((val & 0xffc00000) >>> 0) === 0xea000000) {
+      else if ((val & 0xffc00000) >>> 0 === 0xea000000) {
         const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const rm = (val >> 16) & 0x1f;
@@ -1364,7 +1545,7 @@ export class DisassemblerRouter {
         }
       }
       // TST (ands immediate) / ANDS (immediate)
-      else if (((val & 0xffc00000) >>> 0) === 0xf2000000) {
+      else if ((val & 0xffc00000) >>> 0 === 0xf2000000) {
         const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const imm = (val >> 10) & 0xfff;
@@ -1388,7 +1569,7 @@ export class DisassemblerRouter {
         }
       }
       // UBFM (LSR / LSL / UBFX immediate)
-      else if (((val & 0xffc00000) >>> 0) === 0xd3400000) {
+      else if ((val & 0xffc00000) >>> 0 === 0xd3400000) {
         const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const immr = (val >> 16) & 0x3f;
@@ -1424,7 +1605,7 @@ export class DisassemblerRouter {
         }
       }
       // SBFM (ASR / SBFX immediate)
-      else if (((val & 0xffc00000) >>> 0) === 0x93400000) {
+      else if ((val & 0xffc00000) >>> 0 === 0x93400000) {
         const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const immr = (val >> 16) & 0x3f;
@@ -1452,10 +1633,10 @@ export class DisassemblerRouter {
       }
       // AArch64 Shift Register: LSLV, LSRV, ASRV, RORV
       else if (
-        (((val & 0xffc0fc00) >>> 0) === 0x1ac02000) ||
-        (((val & 0xffc0fc00) >>> 0) === 0x1ac02400) ||
-        (((val & 0xffc0fc00) >>> 0) === 0x1ac02800) ||
-        (((val & 0xffc0fc00) >>> 0) === 0x1ac02c00)
+        (val & 0xffc0fc00) >>> 0 === 0x1ac02000 ||
+        (val & 0xffc0fc00) >>> 0 === 0x1ac02400 ||
+        (val & 0xffc0fc00) >>> 0 === 0x1ac02800 ||
+        (val & 0xffc0fc00) >>> 0 === 0x1ac02c00
       ) {
         const op = (val >> 10) & 3;
         const rd = val & 0x1f;
@@ -1474,7 +1655,7 @@ export class DisassemblerRouter {
         ];
       }
       // NZCV Flags / System instructions
-      else if (((val & 0xffffffe0) >>> 0) === 0xd53b4200) {
+      else if ((val & 0xffffffe0) >>> 0 === 0xd53b4200) {
         mnemonic = 'mrs';
         const rt = val & 0x1f;
         const rtName = regs[rt];
@@ -1483,7 +1664,7 @@ export class DisassemblerRouter {
           { type: 'reg', reg: rtName },
           { type: 'reg', reg: 'nzcv' },
         ];
-      } else if (((val & 0xffffffe0) >>> 0) === 0xd51b4200) {
+      } else if ((val & 0xffffffe0) >>> 0 === 0xd51b4200) {
         mnemonic = 'msr';
         const rt = val & 0x1f;
         const rtName = regs[rt];
@@ -1494,7 +1675,7 @@ export class DisassemblerRouter {
         ];
       }
       // MOVZ / MOVK / MOVN (Move immediate)
-      else if (((val & 0xff800000) >>> 0) === 0xd2800000) {
+      else if ((val & 0xff800000) >>> 0 === 0xd2800000) {
         mnemonic = 'mov';
         const rd = val & 0x1f;
         const imm = (val >> 5) & 0xffff;
@@ -1506,9 +1687,7 @@ export class DisassemblerRouter {
         ];
       }
       // ORR / AND / EOR / ORN / BIC / EON / MVN (register/logical)
-      else if (
-        (((val & 0x1f000000) >>> 0) === 0x0a000000)
-      ) {
+      else if ((val & 0x1f000000) >>> 0 === 0x0a000000) {
         const op = (val >> 29) & 3;
         const neg = (val & 0x00200000) !== 0;
         const rd = val & 0x1f;
@@ -1530,7 +1709,7 @@ export class DisassemblerRouter {
             neg ? 'bic' : 'and',
             neg ? 'orn' : 'orr',
             neg ? 'eon' : 'eor',
-            neg ? 'bics' : 'ands'
+            neg ? 'bics' : 'ands',
           ];
           mnemonic = names[op];
           opStr = `${rdName}, ${rnName}, ${rmName}`;
@@ -1543,10 +1722,10 @@ export class DisassemblerRouter {
       }
       // SDIV / UDIV (Signed / Unsigned Division)
       else if (
-        (((val & 0xffc0fc00) >>> 0) === 0x1ac00c00) ||
-        (((val & 0xffc0fc00) >>> 0) === 0x1ac00800)
+        (val & 0xffc0fc00) >>> 0 === 0x1ac00c00 ||
+        (val & 0xffc0fc00) >>> 0 === 0x1ac00800
       ) {
-        mnemonic = (val & 0x00000400) ? 'sdiv' : 'udiv';
+        mnemonic = val & 0x00000400 ? 'sdiv' : 'udiv';
         const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const rm = (val >> 16) & 0x1f;
@@ -1561,13 +1740,13 @@ export class DisassemblerRouter {
         ];
       }
       // MADD / MSUB / MUL / MNEG (Multiply instructions)
-      else if (((val & 0xff200000) >>> 0) === 0x9b000000) {
+      else if ((val & 0xff200000) >>> 0 === 0x9b000000) {
         const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const ra = (val >> 10) & 0x1f;
         const rm = (val >> 16) & 0x1f;
         const isSub = (val & 0x00008000) !== 0;
-        
+
         const rdName = regs[rd] || 'x0';
         const rnName = regs[rn] || 'x0';
         const rmName = regs[rm] || 'x0';
@@ -1594,10 +1773,10 @@ export class DisassemblerRouter {
       }
       // LDR / STR (immediate offset / register offset)
       else if (
-        (((val & 0xffc00000) >>> 0) === 0xf9400000) ||
-        (((val & 0xffc00000) >>> 0) === 0xf9000000)
+        (val & 0xffc00000) >>> 0 === 0xf9400000 ||
+        (val & 0xffc00000) >>> 0 === 0xf9000000
       ) {
-        mnemonic = (val & 0x00400000) ? 'ldr' : 'str';
+        mnemonic = val & 0x00400000 ? 'ldr' : 'str';
         const rt = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const imm = ((val >> 10) & 0xfff) * 8; // scaled by 8 for 64-bit load/store
@@ -1606,15 +1785,15 @@ export class DisassemblerRouter {
         opStr = `${rtName}, [${rnName}, #0x${imm.toString(16)}]`;
         operands = [
           { type: 'reg', reg: rtName },
-          { type: 'mem', mem: { base: rnName, disp: imm } }
+          { type: 'mem', mem: { base: rnName, disp: imm } },
         ];
       }
       // LDP / STP (register pair)
       else if (
-        (((val & 0xffc00000) >>> 0) === 0x29400000) ||
-        (((val & 0xffc00000) >>> 0) === 0x29000000)
+        (val & 0xffc00000) >>> 0 === 0x29400000 ||
+        (val & 0xffc00000) >>> 0 === 0x29000000
       ) {
-        mnemonic = (val & 0x00400000) ? 'ldp' : 'stp';
+        mnemonic = val & 0x00400000 ? 'ldp' : 'stp';
         const rt1 = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const rt2 = (val >> 10) & 0x1f;
@@ -1626,16 +1805,16 @@ export class DisassemblerRouter {
         operands = [
           { type: 'reg', reg: rt1Name },
           { type: 'reg', reg: rt2Name },
-          { type: 'mem', mem: { base: rnName, disp: imm } }
+          { type: 'mem', mem: { base: rnName, disp: imm } },
         ];
       }
       // Stack simulation patterns: str reg, [sp, #-16]! / ldr reg, [sp], #16
-      else if (((val & 0xffc003e0) >>> 0) === 0xf81f0ffe) {
+      else if ((val & 0xffc003e0) >>> 0 === 0xf81f0ffe) {
         mnemonic = 'push';
         const rt = val & 0x1f;
         opStr = regs[rt];
         operands = [{ type: 'reg', reg: regs[rt] }];
-      } else if (((val & 0xffc003e0) >>> 0) === 0xf84007fe) {
+      } else if ((val & 0xffc003e0) >>> 0 === 0xf84007fe) {
         mnemonic = 'pop';
         const rt = val & 0x1f;
         opStr = regs[rt];
@@ -1675,7 +1854,10 @@ export class DisassemblerRouter {
    * Lightweight mock Dalvik bytecode disassembler.
    * Decodes DEX bytecode.
    */
-  private disassembleDalvik(data: Uint8Array, baseAddress: number): Instruction[] {
+  private disassembleDalvik(
+    data: Uint8Array,
+    baseAddress: number
+  ): Instruction[] {
     const instructions: Instruction[] = [];
     let i = 0;
     while (i < data.length) {
@@ -1694,7 +1876,10 @@ export class DisassemblerRouter {
         const vA = data[i + 1] & 0xf;
         const vB = (data[i + 1] >> 4) & 0xf;
         opStr = `v${vA}, v${vB}`;
-        operands = [{ type: 'reg', reg: `v${vA}` }, { type: 'reg', reg: `v${vB}` }];
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'reg', reg: `v${vB}` },
+        ];
         size = 2;
       } else if (opcode === 0x12) {
         mnemonic = 'const/4';
@@ -1702,14 +1887,24 @@ export class DisassemblerRouter {
         const B = (data[i + 1] >> 4) & 0xf;
         const val = B > 7 ? B - 16 : B;
         opStr = `v${vA}, #0x${val.toString(16)}`;
-        operands = [{ type: 'reg', reg: `v${vA}` }, { type: 'imm', imm: val }];
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'imm', imm: val },
+        ];
         size = 2;
       } else if (opcode === 0x26) {
         mnemonic = 'fill-array-data';
         const vA = data[i + 1];
-        const offset = data[i + 2] | (data[i + 3] << 8) | (data[i + 4] << 16) | (data[i + 5] << 24);
+        const offset =
+          data[i + 2] |
+          (data[i + 3] << 8) |
+          (data[i + 4] << 16) |
+          (data[i + 5] << 24);
         opStr = `v${vA}, +0x${offset.toString(16)}`;
-        operands = [{ type: 'reg', reg: `v${vA}` }, { type: 'imm', imm: offset }];
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'imm', imm: offset },
+        ];
         size = 6;
       } else if (opcode === 0x28) {
         mnemonic = 'goto';
@@ -1727,7 +1922,7 @@ export class DisassemblerRouter {
         operands = [
           { type: 'reg', reg: `v${vA}` },
           { type: 'reg', reg: `v${vB}` },
-          { type: 'imm', imm: addr + signedOffset * 2 }
+          { type: 'imm', imm: addr + signedOffset * 2 },
         ];
         size = 4;
       } else if (opcode === 0x71 || opcode === 0x6e) {
@@ -1746,7 +1941,10 @@ export class DisassemblerRouter {
         const val = data[i + 2] | (data[i + 3] << 8);
         const signedVal = val > 0x7fff ? val - 0x10000 : val;
         opStr = `v${vA}, #0x${signedVal.toString(16)}`;
-        operands = [{ type: 'reg', reg: `v${vA}` }, { type: 'imm', imm: signedVal }];
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'imm', imm: signedVal },
+        ];
         size = 4;
       } else {
         mnemonic = `db`;
@@ -1758,7 +1956,9 @@ export class DisassemblerRouter {
       if (i + size > data.length) {
         size = data.length - i;
         mnemonic = 'db';
-        opStr = Array.from(data.subarray(i, i + size)).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(', ');
+        opStr = Array.from(data.subarray(i, i + size))
+          .map((b) => `0x${b.toString(16).padStart(2, '0')}`)
+          .join(', ');
       }
 
       instructions.push({

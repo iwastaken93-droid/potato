@@ -5,10 +5,18 @@
  */
 
 import { Section } from '../disassembler/types.js';
-import { YaraEngine, YaraScanResult, YaraRule, parseYaraRules } from '../analyzer/yara.js';
+import {
+  YaraEngine,
+  YaraScanResult,
+  YaraRule,
+  parseYaraRules,
+} from '../analyzer/yara.js';
 
 export interface YaraPanelOptions {
-  onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export class YaraPanel {
@@ -48,10 +56,7 @@ rule Common_Strings {
         $pe_sig or $libc
 }`;
 
-  constructor(
-    container: HTMLElement,
-    options: YaraPanelOptions
-  ) {
+  constructor(container: HTMLElement, options: YaraPanelOptions) {
     this.container = container;
     this.options = options;
     this.yaraEngine = new YaraEngine();
@@ -63,13 +68,10 @@ rule Common_Strings {
   /**
    * Updates the YARA panel data
    */
-  public updateData(
-    binaryData: Uint8Array,
-    sections: Section[]
-  ) {
+  public updateData(binaryData: Uint8Array, sections: Section[]) {
     this.binaryData = binaryData;
     this.sections = sections;
-    
+
     // Automatically trigger scan if we have rules compiled and binary loaded
     if (this.binaryData.length > 0) {
       this.runScan();
@@ -354,7 +356,8 @@ rule Common_Strings {
 
     const subtitle = document.createElement('div');
     subtitle.className = 'yara-subtitle';
-    subtitle.innerHTML = 'Write custom YARA rules and scan the loaded binary instantly';
+    subtitle.innerHTML =
+      'Write custom YARA rules and scan the loaded binary instantly';
 
     titleArea.appendChild(title);
     titleArea.appendChild(subtitle);
@@ -385,7 +388,7 @@ rule Common_Strings {
       align-items: center;
       width: 100%;
     `;
-    
+
     const labelTitle = document.createElement('span');
     labelTitle.textContent = 'YARA Rules Definition';
     editorLabel.appendChild(labelTitle);
@@ -419,7 +422,8 @@ rule Common_Strings {
     this.editorEl = document.createElement('textarea');
     this.editorEl.className = 'yara-textarea';
     this.editorEl.value = this.currentRulesSource;
-    this.editorEl.placeholder = '// Write YARA rules here...\nrule RuleName {\n  strings:\n    $a = "test"\n  condition:\n    $a\n}';
+    this.editorEl.placeholder =
+      '// Write YARA rules here...\nrule RuleName {\n  strings:\n    $a = "test"\n  condition:\n    $a\n}';
 
     this.compileStatusEl = document.createElement('div');
     this.compileStatusEl.className = 'yara-compile-status success';
@@ -499,7 +503,9 @@ rule Common_Strings {
 
     const importBtn = this.container.querySelector('#yara-import-btn');
     const exportBtn = this.container.querySelector('#yara-export-btn');
-    const fileInput = this.container.querySelector('#yara-file-input') as HTMLInputElement | null;
+    const fileInput = this.container.querySelector(
+      '#yara-file-input'
+    ) as HTMLInputElement | null;
 
     if (importBtn && fileInput) {
       importBtn.addEventListener('click', () => {
@@ -573,12 +579,16 @@ rule Common_Strings {
   }
 
   private getAddressFromOffset(offset: number): number {
-    const sec = this.sections.find(s => offset >= s.fileOffset && offset < s.fileOffset + s.fileSize);
+    const sec = this.sections.find(
+      (s) => offset >= s.fileOffset && offset < s.fileOffset + s.fileSize
+    );
     if (sec) {
       return sec.virtualAddress + (offset - sec.fileOffset);
     }
-    const executeSection = this.sections.find(s => s.flags.execute);
-    const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+    const executeSection = this.sections.find((s) => s.flags.execute);
+    const textBaseAddress = executeSection
+      ? executeSection.virtualAddress
+      : 0x1000;
     return textBaseAddress + offset;
   }
 
@@ -596,8 +606,8 @@ rule Common_Strings {
 
     const compiledRules = this.yaraEngine.getRules();
 
-    results.forEach(res => {
-      const ruleDef = compiledRules.find(r => r.name === res.ruleName);
+    results.forEach((res) => {
+      const ruleDef = compiledRules.find((r) => r.name === res.ruleName);
 
       const card = document.createElement('div');
       card.className = 'yara-card';
@@ -646,19 +656,19 @@ rule Common_Strings {
         `;
 
         const tbody = table.querySelector('tbody')!;
-        res.matches.forEach(match => {
+        res.matches.forEach((match) => {
           const virtualAddress = this.getAddressFromOffset(match.offset);
-          
+
           const row = document.createElement('tr');
-          
+
           const tdId = document.createElement('td');
           tdId.className = 'yara-match-id';
           tdId.textContent = match.stringId;
-          
+
           const tdOffset = document.createElement('td');
           tdOffset.className = 'yara-match-offset';
           tdOffset.innerHTML = `0x${match.offset.toString(16).toUpperCase()}<br/><span style="color: var(--text-muted); font-size: 0.7rem;">VA: 0x${virtualAddress.toString(16).toUpperCase()}</span>`;
-          
+
           const tdVal = document.createElement('td');
           tdVal.className = 'yara-match-val';
           tdVal.textContent = match.matchedValue;
@@ -671,13 +681,17 @@ rule Common_Strings {
           asmBtn.className = 'yara-action-btn';
           asmBtn.textContent = 'ASM';
           asmBtn.title = 'Navigate in Assembly View';
-          asmBtn.addEventListener('click', () => this.options.onNavigate('assembly', virtualAddress));
+          asmBtn.addEventListener('click', () =>
+            this.options.onNavigate('assembly', virtualAddress)
+          );
 
           const hexBtn = document.createElement('button');
           hexBtn.className = 'yara-action-btn';
           hexBtn.textContent = 'HEX';
           hexBtn.title = 'Navigate in Hex Viewer';
-          hexBtn.addEventListener('click', () => this.options.onNavigate('hex', virtualAddress));
+          hexBtn.addEventListener('click', () =>
+            this.options.onNavigate('hex', virtualAddress)
+          );
 
           btnGroup.appendChild(asmBtn);
           btnGroup.appendChild(hexBtn);
@@ -696,7 +710,8 @@ rule Common_Strings {
         info.style.fontSize = '0.8rem';
         info.style.color = 'var(--text-muted)';
         info.style.fontStyle = 'italic';
-        info.textContent = 'Rule matched but did not report any matching strings (condition-only match).';
+        info.textContent =
+          'Rule matched but did not report any matching strings (condition-only match).';
         card.appendChild(info);
       }
 

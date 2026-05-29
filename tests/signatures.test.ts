@@ -7,9 +7,9 @@ describe('Binary Signature Scanner Unit Tests', () => {
       const scanner = new SignatureScanner(true);
       const rules = scanner.getRules();
       expect(rules.length).toBeGreaterThan(0);
-      expect(rules.some(r => r.name === 'GCC')).toBe(true);
-      expect(rules.some(r => r.name === 'UPX')).toBe(true);
-      expect(rules.some(r => r.name === 'AES S-box')).toBe(true);
+      expect(rules.some((r) => r.name === 'GCC')).toBe(true);
+      expect(rules.some((r) => r.name === 'UPX')).toBe(true);
+      expect(rules.some((r) => r.name === 'AES S-box')).toBe(true);
     });
 
     it('should initialize empty when registerDefaults is false', () => {
@@ -121,7 +121,9 @@ describe('Binary Signature Scanner Unit Tests', () => {
           category: 'other',
           patterns: [{ type: 'hex', value: '55 89 ?? 90' }],
         });
-        const buffer = new Uint8Array([0x55, 0x89, 0xe5, 0x90, 0x00, 0x55, 0x89, 0xff, 0x90]);
+        const buffer = new Uint8Array([
+          0x55, 0x89, 0xe5, 0x90, 0x00, 0x55, 0x89, 0xff, 0x90,
+        ]);
         const results = scanner.scan(buffer);
         expect(results).toHaveLength(1);
         expect(results[0].matches).toHaveLength(2);
@@ -183,27 +185,33 @@ describe('Binary Signature Scanner Unit Tests', () => {
     const scanner = new SignatureScanner(true);
 
     it('should detect GCC signature', () => {
-      const buffer = new TextEncoder().encode('Some binary containing GCC: (GNU) 11.2.0 string.');
+      const buffer = new TextEncoder().encode(
+        'Some binary containing GCC: (GNU) 11.2.0 string.'
+      );
       const results = scanner.scan(buffer);
-      const gccResult = results.find(r => r.ruleName === 'GCC');
+      const gccResult = results.find((r) => r.ruleName === 'GCC');
       expect(gccResult).toBeDefined();
       expect(gccResult?.category).toBe('compiler');
-      expect(gccResult?.matches.some(m => m.matchedValue === 'GCC: (GNU) 11.2.0')).toBe(true);
+      expect(
+        gccResult?.matches.some((m) => m.matchedValue === 'GCC: (GNU) 11.2.0')
+      ).toBe(true);
     });
 
     it('should detect MSVC signature', () => {
       // 52 69 63 68 is "Rich"
       const buffer = new Uint8Array([0x90, 0x52, 0x69, 0x63, 0x68, 0x90]);
       const results = scanner.scan(buffer);
-      const msvcResult = results.find(r => r.ruleName === 'MSVC');
+      const msvcResult = results.find((r) => r.ruleName === 'MSVC');
       expect(msvcResult).toBeDefined();
       expect(msvcResult?.category).toBe('compiler');
     });
 
     it('should detect Clang signature', () => {
-      const buffer = new TextEncoder().encode('Built with clang version 14.0.0 (https://github.com...)');
+      const buffer = new TextEncoder().encode(
+        'Built with clang version 14.0.0 (https://github.com...)'
+      );
       const results = scanner.scan(buffer);
-      const clangResult = results.find(r => r.ruleName === 'Clang');
+      const clangResult = results.find((r) => r.ruleName === 'Clang');
       expect(clangResult).toBeDefined();
       expect(clangResult?.category).toBe('compiler');
     });
@@ -212,15 +220,17 @@ describe('Binary Signature Scanner Unit Tests', () => {
       // fb ff ff ff is Go PCCLN magic in PE/ELF
       const buffer = new Uint8Array([0x00, 0xfb, 0xff, 0xff, 0xff, 0x00]);
       const results = scanner.scan(buffer);
-      const goResult = results.find(r => r.ruleName === 'Go');
+      const goResult = results.find((r) => r.ruleName === 'Go');
       expect(goResult).toBeDefined();
       expect(goResult?.category).toBe('compiler');
     });
 
     it('should detect Rust signature', () => {
-      const buffer = new TextEncoder().encode('rustc-f3751c6767b140884b2e81138a26b07db3f05c48');
+      const buffer = new TextEncoder().encode(
+        'rustc-f3751c6767b140884b2e81138a26b07db3f05c48'
+      );
       const results = scanner.scan(buffer);
-      const rustResult = results.find(r => r.ruleName === 'Rust');
+      const rustResult = results.find((r) => r.ruleName === 'Rust');
       expect(rustResult).toBeDefined();
       expect(rustResult?.category).toBe('compiler');
     });
@@ -228,29 +238,29 @@ describe('Binary Signature Scanner Unit Tests', () => {
     it('should detect UPX packer signature', () => {
       const buffer = new Uint8Array([0x55, 0x50, 0x58, 0x21]); // UPX!
       const results = scanner.scan(buffer);
-      const upxResult = results.find(r => r.ruleName === 'UPX');
+      const upxResult = results.find((r) => r.ruleName === 'UPX');
       expect(upxResult).toBeDefined();
       expect(upxResult?.category).toBe('packer');
     });
 
     it('should detect MD5 constants', () => {
       const buffer = new Uint8Array([
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98,
+        0x76, 0x54, 0x32, 0x10,
       ]);
       const results = scanner.scan(buffer);
-      const md5Result = results.find(r => r.ruleName === 'MD5 Constants');
+      const md5Result = results.find((r) => r.ruleName === 'MD5 Constants');
       expect(md5Result).toBeDefined();
       expect(md5Result?.category).toBe('crypto');
     });
 
     it('should detect AES S-box constants', () => {
       const buffer = new Uint8Array([
-        0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
-        0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+        0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b,
+        0xfe, 0xd7, 0xab, 0x76,
       ]);
       const results = scanner.scan(buffer);
-      const aesResult = results.find(r => r.ruleName === 'AES S-box');
+      const aesResult = results.find((r) => r.ruleName === 'AES S-box');
       expect(aesResult).toBeDefined();
       expect(aesResult?.category).toBe('crypto');
     });

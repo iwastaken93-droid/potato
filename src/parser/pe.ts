@@ -577,7 +577,7 @@ export class PEParser {
       21: 'Animated Cursor',
       22: 'Animated Icon',
       23: 'HTML',
-      24: 'Manifest'
+      24: 'Manifest',
     };
 
     const getResourceTypeName = (type: number | string): string => {
@@ -594,14 +594,24 @@ export class PEParser {
       const resourceStartOffset = rvaToOffset(resourceDirRva);
 
       if (resourceStartOffset !== 0) {
-        const parseDirectory = (dirOffset: number, level: number, path: (string | number)[]): ParsedResource[] => {
+        const parseDirectory = (
+          dirOffset: number,
+          level: number,
+          path: (string | number)[]
+        ): ParsedResource[] => {
           const absoluteDirOffset = resourceStartOffset + dirOffset;
           if (absoluteDirOffset + 16 > this.view.byteLength) {
             return [];
           }
 
-          const numberOfNamedEntries = this.view.getUint16(absoluteDirOffset + 12, true);
-          const numberOfIdEntries = this.view.getUint16(absoluteDirOffset + 14, true);
+          const numberOfNamedEntries = this.view.getUint16(
+            absoluteDirOffset + 12,
+            true
+          );
+          const numberOfIdEntries = this.view.getUint16(
+            absoluteDirOffset + 14,
+            true
+          );
           const totalEntries = numberOfNamedEntries + numberOfIdEntries;
 
           const results: ParsedResource[] = [];
@@ -613,8 +623,14 @@ export class PEParser {
               break;
             }
 
-            const nameOffsetOrId = this.view.getUint32(absoluteEntryOffset, true);
-            const offsetToDataOrDirectory = this.view.getUint32(absoluteEntryOffset + 4, true);
+            const nameOffsetOrId = this.view.getUint32(
+              absoluteEntryOffset,
+              true
+            );
+            const offsetToDataOrDirectory = this.view.getUint32(
+              absoluteEntryOffset + 4,
+              true
+            );
 
             // Parse Name/ID
             let nameOrId: string | number;
@@ -627,7 +643,9 @@ export class PEParser {
                 for (let j = 0; j < length; j++) {
                   const charOffset = absoluteStrOffset + 2 + j * 2;
                   if (charOffset + 2 <= this.view.byteLength) {
-                    chars.push(String.fromCharCode(this.view.getUint16(charOffset, true)));
+                    chars.push(
+                      String.fromCharCode(this.view.getUint16(charOffset, true))
+                    );
                   }
                 }
                 nameOrId = chars.join('');
@@ -642,16 +660,31 @@ export class PEParser {
             const subOffset = offsetToDataOrDirectory & 0x7fffffff;
 
             if (isSubdir) {
-              results.push(...parseDirectory(subOffset, level + 1, [...path, nameOrId]));
+              results.push(
+                ...parseDirectory(subOffset, level + 1, [...path, nameOrId])
+              );
             } else {
               const absoluteDataEntryOffset = resourceStartOffset + subOffset;
               if (absoluteDataEntryOffset + 16 <= this.view.byteLength) {
-                const dataRva = this.view.getUint32(absoluteDataEntryOffset, true);
-                const size = this.view.getUint32(absoluteDataEntryOffset + 4, true);
-                
+                const dataRva = this.view.getUint32(
+                  absoluteDataEntryOffset,
+                  true
+                );
+                const size = this.view.getUint32(
+                  absoluteDataEntryOffset + 4,
+                  true
+                );
+
                 const fileOffset = rvaToOffset(dataRva);
-                if (fileOffset !== 0 && fileOffset + size <= this.view.byteLength) {
-                  const dataBytes = new Uint8Array(this.buffer, fileOffset, size);
+                if (
+                  fileOffset !== 0 &&
+                  fileOffset + size <= this.view.byteLength
+                ) {
+                  const dataBytes = new Uint8Array(
+                    this.buffer,
+                    fileOffset,
+                    size
+                  );
                   const type = path[0] !== undefined ? path[0] : 'Unknown';
                   const name = path[1] !== undefined ? path[1] : nameOrId;
                   const language = path[2] !== undefined ? Number(nameOrId) : 0;
@@ -662,7 +695,7 @@ export class PEParser {
                     language,
                     offset: fileOffset,
                     size,
-                    data: dataBytes
+                    data: dataBytes,
                   });
                 }
               }
@@ -678,7 +711,7 @@ export class PEParser {
 
         // Manifests (Type 24)
         const manifests: string[] = [];
-        const manifestResources = allResources.filter(r => r.type === 24);
+        const manifestResources = allResources.filter((r) => r.type === 24);
         for (const r of manifestResources) {
           try {
             const text = new TextDecoder('utf-8').decode(r.data);
@@ -691,7 +724,7 @@ export class PEParser {
 
         // String Tables (Type 6)
         const strings: Record<number, string> = {};
-        const stringResources = allResources.filter(r => r.type === 6);
+        const stringResources = allResources.filter((r) => r.type === 6);
         for (const r of stringResources) {
           if (typeof r.name === 'number') {
             const blockId = r.name;
@@ -705,7 +738,8 @@ export class PEParser {
                 if (offset + len * 2 > r.data.length) break;
                 const chars: string[] = [];
                 for (let j = 0; j < len; j++) {
-                  const charVal = r.data[offset + j * 2] | (r.data[offset + j * 2 + 1] << 8);
+                  const charVal =
+                    r.data[offset + j * 2] | (r.data[offset + j * 2 + 1] << 8);
                   chars.push(String.fromCharCode(charVal));
                 }
                 strings[stringIdBase + i] = chars.join('');
@@ -716,13 +750,16 @@ export class PEParser {
         }
 
         // Icons (Type 3) and Group Icons (Type 14)
-        const icons: { type: number | string; size: number; offset: number }[] = [];
-        const iconResources = allResources.filter(r => r.type === 3 || r.type === 14);
+        const icons: { type: number | string; size: number; offset: number }[] =
+          [];
+        const iconResources = allResources.filter(
+          (r) => r.type === 3 || r.type === 14
+        );
         for (const r of iconResources) {
           icons.push({
             type: r.type === 3 ? 'Icon' : 'Group Icon',
             size: r.size,
-            offset: r.offset
+            offset: r.offset,
           });
         }
 
@@ -730,7 +767,7 @@ export class PEParser {
           manifests,
           strings,
           icons,
-          all: allResources
+          all: allResources,
         };
       }
     }
@@ -743,7 +780,7 @@ export class PEParser {
       sections,
       imports,
       exports,
-      resources
+      resources,
     };
   }
 }

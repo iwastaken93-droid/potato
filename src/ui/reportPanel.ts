@@ -7,7 +7,10 @@
 import { Section, Symbol } from '../disassembler/types.js';
 import { ExtractedString } from '../analyzer/strings.js';
 import { SignatureScanner, ScanResult } from '../analyzer/signatures.js';
-import { calculateEntropy, findHighEntropyBlocks } from '../analyzer/entropy.js';
+import {
+  calculateEntropy,
+  findHighEntropyBlocks,
+} from '../analyzer/entropy.js';
 import { ReportGenerator, ReportData } from '../analyzer/reportGenerator.js';
 
 export class ReportPanel {
@@ -323,14 +326,17 @@ export class ReportPanel {
     headerEl.className = 'report-header-controls';
 
     const titleArea = document.createElement('div');
-    titleArea.style.cssText = 'display: flex; flex-direction: column; gap: 0.25rem;';
-    
+    titleArea.style.cssText =
+      'display: flex; flex-direction: column; gap: 0.25rem;';
+
     const title = document.createElement('h2');
     title.textContent = '📊 Binary Report Generator';
-    title.style.cssText = 'margin: 0; font-size: 1.25rem; color: var(--text-primary);';
+    title.style.cssText =
+      'margin: 0; font-size: 1.25rem; color: var(--text-primary);';
 
     const subtitle = document.createElement('span');
-    subtitle.textContent = 'Generate and export full binary metadata and static analysis summaries';
+    subtitle.textContent =
+      'Generate and export full binary metadata and static analysis summaries';
     subtitle.style.cssText = 'font-size: 0.8rem; color: var(--text-muted);';
 
     titleArea.appendChild(title);
@@ -341,10 +347,20 @@ export class ReportPanel {
     const btnGroup = document.createElement('div');
     btnGroup.className = 'report-btn-group';
 
-    const copyBtn = this.createButton('📋 Copy MD', 'btn-secondary', () => this.handleCopy());
-    const exportMDBtn = this.createButton('📥 Save MD', 'btn-secondary', () => this.handleExportMD());
-    const exportJSONBtn = this.createButton('📥 Save JSON', 'btn-secondary', () => this.handleExportJSON());
-    const printBtn = this.createButton('🖨️ Print PDF', 'btn-primary', () => this.handlePrint());
+    const copyBtn = this.createButton('📋 Copy MD', 'btn-secondary', () =>
+      this.handleCopy()
+    );
+    const exportMDBtn = this.createButton('📥 Save MD', 'btn-secondary', () =>
+      this.handleExportMD()
+    );
+    const exportJSONBtn = this.createButton(
+      '📥 Save JSON',
+      'btn-secondary',
+      () => this.handleExportJSON()
+    );
+    const printBtn = this.createButton('🖨️ Print PDF', 'btn-primary', () =>
+      this.handlePrint()
+    );
 
     btnGroup.appendChild(copyBtn);
     btnGroup.appendChild(exportMDBtn);
@@ -359,10 +375,10 @@ export class ReportPanel {
     const tabs = [
       { id: 'interactive', label: '📊 Interactive Dashboard' },
       { id: 'markdown', label: '📝 Markdown Preview' },
-      { id: 'json', label: '⚙️ JSON View' }
+      { id: 'json', label: '⚙️ JSON View' },
     ];
 
-    tabs.forEach(tab => {
+    tabs.forEach((tab) => {
       const btn = document.createElement('button');
       btn.className = `report-tab-btn ${this.activeTab === tab.id ? 'active' : ''}`;
       btn.textContent = tab.label;
@@ -383,7 +399,11 @@ export class ReportPanel {
     this.container.appendChild(this.rootEl);
   }
 
-  private createButton(text: string, className: string, onClick: () => void): HTMLButtonElement {
+  private createButton(
+    text: string,
+    className: string,
+    onClick: () => void
+  ): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = `btn ${className}`;
     btn.textContent = text;
@@ -394,7 +414,7 @@ export class ReportPanel {
 
   private setActiveTab(tabId: 'interactive' | 'markdown' | 'json') {
     this.activeTab = tabId;
-    
+
     // Update button active states
     const buttons = this.rootEl.querySelectorAll('.report-tab-btn');
     buttons.forEach((btn, idx) => {
@@ -469,9 +489,12 @@ export class ReportPanel {
         const flagsStr = [
           sec.flags.read ? '<span class="badge-tag badge-read">R</span>' : '',
           sec.flags.write ? '<span class="badge-tag badge-write">W</span>' : '',
-          sec.flags.execute ? '<span class="badge-tag badge-execute">X</span>' : ''
+          sec.flags.execute
+            ? '<span class="badge-tag badge-execute">X</span>'
+            : '',
         ].join(' ');
-        const entropyVal = sec.entropy !== undefined ? sec.entropy.toFixed(4) : 'N/A';
+        const entropyVal =
+          sec.entropy !== undefined ? sec.entropy.toFixed(4) : 'N/A';
         secRows += `
           <tr>
             <td style="font-family: var(--font-mono); font-weight: bold;">${sec.name}</td>
@@ -511,7 +534,7 @@ export class ReportPanel {
 
     // Card 3: Symbols
     if (data.symbols && data.symbols.length > 0) {
-      const funcSyms = data.symbols.filter(s => s.type === 'function');
+      const funcSyms = data.symbols.filter((s) => s.type === 'function');
       let symRows = '';
       const displayed = data.symbols.slice(0, 10);
       for (const sym of displayed) {
@@ -557,7 +580,9 @@ export class ReportPanel {
     if (data.signatures && data.signatures.length > 0) {
       let sigRows = '';
       for (const sig of data.signatures) {
-        const offsets = sig.matches.map(m => `0x${m.offset.toString(16).toUpperCase()}`).join(', ');
+        const offsets = sig.matches
+          .map((m) => `0x${m.offset.toString(16).toUpperCase()}`)
+          .join(', ');
         sigRows += `
           <tr>
             <td style="font-weight: bold; color: var(--text-primary);">${sig.ruleName}</td>
@@ -586,9 +611,14 @@ export class ReportPanel {
     }
 
     // Card 5: High-Entropy Blocks
-    if (data.entropy.highEntropyBlocks && data.entropy.highEntropyBlocks.length > 0) {
+    if (
+      data.entropy.highEntropyBlocks &&
+      data.entropy.highEntropyBlocks.length > 0
+    ) {
       let entropyRows = '';
-      const highBlocks = data.entropy.highEntropyBlocks.filter(b => b.isHighEntropy);
+      const highBlocks = data.entropy.highEntropyBlocks.filter(
+        (b) => b.isHighEntropy
+      );
       const displayedBlocks = highBlocks.slice(0, 10);
       for (const block of displayedBlocks) {
         entropyRows += `
@@ -629,8 +659,15 @@ export class ReportPanel {
       let stringRows = '';
       const displayedStrings = data.strings.slice(0, 15);
       for (const str of displayedStrings) {
-        const tags = str.tags.map(t => `<span class="badge-tag">${t}</span>`).join(' ') || '-';
-        const escaped = str.value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const tags =
+          str.tags
+            .map((t) => `<span class="badge-tag">${t}</span>`)
+            .join(' ') || '-';
+        const escaped = str.value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
         stringRows += `
           <tr>
             <td style="font-family: var(--font-mono);">0x${str.offset.toString(16).toUpperCase()}</td>
@@ -703,18 +740,21 @@ export class ReportPanel {
     const copyBtn = this.previewContentEl.querySelector('.btn-sm-json-copy');
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(jsonStr).then(() => {
-          alert('JSON report copied to clipboard!');
-        }).catch(err => {
-          console.error('Could not copy JSON: ', err);
-        });
+        navigator.clipboard
+          .writeText(jsonStr)
+          .then(() => {
+            alert('JSON report copied to clipboard!');
+          })
+          .catch((err) => {
+            console.error('Could not copy JSON: ', err);
+          });
       });
     }
   }
 
   private renderMarkdownToHTML(markdown: string): string {
     let html = markdown;
-    
+
     html = this.escapeHtml(html);
 
     // Headings
@@ -741,10 +781,15 @@ export class ReportPanel {
           inTable = true;
           tableHtml = '<table class="markdown-table">';
         }
-        
-        const cells = line.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-        const isSeparator = cells.every(c => /^:-*|-+:?|:-+:?$/.test(c) || c === '---' || c === '');
-        
+
+        const cells = line
+          .split('|')
+          .map((c) => c.trim())
+          .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+        const isSeparator = cells.every(
+          (c) => /^:-*|-+:?|:-+:?$/.test(c) || c === '---' || c === ''
+        );
+
         if (isSeparator) {
           continue;
         }
@@ -752,13 +797,13 @@ export class ReportPanel {
         const tag = tableHtml.includes('<thead>') ? 'td' : 'th';
         if (tag === 'th') {
           tableHtml += '<thead><tr>';
-          cells.forEach(c => {
+          cells.forEach((c) => {
             tableHtml += `<th>${c}</th>`;
           });
           tableHtml += '</tr></thead><tbody>';
         } else {
           tableHtml += '<tr>';
-          cells.forEach(c => {
+          cells.forEach((c) => {
             tableHtml += `<td>${c}</td>`;
           });
           tableHtml += '</tr>';
@@ -781,14 +826,22 @@ export class ReportPanel {
     html = outputLines.join('\n');
 
     // Paragraphs & newlines
-    html = html.split('\n\n').map(p => {
-      p = p.trim();
-      if (!p) return '';
-      if (p.startsWith('<h') || p.startsWith('<table') || p.startsWith('<ul') || p.startsWith('<li')) {
-        return p;
-      }
-      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
-    }).join('\n');
+    html = html
+      .split('\n\n')
+      .map((p) => {
+        p = p.trim();
+        if (!p) return '';
+        if (
+          p.startsWith('<h') ||
+          p.startsWith('<table') ||
+          p.startsWith('<ul') ||
+          p.startsWith('<li')
+        ) {
+          return p;
+        }
+        return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+      })
+      .join('\n');
 
     return html;
   }
@@ -844,32 +897,43 @@ export class ReportPanel {
     if (!this.currentReportData) return;
     const md = ReportGenerator.generateMarkdown(this.currentReportData);
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(md).then(() => {
-        if (typeof alert !== 'undefined') {
-          alert('Markdown report copied to clipboard!');
-        }
-      }).catch(err => {
-        console.error('Could not copy text: ', err);
-      });
+      navigator.clipboard
+        .writeText(md)
+        .then(() => {
+          if (typeof alert !== 'undefined') {
+            alert('Markdown report copied to clipboard!');
+          }
+        })
+        .catch((err) => {
+          console.error('Could not copy text: ', err);
+        });
     }
   }
 
   private handleExportMD() {
     if (!this.currentReportData) return;
     const md = ReportGenerator.generateMarkdown(this.currentReportData);
-    this.downloadFile(md, `${this.currentReportData.fileName}_report.md`, 'text/markdown');
+    this.downloadFile(
+      md,
+      `${this.currentReportData.fileName}_report.md`,
+      'text/markdown'
+    );
   }
 
   private handleExportJSON() {
     if (!this.currentReportData) return;
     const json = ReportGenerator.generateJSON(this.currentReportData);
-    this.downloadFile(json, `${this.currentReportData.fileName}_report.json`, 'application/json');
+    this.downloadFile(
+      json,
+      `${this.currentReportData.fileName}_report.json`,
+      'application/json'
+    );
   }
 
   private handlePrint() {
     if (!this.currentReportData) return;
     const md = ReportGenerator.generateMarkdown(this.currentReportData);
-    
+
     if (typeof window === 'undefined' || !window.open) return;
     // Create print-friendly content window
     const printWindow = window.open('', '_blank');
@@ -955,7 +1019,10 @@ export class ReportPanel {
     if (typeof document === 'undefined') return;
     const a = document.createElement('a');
     const file = new Blob([content], { type: contentType });
-    const url = typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(file) : '';
+    const url =
+      typeof URL !== 'undefined' && URL.createObjectURL
+        ? URL.createObjectURL(file)
+        : '';
     if (url) {
       a.href = url;
       a.download = fileName;

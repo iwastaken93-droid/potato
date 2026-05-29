@@ -113,7 +113,11 @@ export class DexParser {
 
   constructor(buffer: ArrayBuffer | Uint8Array) {
     this.data = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-    this.view = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength);
+    this.view = new DataView(
+      this.data.buffer,
+      this.data.byteOffset,
+      this.data.byteLength
+    );
   }
 
   public parse(): ParsedDex {
@@ -191,7 +195,7 @@ export class DexParser {
       const offsetPos = stringIdsOff + i * 4;
       if (offsetPos + 4 > this.data.length) break;
       const stringDataOff = this.view.getUint32(offsetPos, le);
-      
+
       // Dex strings are MUTF-8. First byte is ULEB128 string length.
       if (stringDataOff < this.data.length) {
         const ref = { offset: stringDataOff };
@@ -247,7 +251,7 @@ export class DexParser {
       if (methodPos + 8 > this.data.length) break;
       const classIdx = this.view.getUint16(methodPos, le);
       const nameIdx = this.view.getUint32(methodPos + 4, le);
-      
+
       const className = types[classIdx] || `Class_${classIdx}`;
       const methodName = strings[nameIdx] || `method_${nameIdx}`;
       methods.push(`${className}->${methodName}`);
@@ -329,7 +333,8 @@ export class DexParser {
 
               const tries: TryItem[] = [];
               if (triesSize > 0) {
-                const triesStartOff = codeOff + 16 + insnsSize * 2 + ((insnsSize % 2 !== 0) ? 2 : 0);
+                const triesStartOff =
+                  codeOff + 16 + insnsSize * 2 + (insnsSize % 2 !== 0 ? 2 : 0);
                 const handlersStartOff = triesStartOff + triesSize * 8;
 
                 // Decode list size to find where handlers actually start
@@ -422,7 +427,10 @@ export function parseDex(buffer: ArrayBuffer | Uint8Array): ParsedDex {
   return new DexParser(buffer).parse();
 }
 
-export function readUleb128(bytes: Uint8Array, ref: { offset: number }): number {
+export function readUleb128(
+  bytes: Uint8Array,
+  ref: { offset: number }
+): number {
   let result = 0;
   let shift = 0;
   while (ref.offset < bytes.length) {
@@ -436,7 +444,10 @@ export function readUleb128(bytes: Uint8Array, ref: { offset: number }): number 
   return result;
 }
 
-export function readSleb128(bytes: Uint8Array, ref: { offset: number }): number {
+export function readSleb128(
+  bytes: Uint8Array,
+  ref: { offset: number }
+): number {
   let result = 0;
   let shift = 0;
   let byte = 0;
@@ -474,7 +485,9 @@ export function decodeMutf8(bytes: Uint8Array): string {
     } else if ((b1 & 0xf0) === 0xe0) {
       const b2 = bytes[i++];
       const b3 = bytes[i++];
-      result += String.fromCharCode(((b1 & 0x0f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f));
+      result += String.fromCharCode(
+        ((b1 & 0x0f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f)
+      );
     }
   }
   return result;

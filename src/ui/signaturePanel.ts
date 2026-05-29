@@ -5,10 +5,17 @@
  */
 
 import { Section } from '../disassembler/types.js';
-import { SignatureScanner, ScanResult, RuleCategory } from '../analyzer/signatures.js';
+import {
+  SignatureScanner,
+  ScanResult,
+  RuleCategory,
+} from '../analyzer/signatures.js';
 
 export interface SignaturePanelOptions {
-  onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export class SignaturePanel {
@@ -28,10 +35,7 @@ export class SignaturePanel {
   private currentResults: ScanResult[] = [];
   private activeCategoryFilter: string = 'all';
 
-  constructor(
-    container: HTMLElement,
-    options: SignaturePanelOptions
-  ) {
+  constructor(container: HTMLElement, options: SignaturePanelOptions) {
     this.container = container;
     this.options = options;
     this.scanner = new SignatureScanner(true);
@@ -43,10 +47,7 @@ export class SignaturePanel {
   /**
    * Updates the signature panel data and automatically performs a scan
    */
-  public updateData(
-    binaryData: Uint8Array,
-    sections: Section[]
-  ) {
+  public updateData(binaryData: Uint8Array, sections: Section[]) {
     this.binaryData = binaryData;
     this.sections = sections;
 
@@ -394,16 +395,16 @@ export class SignaturePanel {
 
     this.categoryFilterSelect = document.createElement('select');
     this.categoryFilterSelect.className = 'sig-select-box';
-    
+
     const categories: { value: string; label: string }[] = [
       { value: 'all', label: 'All Categories' },
       { value: 'compiler', label: 'Compilers' },
       { value: 'packer', label: 'Packers' },
       { value: 'crypto', label: 'Cryptography' },
-      { value: 'other', label: 'Other/Custom' }
+      { value: 'other', label: 'Other/Custom' },
     ];
 
-    categories.forEach(cat => {
+    categories.forEach((cat) => {
       const opt = document.createElement('option');
       opt.value = cat.value;
       opt.textContent = cat.label;
@@ -436,7 +437,9 @@ export class SignaturePanel {
     this.rootEl.appendChild(resultsContainer);
     this.container.appendChild(this.rootEl);
 
-    this.ruleCountEl = document.getElementById('sig-rules-count') as HTMLSpanElement;
+    this.ruleCountEl = document.getElementById(
+      'sig-rules-count'
+    ) as HTMLSpanElement;
 
     // Initial state info
     this.resultsListEl.innerHTML = `
@@ -480,13 +483,17 @@ export class SignaturePanel {
   }
 
   private getAddressFromOffset(offset: number): number {
-    const sec = this.sections.find(s => offset >= s.fileOffset && offset < s.fileOffset + s.fileSize);
+    const sec = this.sections.find(
+      (s) => offset >= s.fileOffset && offset < s.fileOffset + s.fileSize
+    );
     if (sec) {
       return sec.virtualAddress + (offset - sec.fileOffset);
     }
     // Fallback: if no section maps this offset, map from executable section or default base
-    const executeSection = this.sections.find(s => s.flags.execute);
-    const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+    const executeSection = this.sections.find((s) => s.flags.execute);
+    const textBaseAddress = executeSection
+      ? executeSection.virtualAddress
+      : 0x1000;
     return textBaseAddress + offset;
   }
 
@@ -494,7 +501,7 @@ export class SignaturePanel {
     this.resultsListEl.innerHTML = '';
 
     // Filter results according to category filter
-    const filteredResults = this.currentResults.filter(res => {
+    const filteredResults = this.currentResults.filter((res) => {
       if (this.activeCategoryFilter === 'all') return true;
       return res.category === this.activeCategoryFilter;
     });
@@ -504,12 +511,12 @@ export class SignaturePanel {
       compiler: [],
       packer: [],
       crypto: [],
-      other: []
+      other: [],
     };
 
     let totalMatchesCount = 0;
 
-    filteredResults.forEach(res => {
+    filteredResults.forEach((res) => {
       if (categoriesMap[res.category]) {
         categoriesMap[res.category].push(res);
         totalMatchesCount += res.matches.length;
@@ -518,17 +525,29 @@ export class SignaturePanel {
 
     this.statusTextEl.textContent = `Found ${filteredResults.length} rule matches (${totalMatchesCount} total matched offsets)`;
 
-    const categoriesOrder: { key: RuleCategory; label: string; icon: string }[] = [
+    const categoriesOrder: {
+      key: RuleCategory;
+      label: string;
+      icon: string;
+    }[] = [
       { key: 'compiler', label: 'Compilers / Toolchains', icon: '⚙️' },
-      { key: 'packer', label: 'Packers / Protectors / Compressors', icon: '📦' },
-      { key: 'crypto', label: 'Cryptographic Constants / Algorithms', icon: '🔑' },
-      { key: 'other', label: 'Other Signatures', icon: '🏷️' }
+      {
+        key: 'packer',
+        label: 'Packers / Protectors / Compressors',
+        icon: '📦',
+      },
+      {
+        key: 'crypto',
+        label: 'Cryptographic Constants / Algorithms',
+        icon: '🔑',
+      },
+      { key: 'other', label: 'Other Signatures', icon: '🏷️' },
     ];
 
     let hasAnyMatches = false;
     const fragment = document.createDocumentFragment();
 
-    categoriesOrder.forEach(cat => {
+    categoriesOrder.forEach((cat) => {
       const resultsForCat = categoriesMap[cat.key];
       if (!resultsForCat || resultsForCat.length === 0) return;
 
@@ -545,7 +564,7 @@ export class SignaturePanel {
       groupDiv.appendChild(headerDiv);
 
       // Category Results
-      resultsForCat.forEach(res => {
+      resultsForCat.forEach((res) => {
         const card = document.createElement('div');
         card.className = 'sig-result-card';
 
@@ -569,7 +588,7 @@ export class SignaturePanel {
         const matchesContainer = document.createElement('div');
         matchesContainer.className = 'sig-matches-container';
 
-        res.matches.forEach(match => {
+        res.matches.forEach((match) => {
           const matchItem = document.createElement('div');
           matchItem.className = 'sig-match-item';
 
@@ -598,12 +617,16 @@ export class SignaturePanel {
           const asmBtn = document.createElement('button');
           asmBtn.className = 'sig-action-btn asm-btn';
           asmBtn.innerHTML = '⚡ Assembly';
-          asmBtn.addEventListener('click', () => this.options.onNavigate('assembly', virtualAddress));
+          asmBtn.addEventListener('click', () =>
+            this.options.onNavigate('assembly', virtualAddress)
+          );
 
           const hexBtn = document.createElement('button');
           hexBtn.className = 'sig-action-btn hex-btn';
           hexBtn.innerHTML = '🔢 Hex Viewer';
-          hexBtn.addEventListener('click', () => this.options.onNavigate('hex', virtualAddress));
+          hexBtn.addEventListener('click', () =>
+            this.options.onNavigate('hex', virtualAddress)
+          );
 
           actionsDiv.appendChild(asmBtn);
           actionsDiv.appendChild(hexBtn);

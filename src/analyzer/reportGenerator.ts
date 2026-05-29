@@ -25,22 +25,27 @@ export class ReportGenerator {
     const reportObj: any = { ...data };
     delete reportObj.binaryData;
 
-    if (data.binaryData && data.binaryData.length > 64 && data.binaryData[0] === 0x4d && data.binaryData[1] === 0x5a) {
+    if (
+      data.binaryData &&
+      data.binaryData.length > 64 &&
+      data.binaryData[0] === 0x4d &&
+      data.binaryData[1] === 0x5a
+    ) {
       try {
-        const peParser = new PEParser(data.binaryData.buffer);
+        const peParser = new PEParser(data.binaryData.buffer as ArrayBuffer);
         const pe = peParser.parse();
         if (pe.resources) {
           reportObj.peResources = {
             manifests: pe.resources.manifests,
             stringsCount: Object.keys(pe.resources.strings).length,
             iconsCount: pe.resources.icons.length,
-            allResources: pe.resources.all.map(r => ({
+            allResources: pe.resources.all.map((r) => ({
               typeName: r.typeName,
               name: r.name,
               language: r.language,
               size: r.size,
-              offset: r.offset
-            }))
+              offset: r.offset,
+            })),
           };
         }
       } catch (e) {
@@ -61,7 +66,7 @@ export class ReportGenerator {
     };
 
     let md = `# Binary Analysis Report: ${data.fileName}\n\n`;
-    
+
     // Metadata Table
     md += `## 📋 File Metadata\n\n`;
     md += `| Parameter | Value |\n`;
@@ -81,9 +86,10 @@ export class ReportGenerator {
         const flagsStr = [
           sec.flags.read ? 'R' : '-',
           sec.flags.write ? 'W' : '-',
-          sec.flags.execute ? 'X' : '-'
+          sec.flags.execute ? 'X' : '-',
         ].join('');
-        const entropyVal = sec.entropy !== undefined ? sec.entropy.toFixed(4) : 'N/A';
+        const entropyVal =
+          sec.entropy !== undefined ? sec.entropy.toFixed(4) : 'N/A';
         md += `| \`${sec.name}\` | 0x${sec.virtualAddress.toString(16).toUpperCase()} | ${formatSize(sec.virtualSize)} | 0x${sec.fileOffset.toString(16).toUpperCase()} | ${formatSize(sec.fileSize)} | ${entropyVal} | \`${flagsStr}\` |\n`;
       }
     } else {
@@ -93,8 +99,8 @@ export class ReportGenerator {
 
     // Symbols List
     md += `## 🏷️ Symbols\n\n`;
-    const funcSyms = data.symbols.filter(s => s.type === 'function');
-    const otherSyms = data.symbols.filter(s => s.type !== 'function');
+    const funcSyms = data.symbols.filter((s) => s.type === 'function');
+    const otherSyms = data.symbols.filter((s) => s.type !== 'function');
     md += `Total Symbols: ${data.symbols.length} (Functions: ${funcSyms.length}, Other: ${otherSyms.length})\n\n`;
     if (data.symbols.length > 0) {
       md += `| Name | Address | Type | Binding | Size |\n`;
@@ -119,7 +125,11 @@ export class ReportGenerator {
       md += `| Rule Name | Category | Matches (Offsets) |\n`;
       md += `|---|---|---|\n`;
       for (const sig of data.signatures) {
-        const matchesStr = sig.matches.map(m => `0x${m.offset.toString(16).toUpperCase()} (${m.patternType})`).join(', ');
+        const matchesStr = sig.matches
+          .map(
+            (m) => `0x${m.offset.toString(16).toUpperCase()} (${m.patternType})`
+          )
+          .join(', ');
         md += `| **${sig.ruleName}** | \`${sig.category}\` | ${matchesStr} |\n`;
       }
     } else {
@@ -129,7 +139,10 @@ export class ReportGenerator {
 
     // Entropy Blocks
     md += `## 📈 High Entropy Blocks\n\n`;
-    if (data.entropy.highEntropyBlocks && data.entropy.highEntropyBlocks.length > 0) {
+    if (
+      data.entropy.highEntropyBlocks &&
+      data.entropy.highEntropyBlocks.length > 0
+    ) {
       md += `| Start Offset | End Offset | Length | Entropy |\n`;
       md += `|---|---|---|---|\n`;
       for (const block of data.entropy.highEntropyBlocks) {
@@ -147,8 +160,14 @@ export class ReportGenerator {
       md += `|---|---|---|---|---|\n`;
       const displayedStrings = data.strings.slice(0, 100);
       for (const str of displayedStrings) {
-        const tagsStr = str.tags.length > 0 ? str.tags.map(t => `\`${t}\``).join(', ') : '-';
-        const escapedValue = str.value.replace(/\|/g, '\\|').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        const tagsStr =
+          str.tags.length > 0
+            ? str.tags.map((t) => `\`${t}\``).join(', ')
+            : '-';
+        const escapedValue = str.value
+          .replace(/\|/g, '\\|')
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r');
         md += `| 0x${str.offset.toString(16).toUpperCase()} | 0x${str.virtualAddress.toString(16).toUpperCase()} | \`${str.encoding}\` | ${tagsStr} | \`${escapedValue}\` |\n`;
       }
       if (data.strings.length > 100) {
@@ -161,14 +180,19 @@ export class ReportGenerator {
     md += `\n`;
 
     // PE Resources section if it exists
-    if (data.binaryData && data.binaryData.length > 64 && data.binaryData[0] === 0x4d && data.binaryData[1] === 0x5a) {
+    if (
+      data.binaryData &&
+      data.binaryData.length > 64 &&
+      data.binaryData[0] === 0x4d &&
+      data.binaryData[1] === 0x5a
+    ) {
       try {
-        const peParser = new PEParser(data.binaryData.buffer);
+        const peParser = new PEParser(data.binaryData.buffer as ArrayBuffer);
         const pe = peParser.parse();
         if (pe.resources && pe.resources.all && pe.resources.all.length > 0) {
           const r = pe.resources;
           md += `## 📦 PE Resource (.rsrc) Section\n\n`;
-          
+
           md += `### All Resources\n\n`;
           md += `| Type Name | Name/ID | Lang ID | Size | Offset |\n`;
           md += `|---|---|---|---|---|\n`;

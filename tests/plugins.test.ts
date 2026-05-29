@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PluginManager, AnalyzerPlugin, AnalyzerContext, AnalyzerResult } from '../src/analyzer/plugins.js';
+import {
+  PluginManager,
+  AnalyzerPlugin,
+  AnalyzerContext,
+  AnalyzerResult,
+} from '../src/analyzer/plugins.js';
 
 describe('Plugin System Architecture Unit Tests', () => {
   let manager: PluginManager;
@@ -11,7 +16,7 @@ describe('Plugin System Architecture Unit Tests', () => {
       binaryData: new Uint8Array([0x7f, 0x45, 0x4c, 0x46]), // ELF magic
       sections: [],
       symbols: [],
-      instructions: []
+      instructions: [],
     };
   });
 
@@ -29,7 +34,7 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'Test Plugin',
         description: 'A mock plugin for testing',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
       init: initSpy,
       destroy: destroySpy,
@@ -37,9 +42,9 @@ describe('Plugin System Architecture Unit Tests', () => {
         return {
           pluginId: 'test-plugin',
           success: true,
-          findings: []
+          findings: [],
         };
-      }
+      },
     };
 
     await manager.register(plugin);
@@ -60,9 +65,9 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'Plugin 1',
         description: 'First instance',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
-      analyze: () => ({ pluginId: 'dup-plugin', success: true, findings: [] })
+      analyze: () => ({ pluginId: 'dup-plugin', success: true, findings: [] }),
     };
 
     const plugin2: AnalyzerPlugin = {
@@ -71,13 +76,15 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'Plugin 2',
         description: 'Second instance',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
-      analyze: () => ({ pluginId: 'dup-plugin', success: true, findings: [] })
+      analyze: () => ({ pluginId: 'dup-plugin', success: true, findings: [] }),
     };
 
     await manager.register(plugin1);
-    await expect(manager.register(plugin2)).rejects.toThrow('Plugin with ID "dup-plugin" is already registered.');
+    await expect(manager.register(plugin2)).rejects.toThrow(
+      'Plugin with ID "dup-plugin" is already registered.'
+    );
   });
 
   it('should run supports check and skip plugins that are not supported', async () => {
@@ -87,10 +94,14 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'Supported',
         description: 'Should run',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
       supports: () => true,
-      analyze: () => ({ pluginId: 'supported-plugin', success: true, findings: [] })
+      analyze: () => ({
+        pluginId: 'supported-plugin',
+        success: true,
+        findings: [],
+      }),
     };
 
     const unsupportedPlugin: AnalyzerPlugin = {
@@ -99,10 +110,14 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'Unsupported',
         description: 'Should not run',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
       supports: () => false,
-      analyze: () => ({ pluginId: 'unsupported-plugin', success: true, findings: [] })
+      analyze: () => ({
+        pluginId: 'unsupported-plugin',
+        success: true,
+        findings: [],
+      }),
     };
 
     await manager.register(supportedPlugin);
@@ -118,7 +133,7 @@ describe('Plugin System Architecture Unit Tests', () => {
       category: 'security',
       severity: 'high' as const,
       description: 'Found ELF signature',
-      evidence: '7F 45 4C 46'
+      evidence: '7F 45 4C 46',
     };
 
     const plugin: AnalyzerPlugin = {
@@ -127,16 +142,16 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'ELF Detector',
         description: 'Detects ELF headers',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
       analyze: (ctx) => {
         const isElf = ctx.binaryData[0] === 0x7f && ctx.binaryData[1] === 0x45;
         return {
           pluginId: 'elf-detector',
           success: true,
-          findings: isElf ? [mockFinding] : []
+          findings: isElf ? [mockFinding] : [],
         };
-      }
+      },
     };
 
     await manager.register(plugin);
@@ -154,11 +169,11 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'Error Plugin',
         description: 'Throws an error',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
       analyze: () => {
         throw new Error('Analysis failed unexpectedly');
-      }
+      },
     };
 
     await manager.register(errorPlugin);
@@ -173,7 +188,9 @@ describe('Plugin System Architecture Unit Tests', () => {
   it('should support discoverable plugins and toggle status', async () => {
     const discoverable = manager.getDiscoverablePlugins();
     expect(discoverable.length).toBeGreaterThan(0);
-    const elfPlugin = discoverable.find(p => p.metadata.id === 'elf-hardening');
+    const elfPlugin = discoverable.find(
+      (p) => p.metadata.id === 'elf-hardening'
+    );
     expect(elfPlugin).toBeDefined();
 
     // Verify it is not registered initially
@@ -191,7 +208,7 @@ describe('Plugin System Architecture Unit Tests', () => {
 
     // Skip running if disabled
     const results = await manager.runAll(mockContext);
-    const elfResult = results.find(r => r.pluginId === 'elf-hardening');
+    const elfResult = results.find((r) => r.pluginId === 'elf-hardening');
     expect(elfResult).toBeUndefined();
 
     // Toggle back
@@ -211,13 +228,13 @@ describe('Plugin System Architecture Unit Tests', () => {
         name: 'Hook Plugin',
         description: 'Test hooks',
         version: '1.0.0',
-        author: 'Antigravity'
+        author: 'Antigravity',
       },
       onBeforeAnalyze: beforeSpy,
       onAfterAnalyze: afterSpy,
       onEnable: enableSpy,
       onDisable: disableSpy,
-      analyze: () => ({ pluginId: 'hook-plugin', success: true, findings: [] })
+      analyze: () => ({ pluginId: 'hook-plugin', success: true, findings: [] }),
     };
 
     await manager.register(hookPlugin);
@@ -234,7 +251,7 @@ describe('Plugin System Architecture Unit Tests', () => {
   it('should get and set plugin configuration options dynamically', async () => {
     await manager.installPlugin('elf-hardening');
     const installed = manager.getPlugin('elf-hardening')!;
-    
+
     expect(installed.config?.checkCanary).toBe(true);
 
     manager.setPluginConfig('elf-hardening', { checkCanary: false });

@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ScriptingEngine, ScriptingContext } from '../src/analyzer/scripting.js';
+import {
+  ScriptingEngine,
+  ScriptingContext,
+} from '../src/analyzer/scripting.js';
 import { ScriptingConsole } from '../src/ui/scriptingConsole.js';
-import type { Instruction, Section, Symbol } from '../src/disassembler/types.js';
+import type {
+  Instruction,
+  Section,
+  Symbol,
+} from '../src/disassembler/types.js';
 import type { ExtractedString } from '../src/analyzer/strings.js';
 
 describe('ScriptingEngine', () => {
@@ -10,7 +17,9 @@ describe('ScriptingEngine', () => {
   let engine: ScriptingEngine;
 
   beforeEach(() => {
-    const binaryData = new Uint8Array([0x55, 0x48, 0x89, 0xe5, 0x48, 0x83, 0xec, 0x10, 0x90, 0xc3]);
+    const binaryData = new Uint8Array([
+      0x55, 0x48, 0x89, 0xe5, 0x48, 0x83, 0xec, 0x10, 0x90, 0xc3,
+    ]);
     const sections: Section[] = [
       {
         name: '.text',
@@ -23,27 +32,76 @@ describe('ScriptingEngine', () => {
       },
     ];
     const symbols: Symbol[] = [
-      { name: 'main', address: 0x1000, type: 'function', binding: 'global', size: 8 },
-      { name: 'helper', address: 0x1008, type: 'function', binding: 'local', size: 2 },
+      {
+        name: 'main',
+        address: 0x1000,
+        type: 'function',
+        binding: 'global',
+        size: 8,
+      },
+      {
+        name: 'helper',
+        address: 0x1008,
+        type: 'function',
+        binding: 'local',
+        size: 2,
+      },
     ];
     const instructions: Instruction[] = [
-      { address: 0x1000, bytes: new Uint8Array([0x55]), mnemonic: 'push', opStr: 'rbp', operands: [], size: 1 },
-      { address: 0x1001, bytes: new Uint8Array([0x48, 0x89, 0xe5]), mnemonic: 'mov', opStr: 'rbp, rsp', operands: [], size: 3 },
-      { address: 0x1004, bytes: new Uint8Array([0x48, 0x83, 0xec, 0x10]), mnemonic: 'sub', opStr: 'rsp, 0x10', operands: [], size: 4 },
-      { address: 0x1008, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: '', operands: [], size: 1 },
-      { address: 0x1009, bytes: new Uint8Array([0xc3]), mnemonic: 'ret', opStr: '', operands: [], size: 1 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x55]),
+        mnemonic: 'push',
+        opStr: 'rbp',
+        operands: [],
+        size: 1,
+      },
+      {
+        address: 0x1001,
+        bytes: new Uint8Array([0x48, 0x89, 0xe5]),
+        mnemonic: 'mov',
+        opStr: 'rbp, rsp',
+        operands: [],
+        size: 3,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0x48, 0x83, 0xec, 0x10]),
+        mnemonic: 'sub',
+        opStr: 'rsp, 0x10',
+        operands: [],
+        size: 4,
+      },
+      {
+        address: 0x1008,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'nop',
+        opStr: '',
+        operands: [],
+        size: 1,
+      },
+      {
+        address: 0x1009,
+        bytes: new Uint8Array([0xc3]),
+        mnemonic: 'ret',
+        opStr: '',
+        operands: [],
+        size: 1,
+      },
     ];
     const extractedStrings: ExtractedString[] = [
-      { offset: 0, virtualAddress: 0x1000, encoding: 'ascii', tags: [], value: 'hello' },
+      {
+        offset: 0,
+        virtualAddress: 0x1000,
+        encoding: 'ascii',
+        tags: [],
+        value: 'hello',
+      },
     ];
     const dependencies = {
       binaryName: 'test.bin',
-      imports: [
-        { library: 'libc.so', name: 'puts', address: 0x2000 },
-      ],
-      exports: [
-        { name: 'main', address: 0x1000 },
-      ],
+      imports: [{ library: 'libc.so', name: 'puts', address: 0x2000 }],
+      exports: [{ name: 'main', address: 0x1000 }],
       locals: [],
     };
 
@@ -230,13 +288,19 @@ describe('ScriptingConsole', () => {
 
   it('should show welcome message initially', () => {
     const outputArea = container.querySelector('.console-body')!;
-    expect(outputArea.textContent).toContain('Welcome to Universal Disassembler Scripting Console');
+    expect(outputArea.textContent).toContain(
+      'Welcome to Universal Disassembler Scripting Console'
+    );
   });
 
   it('should update context correctly', () => {
     consoleComponent.updateContext({ ...context, entryPoint: 0x3000 });
-    const inputField = container.querySelector('#console-input-field') as HTMLInputElement;
-    const runBtn = container.querySelector('#console-run-btn') as HTMLButtonElement;
+    const inputField = container.querySelector(
+      '#console-input-field'
+    ) as HTMLInputElement;
+    const runBtn = container.querySelector(
+      '#console-run-btn'
+    ) as HTMLButtonElement;
 
     inputField.value = 'hex(entryPoint)';
     runBtn.click();
@@ -246,9 +310,11 @@ describe('ScriptingConsole', () => {
   });
 
   it('should execute command when Enter is pressed', () => {
-    const inputField = container.querySelector('#console-input-field') as HTMLInputElement;
+    const inputField = container.querySelector(
+      '#console-input-field'
+    ) as HTMLInputElement;
     inputField.value = '5 + 5';
-    
+
     const event = new KeyboardEvent('keydown', { key: 'Enter' });
     inputField.dispatchEvent(event);
 
@@ -257,8 +323,12 @@ describe('ScriptingConsole', () => {
   });
 
   it('should display console logs and execution errors', () => {
-    const inputField = container.querySelector('#console-input-field') as HTMLInputElement;
-    const runBtn = container.querySelector('#console-run-btn') as HTMLButtonElement;
+    const inputField = container.querySelector(
+      '#console-input-field'
+    ) as HTMLInputElement;
+    const runBtn = container.querySelector(
+      '#console-run-btn'
+    ) as HTMLButtonElement;
 
     // Log message
     inputField.value = 'console.log("test-log")';
@@ -276,9 +346,15 @@ describe('ScriptingConsole', () => {
   });
 
   it('should clear logs and re-show welcome message when clear button is clicked', () => {
-    const inputField = container.querySelector('#console-input-field') as HTMLInputElement;
-    const runBtn = container.querySelector('#console-run-btn') as HTMLButtonElement;
-    const clearBtn = container.querySelector('#console-clear-btn') as HTMLButtonElement;
+    const inputField = container.querySelector(
+      '#console-input-field'
+    ) as HTMLInputElement;
+    const runBtn = container.querySelector(
+      '#console-run-btn'
+    ) as HTMLButtonElement;
+    const clearBtn = container.querySelector(
+      '#console-clear-btn'
+    ) as HTMLButtonElement;
 
     inputField.value = '1 + 1';
     runBtn.click();
@@ -290,12 +366,18 @@ describe('ScriptingConsole', () => {
 
     outputArea = container.querySelector('.console-body')!;
     expect(outputArea.textContent).not.toContain('2');
-    expect(outputArea.textContent).toContain('Welcome to Universal Disassembler Scripting Console');
+    expect(outputArea.textContent).toContain(
+      'Welcome to Universal Disassembler Scripting Console'
+    );
   });
 
   it('should navigate command history using ArrowUp and ArrowDown', () => {
-    const inputField = container.querySelector('#console-input-field') as HTMLInputElement;
-    const runBtn = container.querySelector('#console-run-btn') as HTMLButtonElement;
+    const inputField = container.querySelector(
+      '#console-input-field'
+    ) as HTMLInputElement;
+    const runBtn = container.querySelector(
+      '#console-run-btn'
+    ) as HTMLButtonElement;
 
     inputField.value = 'commandOne';
     runBtn.click();
@@ -312,16 +394,22 @@ describe('ScriptingConsole', () => {
     expect(inputField.value).toBe('commandOne');
 
     // ArrowDown -> commandTwo
-    inputField.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    inputField.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown' })
+    );
     expect(inputField.value).toBe('commandTwo');
 
     // ArrowDown -> empty
-    inputField.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    inputField.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown' })
+    );
     expect(inputField.value).toBe('');
   });
 
   it('should trigger help when clicking help guide button', () => {
-    const helpBtn = container.querySelector('#console-help-btn') as HTMLButtonElement;
+    const helpBtn = container.querySelector(
+      '#console-help-btn'
+    ) as HTMLButtonElement;
     helpBtn.click();
 
     const outputArea = container.querySelector('.console-body')!;

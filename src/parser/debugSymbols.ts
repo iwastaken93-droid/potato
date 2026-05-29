@@ -27,7 +27,10 @@ export interface ParseResult {
 // LEB128 Encoding Utilities (used in DWARF)
 // ============================================================================
 
-export function readULEB128(view: DataView, offset: number): { value: number; bytesRead: number } {
+export function readULEB128(
+  view: DataView,
+  offset: number
+): { value: number; bytesRead: number } {
   let value = 0;
   let shift = 0;
   let bytesRead = 0;
@@ -46,7 +49,10 @@ export function readULEB128(view: DataView, offset: number): { value: number; by
   return { value, bytesRead };
 }
 
-export function readSLEB128(view: DataView, offset: number): { value: number; bytesRead: number } {
+export function readSLEB128(
+  view: DataView,
+  offset: number
+): { value: number; bytesRead: number } {
   let value = 0;
   let shift = 0;
   let bytesRead = 0;
@@ -81,7 +87,7 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
   while (offset < view.byteLength) {
     const startOffset = offset;
     if (offset + 4 > view.byteLength) break;
-    
+
     let unitLength = view.getUint32(offset, true);
     offset += 4;
     let is64Bit = false;
@@ -173,7 +179,9 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
       modTime: number;
       length: number;
     }
-    const files: FileEntry[] = [{ name: '', dirIndex: 0, modTime: 0, length: 0 }]; // Index 0 is dummy/placeholder
+    const files: FileEntry[] = [
+      { name: '', dirIndex: 0, modTime: 0, length: 0 },
+    ]; // Index 0 is dummy/placeholder
     while (offset < headerEndOffset) {
       if (offset + 1 > view.byteLength) break;
       if (view.getUint8(offset) === 0) {
@@ -224,8 +232,13 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
 
     const appendRow = () => {
       const fileEntry = files[file];
-      const dirPath = fileEntry && fileEntry.dirIndex < directories.length ? directories[fileEntry.dirIndex] : '';
-      const filePath = dirPath ? `${dirPath}/${fileEntry?.name || 'unknown'}` : (fileEntry?.name || 'unknown');
+      const dirPath =
+        fileEntry && fileEntry.dirIndex < directories.length
+          ? directories[fileEntry.dirIndex]
+          : '';
+      const filePath = dirPath
+        ? `${dirPath}/${fileEntry?.name || 'unknown'}`
+        : fileEntry?.name || 'unknown';
       lines.push({
         address,
         file: filePath,
@@ -241,7 +254,8 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
       if (opcode >= opcodeBase) {
         // Special Opcode
         const adjustedOpcode = opcode - opcodeBase;
-        const addressAdvance = Math.floor(adjustedOpcode / lineRange) * minInstructionLength;
+        const addressAdvance =
+          Math.floor(adjustedOpcode / lineRange) * minInstructionLength;
         const lineAdvance = lineBase + (adjustedOpcode % lineRange);
 
         address += addressAdvance;
@@ -327,25 +341,29 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
             epilogueBegin = false;
             discriminator = 0;
             break;
-          case 2: { // DW_LNS_advance_pc
+          case 2: {
+            // DW_LNS_advance_pc
             const advPC = readULEB128(view, offset);
             offset += advPC.bytesRead;
             address += advPC.value * minInstructionLength;
             break;
           }
-          case 3: { // DW_LNS_advance_line
+          case 3: {
+            // DW_LNS_advance_line
             const advLine = readSLEB128(view, offset);
             offset += advLine.bytesRead;
             line += advLine.value;
             break;
           }
-          case 4: { // DW_LNS_set_file
+          case 4: {
+            // DW_LNS_set_file
             const setFile = readULEB128(view, offset);
             offset += setFile.bytesRead;
             file = setFile.value;
             break;
           }
-          case 5: { // DW_LNS_set_column
+          case 5: {
+            // DW_LNS_set_column
             const setCol = readULEB128(view, offset);
             offset += setCol.bytesRead;
             column = setCol.value;
@@ -358,9 +376,11 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
             basicBlock = true;
             break;
           case 8: // DW_LNS_const_add_pc
-            address += Math.floor((255 - opcodeBase) / lineRange) * minInstructionLength;
+            address +=
+              Math.floor((255 - opcodeBase) / lineRange) * minInstructionLength;
             break;
-          case 9: { // DW_LNS_fixed_advance_pc
+          case 9: {
+            // DW_LNS_fixed_advance_pc
             if (offset + 2 <= view.byteLength) {
               address += view.getUint16(offset, true);
               offset += 2;
@@ -373,7 +393,8 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
           case 11: // DW_LNS_set_epilogue_begin
             epilogueBegin = true;
             break;
-          case 12: { // DW_LNS_set_isa
+          case 12: {
+            // DW_LNS_set_isa
             const setIsa = readULEB128(view, offset);
             offset += setIsa.bytesRead;
             isa = setIsa.value;
@@ -396,7 +417,10 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
   return lines;
 }
 
-export function parseDwarfInfo(debugInfoBuffer: ArrayBuffer, debugStrBuffer?: ArrayBuffer): DebugSymbol[] {
+export function parseDwarfInfo(
+  debugInfoBuffer: ArrayBuffer,
+  debugStrBuffer?: ArrayBuffer
+): DebugSymbol[] {
   const view = new DataView(debugInfoBuffer);
   const strView = debugStrBuffer ? new DataView(debugStrBuffer) : null;
   const symbols: DebugSymbol[] = [];
@@ -470,14 +494,16 @@ export function parseDwarfInfo(debugInfoBuffer: ArrayBuffer, debugStrBuffer?: Ar
       if (offset < view.byteLength) {
         const form = view.getUint8(offset);
         offset++;
-        if (form === 1) { // inline string
+        if (form === 1) {
+          // inline string
           while (offset < view.byteLength) {
             const char = view.getUint8(offset);
             offset++;
             if (char === 0) break;
             name += String.fromCharCode(char);
           }
-        } else if (form === 2) { // strp (string pointer)
+        } else if (form === 2) {
+          // strp (string pointer)
           if (offset + 4 <= view.byteLength) {
             const strOffsetVal = view.getUint32(offset, true);
             offset += 4;
@@ -539,7 +565,7 @@ export interface PdbMsfHeader {
 export function parseMsfHeader(buffer: ArrayBuffer): PdbMsfHeader {
   const magic = 'Microsoft C/C++ MSF 7.00\r\n\x1a\x44\x53\x00\x00\x00';
   const bytes = new Uint8Array(buffer);
-  
+
   // Verify magic
   for (let i = 0; i < magic.length; i++) {
     if (bytes[i] !== magic.charCodeAt(i)) {
@@ -586,7 +612,10 @@ export function readMsfStream(
       throw new Error('MSF stream block read out of bounds');
     }
 
-    destBytes.set(srcBytes.subarray(blockStart, blockStart + sizeToCopy), destOffset);
+    destBytes.set(
+      srcBytes.subarray(blockStart, blockStart + sizeToCopy),
+      destOffset
+    );
     destOffset += sizeToCopy;
     bytesRemaining -= sizeToCopy;
   }
@@ -595,7 +624,10 @@ export function readMsfStream(
 }
 
 // Helper to parse simple custom PDB symbols format or stream contents
-export function parsePdbSymbols(dbiStreamBuffer: ArrayBuffer): { symbols: DebugSymbol[]; lines: LineInfo[] } {
+export function parsePdbSymbols(dbiStreamBuffer: ArrayBuffer): {
+  symbols: DebugSymbol[];
+  lines: LineInfo[];
+} {
   // Let's implement a clean parser for PDB symbol streams
   // In a real PDB, the DBI stream maps to modules, and each module has a stream.
   // Symbol records are in a separate stream (usually specified in DBI stream).
@@ -626,7 +658,7 @@ export function parsePdbSymbols(dbiStreamBuffer: ArrayBuffer): { symbols: DebugS
       const flags = view.getUint32(offset + 4, true);
       const addrOffset = view.getUint32(offset + 8, true);
       const segment = view.getUint16(offset + 12, true);
-      
+
       let nameOffset = offset + 14;
       if (type === 0x1110 || type === 0x110f) {
         nameOffset = offset + 16; // Skip symtype
@@ -648,12 +680,13 @@ export function parsePdbSymbols(dbiStreamBuffer: ArrayBuffer): { symbols: DebugS
           type: type === 0x110e ? 'public' : 'function',
         });
       }
-    } else if (type === 0x1015) { // S_DEFSYM_LINE custom mock for line info mapping in our tests
+    } else if (type === 0x1015) {
+      // S_DEFSYM_LINE custom mock for line info mapping in our tests
       // [len (2)] [type (2)] [addrOffset (4)] [segment (2)] [line (4)] [filename]
       const addrOffset = view.getUint32(offset + 4, true);
       const segment = view.getUint16(offset + 8, true);
       const line = view.getUint32(offset + 10, true);
-      
+
       let fileName = '';
       let i = offset + 14;
       while (i < nextOffset) {
@@ -700,7 +733,7 @@ export class DebugSymbolsParser {
       try {
         const msfHeader = parseMsfHeader(options.pdbFile);
         this.format = 'PDB';
-        
+
         // Mock directory reading: In MSF, we'd read the block map, and read the stream size & blocks.
         // For testing, let's treat the rest of the PDB file as containing Symbol records directly
         // if no elaborate MSF layout is built, or parse it properly.
@@ -756,7 +789,11 @@ export class DebugSymbolsParser {
         return sym.name;
       }
       // If address is within symbol range [addr, addr + size]
-      if (sym.size && address >= sym.address && address < sym.address + sym.size) {
+      if (
+        sym.size &&
+        address >= sym.address &&
+        address < sym.address + sym.size
+      ) {
         return sym.name;
       }
       // Fallback: closest starting address <= target address
@@ -772,7 +809,11 @@ export class DebugSymbolsParser {
   /**
    * Set symbol and line lists directly (useful for testing or manual loads)
    */
-  public loadRaw(format: 'DWARF' | 'PDB', symbols: DebugSymbol[], lines: LineInfo[]): void {
+  public loadRaw(
+    format: 'DWARF' | 'PDB',
+    symbols: DebugSymbol[],
+    lines: LineInfo[]
+  ): void {
     this.format = format;
     this.symbols = symbols;
     this.lines = lines;

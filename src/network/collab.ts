@@ -43,31 +43,43 @@ type HighlightCallback = (data: SyncHighlight) => void;
 type RenameCallback = (data: SyncRename) => void;
 
 // Simple diff utility to identify edits between two strings
-export function computeStringDiff(oldStr: string, newStr: string): Array<{ type: 'insert' | 'delete', index: number, text: string }> {
+export function computeStringDiff(
+  oldStr: string,
+  newStr: string
+): Array<{ type: 'insert' | 'delete'; index: number; text: string }> {
   let start = 0;
-  while (start < oldStr.length && start < newStr.length && oldStr[start] === newStr[start]) {
+  while (
+    start < oldStr.length &&
+    start < newStr.length &&
+    oldStr[start] === newStr[start]
+  ) {
     start++;
   }
   let oldEnd = oldStr.length;
   let newEnd = newStr.length;
-  while (oldEnd > start && newEnd > start && oldStr[oldEnd - 1] === newStr[newEnd - 1]) {
+  while (
+    oldEnd > start &&
+    newEnd > start &&
+    oldStr[oldEnd - 1] === newStr[newEnd - 1]
+  ) {
     oldEnd--;
     newEnd--;
   }
 
-  const ops: Array<{ type: 'insert' | 'delete', index: number, text: string }> = [];
+  const ops: Array<{ type: 'insert' | 'delete'; index: number; text: string }> =
+    [];
   if (oldEnd > start) {
     ops.push({
       type: 'delete',
       index: start,
-      text: oldStr.substring(start, oldEnd)
+      text: oldStr.substring(start, oldEnd),
     });
   }
   if (newEnd > start) {
     ops.push({
       type: 'insert',
       index: start,
-      text: newStr.substring(start, newEnd)
+      text: newStr.substring(start, newEnd),
     });
   }
   return ops;
@@ -75,11 +87,21 @@ export function computeStringDiff(oldStr: string, newStr: string): Array<{ type:
 
 // Yjs-like sequence CRDT for collaborative text editing
 export class MockYText {
-  private items: Array<{ id: string; char: string; origin: string | null; deleted: boolean }> = [];
+  private items: Array<{
+    id: string;
+    char: string;
+    origin: string | null;
+    deleted: boolean;
+  }> = [];
 
   constructor() {}
 
-  public insert(index: number, char: string, client: string, clock: number): { id: string; origin: string | null } {
+  public insert(
+    index: number,
+    char: string,
+    client: string,
+    clock: number
+  ): { id: string; origin: string | null } {
     let origin: string | null = null;
     let visibleCount = 0;
     let insertPos = 0;
@@ -118,11 +140,11 @@ export class MockYText {
   }
 
   public applyInsert(id: string, char: string, origin: string | null): boolean {
-    if (this.items.some(item => item.id === id)) return false;
+    if (this.items.some((item) => item.id === id)) return false;
 
     let insertPos = 0;
     if (origin !== null) {
-      const idx = this.items.findIndex(item => item.id === origin);
+      const idx = this.items.findIndex((item) => item.id === origin);
       if (idx !== -1) {
         insertPos = idx + 1;
       } else {
@@ -130,8 +152,11 @@ export class MockYText {
       }
     }
 
-    while (insertPos < this.items.length && this.items[insertPos].origin === origin) {
-      if (this.items[insertPos].id > id) {
+    while (
+      insertPos < this.items.length &&
+      this.items[insertPos].origin === origin
+    ) {
+      if (this.items[insertPos].id < id) {
         break;
       }
       insertPos++;
@@ -142,7 +167,7 @@ export class MockYText {
   }
 
   public applyDelete(id: string): boolean {
-    const item = this.items.find(item => item.id === id);
+    const item = this.items.find((item) => item.id === id);
     if (item && !item.deleted) {
       item.deleted = true;
       return true;
@@ -152,8 +177,8 @@ export class MockYText {
 
   public toString(): string {
     return this.items
-      .filter(item => !item.deleted)
-      .map(item => item.char)
+      .filter((item) => !item.deleted)
+      .map((item) => item.char)
       .join('');
   }
 
@@ -183,13 +208,18 @@ export class MockNetworkBroker {
     }
   }
 
-  public static broadcast(room: string, sender: CollabEngine, message: any, latencyMs: number = 0): void {
+  public static broadcast(
+    room: string,
+    sender: CollabEngine,
+    message: any,
+    latencyMs: number = 0
+  ): void {
     const peers = this.rooms.get(room);
     if (!peers) return;
 
     for (const peer of peers) {
       if (peer === sender) continue;
-      
+
       if (latencyMs > 0) {
         setTimeout(() => {
           if (peer.isConnected() && peer.getRoomName() === room) {
@@ -208,13 +238,20 @@ export class CollabEngine {
   private roomName: string = '';
   private username: string = '';
   private peers: Peer[] = [];
-  
+
   // CRDT states
   private commentTexts: Map<number, MockYText> = new Map();
-  private commentMetadata: Map<number, { peerName: string, timestamp: number }> = new Map();
-  
-  private highlights: Map<number, SyncHighlight & { clock: number; client: string }> = new Map();
-  private renames: Map<string, SyncRename & { clock: number; client: string }> = new Map();
+  private commentMetadata: Map<
+    number,
+    { peerName: string; timestamp: number }
+  > = new Map();
+
+  private highlights: Map<
+    number,
+    SyncHighlight & { clock: number; client: string }
+  > = new Map();
+  private renames: Map<string, SyncRename & { clock: number; client: string }> =
+    new Map();
 
   private lamportClock: number = 0;
   private latencyMs: number = 0;
@@ -257,7 +294,10 @@ export class CollabEngine {
   public getComments(): Map<number, SyncComment> {
     const result = new Map<number, SyncComment>();
     for (const [address, ytext] of this.commentTexts.entries()) {
-      const meta = this.commentMetadata.get(address) || { peerName: 'System', timestamp: Date.now() };
+      const meta = this.commentMetadata.get(address) || {
+        peerName: 'System',
+        timestamp: Date.now(),
+      };
       result.set(address, {
         address,
         comment: ytext.toString(),
@@ -275,7 +315,7 @@ export class CollabEngine {
         address: data.address,
         color: data.color,
         peerName: data.peerName,
-        timestamp: data.timestamp
+        timestamp: data.timestamp,
       });
     }
     return result;
@@ -289,7 +329,7 @@ export class CollabEngine {
         renamedName: data.renamedName,
         type: data.type,
         peerName: data.peerName,
-        timestamp: data.timestamp
+        timestamp: data.timestamp,
       });
     }
     return result;
@@ -344,15 +384,20 @@ export class CollabEngine {
     this.notifyPeers();
 
     // Broadcast join to other active clients
-    MockNetworkBroker.broadcast(this.roomName, this, {
-      type: 'peer_join',
-      peer: {
-        id: this.username,
-        name: this.username,
-        color: '#8B5CF6',
-        status: 'connected'
-      }
-    }, this.latencyMs);
+    MockNetworkBroker.broadcast(
+      this.roomName,
+      this,
+      {
+        type: 'peer_join',
+        peer: {
+          id: this.username,
+          name: this.username,
+          color: '#8B5CF6',
+          status: 'connected',
+        },
+      },
+      this.latencyMs
+    );
 
     this.startSimulation();
   }
@@ -364,12 +409,17 @@ export class CollabEngine {
     if (!this.connected) return;
 
     this.stopSimulation();
-    
+
     // Broadcast leave
-    MockNetworkBroker.broadcast(this.roomName, this, {
-      type: 'peer_leave',
-      peerId: this.username
-    }, this.latencyMs);
+    MockNetworkBroker.broadcast(
+      this.roomName,
+      this,
+      {
+        type: 'peer_leave',
+        peerId: this.username,
+      },
+      this.latencyMs
+    );
 
     MockNetworkBroker.leave(this.roomName, this);
 
@@ -402,7 +452,7 @@ export class CollabEngine {
 
     this.commentMetadata.set(address, {
       peerName: this.username,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     for (const diff of diffs) {
@@ -410,35 +460,50 @@ export class CollabEngine {
         for (let i = 0; i < diff.text.length; i++) {
           this.lamportClock++;
           const char = diff.text[i];
-          const { id, origin } = ytext.insert(diff.index + i, char, this.username, this.lamportClock);
-          
-          MockNetworkBroker.broadcast(this.roomName, this, {
-            type: 'comment_op',
-            address,
-            op: {
-              type: 'insert',
-              id,
-              char,
-              origin,
-              peerName: this.username,
-              timestamp: Date.now()
-            }
-          }, this.latencyMs);
+          const { id, origin } = ytext.insert(
+            diff.index + i,
+            char,
+            this.username,
+            this.lamportClock
+          );
+
+          MockNetworkBroker.broadcast(
+            this.roomName,
+            this,
+            {
+              type: 'comment_op',
+              address,
+              op: {
+                type: 'insert',
+                id,
+                char,
+                origin,
+                peerName: this.username,
+                timestamp: Date.now(),
+              },
+            },
+            this.latencyMs
+          );
         }
       } else if (diff.type === 'delete') {
         for (let i = 0; i < diff.text.length; i++) {
           const id = ytext.delete(diff.index);
           if (id) {
-            MockNetworkBroker.broadcast(this.roomName, this, {
-              type: 'comment_op',
-              address,
-              op: {
-                type: 'delete',
-                id,
-                peerName: this.username,
-                timestamp: Date.now()
-              }
-            }, this.latencyMs);
+            MockNetworkBroker.broadcast(
+              this.roomName,
+              this,
+              {
+                type: 'comment_op',
+                address,
+                op: {
+                  type: 'delete',
+                  id,
+                  peerName: this.username,
+                  timestamp: Date.now(),
+                },
+              },
+              this.latencyMs
+            );
           }
         }
       }
@@ -449,7 +514,7 @@ export class CollabEngine {
       address,
       comment: ytext.toString(),
       peerName: this.username,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -466,22 +531,31 @@ export class CollabEngine {
       peerName: this.username,
       timestamp: Date.now(),
       clock: this.lamportClock,
-      client: this.username
+      client: this.username,
     };
 
     this.highlights.set(address, state);
     this.notifyHighlight(state);
 
-    MockNetworkBroker.broadcast(this.roomName, this, {
-      type: 'highlight_op',
-      state
-    }, this.latencyMs);
+    MockNetworkBroker.broadcast(
+      this.roomName,
+      this,
+      {
+        type: 'highlight_op',
+        state,
+      },
+      this.latencyMs
+    );
   }
 
   /**
    * Broadcast a decompilation rename using LWW-Register strategy.
    */
-  public sendRename(originalName: string, renamedName: string, type: 'function' | 'variable'): void {
+  public sendRename(
+    originalName: string,
+    renamedName: string,
+    type: 'function' | 'variable'
+  ): void {
     if (!this.connected) return;
 
     this.lamportClock++;
@@ -492,16 +566,21 @@ export class CollabEngine {
       peerName: this.username,
       timestamp: Date.now(),
       clock: this.lamportClock,
-      client: this.username
+      client: this.username,
     };
 
     this.renames.set(originalName, state);
     this.notifyRename(state);
 
-    MockNetworkBroker.broadcast(this.roomName, this, {
-      type: 'rename_op',
-      state
-    }, this.latencyMs);
+    MockNetworkBroker.broadcast(
+      this.roomName,
+      this,
+      {
+        type: 'rename_op',
+        state,
+      },
+      this.latencyMs
+    );
   }
 
   /**
@@ -512,14 +591,14 @@ export class CollabEngine {
 
     switch (msg.type) {
       case 'peer_join': {
-        if (!this.peers.some(p => p.id === msg.peer.id)) {
+        if (!this.peers.some((p) => p.id === msg.peer.id)) {
           this.peers.push(msg.peer);
           this.notifyPeers();
         }
         break;
       }
       case 'peer_leave': {
-        this.peers = this.peers.filter(p => p.id !== msg.peerId);
+        this.peers = this.peers.filter((p) => p.id !== msg.peerId);
         this.notifyPeers();
         break;
       }
@@ -529,7 +608,7 @@ export class CollabEngine {
           this.commentTexts.set(address, new MockYText());
         }
         const ytext = this.commentTexts.get(address)!;
-        
+
         let changed = false;
         if (op.type === 'insert') {
           changed = ytext.applyInsert(op.id, op.char, op.origin);
@@ -540,13 +619,13 @@ export class CollabEngine {
         if (changed) {
           this.commentMetadata.set(address, {
             peerName: op.peerName,
-            timestamp: op.timestamp
+            timestamp: op.timestamp,
           });
           this.notifyComment({
             address,
             comment: ytext.toString(),
             peerName: op.peerName,
-            timestamp: op.timestamp
+            timestamp: op.timestamp,
           });
         }
         break;
@@ -554,10 +633,11 @@ export class CollabEngine {
       case 'highlight_op': {
         const { state } = msg;
         const current = this.highlights.get(state.address);
-        
+
         // LWW logic
-        const isNewer = !current || 
-          state.clock > current.clock || 
+        const isNewer =
+          !current ||
+          state.clock > current.clock ||
           (state.clock === current.clock && state.client > current.client);
 
         if (isNewer) {
@@ -571,8 +651,9 @@ export class CollabEngine {
         const current = this.renames.get(state.originalName);
 
         // LWW logic
-        const isNewer = !current || 
-          state.clock > current.clock || 
+        const isNewer =
+          !current ||
+          state.clock > current.clock ||
           (state.clock === current.clock && state.client > current.client);
 
         if (isNewer) {
@@ -590,9 +671,15 @@ export class CollabEngine {
   public simulateRemoteAction(): void {
     if (!this.connected) return;
 
-    const actions = ['comment', 'highlight', 'rename', 'peer_join', 'peer_leave'];
+    const actions = [
+      'comment',
+      'highlight',
+      'rename',
+      'peer_join',
+      'peer_leave',
+    ];
     const action = actions[Math.floor(Math.random() * actions.length)];
-    const mockPeers = this.peers.filter(p => p.status === 'connected');
+    const mockPeers = this.peers.filter((p) => p.status === 'connected');
     if (mockPeers.length === 0 && action !== 'peer_join') return;
 
     const randomPeer = mockPeers[Math.floor(Math.random() * mockPeers.length)];
@@ -602,11 +689,12 @@ export class CollabEngine {
         const addresses = [0x1000, 0x1020, 0x1044, 0x2010];
         const address = addresses[Math.floor(Math.random() * addresses.length)];
         const currentText = this.commentTexts.get(address)?.toString() || '';
-        
+
         // Append or insert characters simulating key presses
         const phrase = ' verified';
-        const targetComment = currentText.length > 20 ? 'Loop check' : currentText + phrase;
-        
+        const targetComment =
+          currentText.length > 20 ? 'Loop check' : currentText + phrase;
+
         this.lamportClock++;
         // Create comment update via operations
         if (!this.commentTexts.has(address)) {
@@ -620,8 +708,13 @@ export class CollabEngine {
             for (let i = 0; i < diff.text.length; i++) {
               this.lamportClock++;
               const char = diff.text[i];
-              const { id, origin } = ytext.insert(diff.index + i, char, randomPeer.name, this.lamportClock);
-              
+              const { id, origin } = ytext.insert(
+                diff.index + i,
+                char,
+                randomPeer.name,
+                this.lamportClock
+              );
+
               // Notify local engine of simulated action as if received from network
               this.receiveMessage({
                 type: 'comment_op',
@@ -632,8 +725,8 @@ export class CollabEngine {
                   char,
                   origin,
                   peerName: randomPeer.name,
-                  timestamp: Date.now()
-                }
+                  timestamp: Date.now(),
+                },
               });
             }
           }
@@ -645,7 +738,7 @@ export class CollabEngine {
         const colors = ['#EF4444', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6'];
         const address = addresses[Math.floor(Math.random() * addresses.length)];
         const color = colors[Math.floor(Math.random() * colors.length)];
-        
+
         this.lamportClock++;
         this.receiveMessage({
           type: 'highlight_op',
@@ -655,19 +748,23 @@ export class CollabEngine {
             peerName: randomPeer.name,
             timestamp: Date.now(),
             clock: this.lamportClock,
-            client: randomPeer.name
-          }
+            client: randomPeer.name,
+          },
         });
         break;
       }
       case 'rename': {
         const renames = [
           { oldName: 'sub_1000', newName: 'decrypt_payload', type: 'function' },
-          { oldName: 'sub_1040', newName: 'initialize_socket', type: 'function' },
+          {
+            oldName: 'sub_1040',
+            newName: 'initialize_socket',
+            type: 'function',
+          },
           { oldName: 'dword_4020', newName: 'g_is_debugged', type: 'variable' },
         ] as const;
         const rename = renames[Math.floor(Math.random() * renames.length)];
-        
+
         this.lamportClock++;
         this.receiveMessage({
           type: 'rename_op',
@@ -678,14 +775,16 @@ export class CollabEngine {
             peerName: randomPeer.name,
             timestamp: Date.now(),
             clock: this.lamportClock,
-            client: randomPeer.name
-          }
+            client: randomPeer.name,
+          },
         });
         break;
       }
       case 'peer_join': {
         const names = ['Dave_Crypt', 'Eve_Pwn', 'Mallory_Mitm'];
-        const unusedName = names.find(n => !this.peers.some(p => p.name === n));
+        const unusedName = names.find(
+          (n) => !this.peers.some((p) => p.name === n)
+        );
         if (unusedName) {
           const newPeer: Peer = {
             id: unusedName,
@@ -695,18 +794,21 @@ export class CollabEngine {
           };
           this.receiveMessage({
             type: 'peer_join',
-            peer: newPeer
+            peer: newPeer,
           });
         }
         break;
       }
       case 'peer_leave': {
-        const removable = this.peers.filter(p => p.id !== 'p1' && p.id !== 'p2' && p.id !== 'p3');
+        const removable = this.peers.filter(
+          (p) => p.id !== 'p1' && p.id !== 'p2' && p.id !== 'p3'
+        );
         if (removable.length > 0) {
-          const target = removable[Math.floor(Math.random() * removable.length)];
+          const target =
+            removable[Math.floor(Math.random() * removable.length)];
           this.receiveMessage({
             type: 'peer_leave',
-            peerId: target.id
+            peerId: target.id,
           });
         }
         break;
@@ -778,4 +880,3 @@ export class CollabEngine {
     }
   }
 }
-

@@ -101,7 +101,7 @@ export class SignatureScanner {
             if (matched) {
               const matchedBytes = buffer.subarray(i, i + parsed.length);
               const hexVal = Array.from(matchedBytes)
-                .map(b => b.toString(16).padStart(2, '0'))
+                .map((b) => b.toString(16).padStart(2, '0'))
                 .join(' ');
               matches.push({
                 patternType: 'hex',
@@ -116,14 +116,21 @@ export class SignatureScanner {
             continue;
           }
 
-          const searchStr = pattern.caseInsensitive ? latin1String.toLowerCase() : latin1String;
-          const findStr = pattern.caseInsensitive ? needle.toLowerCase() : needle;
+          const searchStr = pattern.caseInsensitive
+            ? latin1String.toLowerCase()
+            : latin1String;
+          const findStr = pattern.caseInsensitive
+            ? needle.toLowerCase()
+            : needle;
 
           let index = searchStr.indexOf(findStr);
           while (index !== -1) {
             matches.push({
               patternType: 'text',
-              matchedValue: latin1String.substring(index, index + needle.length),
+              matchedValue: latin1String.substring(
+                index,
+                index + needle.length
+              ),
               offset: index,
             });
             index = searchStr.indexOf(findStr, index + 1);
@@ -250,7 +257,10 @@ export class SignatureScanner {
       category: 'crypto',
       patterns: [
         // MD5 state initializers: 01 23 45 67 (LE)
-        { type: 'hex', value: '01 23 45 67 89 ab cd ef fe dc ba 98 76 54 32 10' },
+        {
+          type: 'hex',
+          value: '01 23 45 67 89 ab cd ef fe dc ba 98 76 54 32 10',
+        },
       ],
     });
 
@@ -260,8 +270,14 @@ export class SignatureScanner {
       patterns: [
         // SHA-256 H0-H3 first initial values in LE or BE
         // 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a
-        { type: 'hex', value: '67 e6 09 6a 85 ae 67 bb 72 f3 6e 3c 3a f5 4f a5' }, // LE
-        { type: 'hex', value: '6a 09 e6 67 bb 67 ae 85 3c 6e f3 72 a5 4f f5 3a' }, // BE
+        {
+          type: 'hex',
+          value: '67 e6 09 6a 85 ae 67 bb 72 f3 6e 3c 3a f5 4f a5',
+        }, // LE
+        {
+          type: 'hex',
+          value: '6a 09 e6 67 bb 67 ae 85 3c 6e f3 72 a5 4f f5 3a',
+        }, // BE
       ],
     });
 
@@ -270,7 +286,10 @@ export class SignatureScanner {
       category: 'crypto',
       patterns: [
         // S-box starting sequence: 63 7c 77 7b f2 6b 6f c5 30 01 67 2b fe d7 ab 76
-        { type: 'hex', value: '63 7c 77 7b f2 6b 6f c5 30 01 67 2b fe d7 ab 76' },
+        {
+          type: 'hex',
+          value: '63 7c 77 7b f2 6b 6f c5 30 01 67 2b fe d7 ab 76',
+        },
       ],
     });
   }

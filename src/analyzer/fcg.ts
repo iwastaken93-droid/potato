@@ -24,8 +24,11 @@ export interface FunctionCallGraph {
  * Builds a Function Call Graph (FCG) from symbols and instructions.
  * Matches call instructions to their target functions.
  */
-export function buildFCG(symbols: Symbol[], instructions: Instruction[]): FunctionCallGraph {
-  const functions = symbols.filter(s => s.type === 'function');
+export function buildFCG(
+  symbols: Symbol[],
+  instructions: Instruction[]
+): FunctionCallGraph {
+  const functions = symbols.filter((s) => s.type === 'function');
   if (functions.length === 0) {
     return { nodes: [], edges: [] };
   }
@@ -35,7 +38,7 @@ export function buildFCG(symbols: Symbol[], instructions: Instruction[]): Functi
 
   // Map starting address to function node
   const addrToNodeMap = new Map<number, FCGNode>();
-  const nodes: FCGNode[] = sortedFuncs.map(f => {
+  const nodes: FCGNode[] = sortedFuncs.map((f) => {
     const node: FCGNode = {
       id: `func_0x${f.address.toString(16)}`,
       name: f.name,
@@ -100,7 +103,7 @@ export function buildFCG(symbols: Symbol[], instructions: Instruction[]): Functi
   const edgesMap = new Map<string, FCGEdge>();
 
   for (const [callerId, insts] of funcInstructions.entries()) {
-    const callerNode = nodes.find(n => n.id === callerId);
+    const callerNode = nodes.find((n) => n.id === callerId);
     if (!callerNode) continue;
 
     for (const inst of insts) {
@@ -140,7 +143,8 @@ export function buildFCG(symbols: Symbol[], instructions: Instruction[]): Functi
         }
 
         if (targetAddr !== null) {
-          const calleeNode = addrToNodeMap.get(targetAddr) || findFunctionByAddress(targetAddr);
+          const calleeNode =
+            addrToNodeMap.get(targetAddr) || findFunctionByAddress(targetAddr);
           if (calleeNode && calleeNode.id !== callerNode.id) {
             if (!callerNode.callees.includes(calleeNode.id)) {
               callerNode.callees.push(calleeNode.id);

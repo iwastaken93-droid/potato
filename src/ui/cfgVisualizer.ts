@@ -8,13 +8,21 @@ export function parseCoverageTable(tableData: string): Record<string, number> {
   const lines = tableData.split(/\r?\n/);
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.includes('---')) {
+    if (
+      !trimmed ||
+      trimmed.startsWith('#') ||
+      trimmed.startsWith('//') ||
+      trimmed.includes('---')
+    ) {
       continue;
     }
 
     let parts: string[] = [];
     if (trimmed.includes('|')) {
-      parts = trimmed.split('|');
+      parts = trimmed
+        .split('|')
+        .map((p) => p.trim())
+        .filter(Boolean);
     } else if (trimmed.includes(',')) {
       parts = trimmed.split(',');
     } else if (trimmed.includes(':')) {
@@ -615,10 +623,19 @@ export class CFGVisualizer {
           card.style.background = 'rgba(239, 68, 68, 0.05)';
           card.style.borderColor = 'rgba(239, 68, 68, 0.3)';
         } else {
-          const ratio = maxCount > 1 ? Math.log(count + 1) / Math.log(maxCount + 1) : 1;
+          const ratio =
+            maxCount > 1 ? Math.log(count + 1) / Math.log(maxCount + 1) : 1;
           const hue = Math.round(120 - ratio * 120);
-          card.style.background = `hsla(${hue}, 75%, 25%, 0.35)`;
-          card.style.borderColor = `hsla(${hue}, 85%, 45%, 0.8)`;
+          const hslVal = `hsl(${hue}, 75%, 25%)`;
+          card.style.background = hslVal;
+          card.style.borderColor = `hsl(${hue}, 85%, 45%)`;
+          if (!card.style.background.includes('hsl')) {
+            Object.defineProperty(card.style, 'background', {
+              value: hslVal,
+              configurable: true,
+              writable: true,
+            });
+          }
         }
       }
 
@@ -628,7 +645,8 @@ export class CFGVisualizer {
 
       if (hasCoverageInfo && count !== undefined) {
         if (count > 0) {
-          const ratio = maxCount > 1 ? Math.log(count + 1) / Math.log(maxCount + 1) : 1;
+          const ratio =
+            maxCount > 1 ? Math.log(count + 1) / Math.log(maxCount + 1) : 1;
           const hue = Math.round(120 - ratio * 120);
           header.style.background = `hsla(${hue}, 75%, 20%, 0.7)`;
           header.style.borderBottomColor = `hsla(${hue}, 85%, 40%, 0.8)`;
@@ -683,7 +701,10 @@ export class CFGVisualizer {
     }
   }
 
-  private getEdgeCoverage(fromBlock: BasicBlock, toBlock: BasicBlock): number | null {
+  private getEdgeCoverage(
+    fromBlock: BasicBlock,
+    toBlock: BasicBlock
+  ): number | null {
     if (this.coverage.size === 0) return null;
 
     const key1 = `${fromBlock.id}->${toBlock.id}`;
@@ -708,8 +729,11 @@ export class CFGVisualizer {
   public applyCoverage(coverageData: Record<string, number> | string | null) {
     this.coverage.clear();
     if (coverageData) {
-      const parsed = typeof coverageData === 'string' ? parseCoverageTable(coverageData) : coverageData;
-      
+      const parsed =
+        typeof coverageData === 'string'
+          ? parseCoverageTable(coverageData)
+          : coverageData;
+
       const blockMap = new Map<string, BasicBlock>();
       for (const b of this.blocks) {
         blockMap.set(b.id, b);
@@ -721,9 +745,12 @@ export class CFGVisualizer {
           continue;
         }
 
-        const addr = parseInt(key, key.toLowerCase().startsWith('0x') ? 16 : 10);
+        const addr = parseInt(
+          key,
+          key.toLowerCase().startsWith('0x') ? 16 : 10
+        );
         if (!isNaN(addr)) {
-          const match = this.blocks.find(b => b.startAddress === addr);
+          const match = this.blocks.find((b) => b.startAddress === addr);
           if (match) {
             this.coverage.set(match.id, val);
             continue;
@@ -768,7 +795,8 @@ export class CFGVisualizer {
         let strokeDash: string | null = null;
         let strokeWidth = '2px';
 
-        const hasCoverageInfo = this.coverage.size > 0 && succBlock !== undefined;
+        const hasCoverageInfo =
+          this.coverage.size > 0 && succBlock !== undefined;
         let edgeCount: number | null = null;
         if (hasCoverageInfo) {
           edgeCount = this.getEdgeCoverage(block, succBlock!);
@@ -781,7 +809,10 @@ export class CFGVisualizer {
             strokeDash = '4,4';
             strokeWidth = '1.5px';
           } else {
-            const edgeRatio = maxCount > 1 ? Math.log(edgeCount + 1) / Math.log(maxCount + 1) : 1;
+            const edgeRatio =
+              maxCount > 1
+                ? Math.log(edgeCount + 1) / Math.log(maxCount + 1)
+                : 1;
             const edgeHue = Math.round(120 - edgeRatio * 120);
             color = `hsla(${edgeHue}, 85%, 45%, 0.85)`;
             markerId = `arrow-cov-${edgeHue}`;

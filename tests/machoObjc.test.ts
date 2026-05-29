@@ -22,7 +22,7 @@ describe('Mach-O Objective-C Metadata Parser Unit Tests', () => {
     const cmdOffset = 32;
     view.setUint32(cmdOffset, 0x19, true); // cmd: LC_SEGMENT_64
     view.setUint32(cmdOffset + 4, 232, true); // cmdsize: 232
-    
+
     // Segment name: "__DATA"
     const segName = '__DATA';
     for (let i = 0; i < segName.length; i++) {

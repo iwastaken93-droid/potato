@@ -41,13 +41,8 @@ describe('CapstoneWasmEngine Unit Tests', () => {
     // 0xc3 (ret)
     // 0xff (db 0xff)
     const data = new Uint8Array([
-      0x90,
-      0x55,
-      0x48, 0x89, 0xe5,
-      0x48, 0x83, 0xec, 0x10,
-      0xb8, 0xef, 0xbe, 0xad, 0xde,
-      0xc3,
-      0xff,
+      0x90, 0x55, 0x48, 0x89, 0xe5, 0x48, 0x83, 0xec, 0x10, 0xb8, 0xef, 0xbe,
+      0xad, 0xde, 0xc3, 0xff,
     ]);
 
     const insts = engine.disassemble(data, 0x1000);
@@ -95,13 +90,11 @@ describe('CapstoneWasmEngine Unit Tests', () => {
     // 0xd65f03c0 (ret)
     // 0xe1a00000 (mov x0, x1)
     const data = new Uint8Array([
-      0x1f, 0x20, 0x03, 0xd5,
-      0xc0, 0x03, 0x5f, 0xd6,
-      0x00, 0x00, 0xa0, 0xe1,
+      0x1f, 0x20, 0x03, 0xd5, 0xc0, 0x03, 0x5f, 0xd6, 0x00, 0x00, 0xa0, 0xe1,
     ]);
 
     const insts = engine.disassemble(data, 0x2000);
-    console.log("DEBUG arm instructions disassemble output:", insts);
+    console.log('DEBUG arm instructions disassemble output:', insts);
     expect(insts.length).toBe(3);
 
     expect(insts[0].address).toBe(0x2000);
@@ -137,7 +130,10 @@ describe('DisassemblerRouter Integration with CapstoneWasmEngine', () => {
     const data = new Uint8Array([0x90, 0x55]); // x86_64 bytes
 
     // Without Capstone
-    const normalInsts = router.disassemble(data, { arch: 'x86_64', baseAddress: 0x1000 });
+    const normalInsts = router.disassemble(data, {
+      arch: 'x86_64',
+      baseAddress: 0x1000,
+    });
     // With Capstone enabled via metadata
     const capstoneInsts = router.disassemble(data, {
       arch: 'x86_64',
@@ -155,7 +151,10 @@ describe('DisassemblerRouter Integration with CapstoneWasmEngine', () => {
     expect(router.isUsingCapstoneWasm()).toBe(true);
 
     const data = new Uint8Array([0x90, 0x55]);
-    const capstoneInsts = router.disassemble(data, { arch: 'x86_64', baseAddress: 0x1000 });
+    const capstoneInsts = router.disassemble(data, {
+      arch: 'x86_64',
+      baseAddress: 0x1000,
+    });
 
     expect(capstoneInsts.length).toBe(2);
     expect(capstoneInsts[0].mnemonic).toBe('nop');

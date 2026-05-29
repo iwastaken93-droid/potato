@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { diffBytes, diffInstructions, myersDiff } from '../src/analyzer/diff.js';
+import {
+  diffBytes,
+  diffInstructions,
+  myersDiff,
+} from '../src/analyzer/diff.js';
 import { Instruction } from '../src/disassembler/types.js';
 
 describe('Binary Diffing Engine Tests', () => {
@@ -24,13 +28,48 @@ describe('Binary Diffing Engine Tests', () => {
   // Test 2: Standard instruction diffs
   it('should compute instruction diffs correctly', () => {
     const instA: Instruction[] = [
-      { address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: '', size: 1, operands: [] },
-      { address: 0x1001, bytes: new Uint8Array([0x50]), mnemonic: 'push', opStr: 'rax', size: 1, operands: [] },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'nop',
+        opStr: '',
+        size: 1,
+        operands: [],
+      },
+      {
+        address: 0x1001,
+        bytes: new Uint8Array([0x50]),
+        mnemonic: 'push',
+        opStr: 'rax',
+        size: 1,
+        operands: [],
+      },
     ];
     const instB: Instruction[] = [
-      { address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: '', size: 1, operands: [] },
-      { address: 0x1001, bytes: new Uint8Array([0x51]), mnemonic: 'push', opStr: 'rcx', size: 1, operands: [] },
-      { address: 0x1002, bytes: new Uint8Array([0x58]), mnemonic: 'pop', opStr: 'rax', size: 1, operands: [] },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'nop',
+        opStr: '',
+        size: 1,
+        operands: [],
+      },
+      {
+        address: 0x1001,
+        bytes: new Uint8Array([0x51]),
+        mnemonic: 'push',
+        opStr: 'rcx',
+        size: 1,
+        operands: [],
+      },
+      {
+        address: 0x1002,
+        bytes: new Uint8Array([0x58]),
+        mnemonic: 'pop',
+        opStr: 'rax',
+        size: 1,
+        operands: [],
+      },
     ];
 
     const result = diffInstructions(instA, instB);
@@ -38,7 +77,7 @@ describe('Binary Diffing Engine Tests', () => {
 
     expect(result[0].type).toBe('equal');
     expect(result[1].type).toBe('replace'); // push rax replaced with push rcx
-    expect(result[2].type).toBe('insert');  // pop rax inserted
+    expect(result[2].type).toBe('insert'); // pop rax inserted
   });
 
   // Test 3: Empty inputs for byte diff
@@ -55,7 +94,7 @@ describe('Binary Diffing Engine Tests', () => {
     const b = new Uint8Array([]);
     const result = diffBytes(a, b);
     expect(result.length).toBe(3);
-    expect(result.every(r => r.type === 'delete')).toBe(true);
+    expect(result.every((r) => r.type === 'delete')).toBe(true);
   });
 
   // Test 5: One empty input for byte diff (only inserts)
@@ -64,7 +103,7 @@ describe('Binary Diffing Engine Tests', () => {
     const b = new Uint8Array([1, 2, 3]);
     const result = diffBytes(a, b);
     expect(result.length).toBe(3);
-    expect(result.every(r => r.type === 'insert')).toBe(true);
+    expect(result.every((r) => r.type === 'insert')).toBe(true);
   });
 
   // Test 6: Fully identical arrays
@@ -73,7 +112,7 @@ describe('Binary Diffing Engine Tests', () => {
     const b = new Uint8Array([1, 2, 3, 4]);
     const result = diffBytes(a, b);
     expect(result.length).toBe(4);
-    expect(result.every(r => r.type === 'equal')).toBe(true);
+    expect(result.every((r) => r.type === 'equal')).toBe(true);
   });
 
   it('should report replaces or deletes/inserts for fully different arrays', () => {
@@ -81,7 +120,12 @@ describe('Binary Diffing Engine Tests', () => {
     const b = new Uint8Array([4, 5, 6]);
     const result = diffBytes(a, b);
     expect(result.length).toBeGreaterThan(0);
-    expect(result.some(r => r.type === 'replace' || r.type === 'delete' || r.type === 'insert')).toBe(true);
+    expect(
+      result.some(
+        (r) =>
+          r.type === 'replace' || r.type === 'delete' || r.type === 'insert'
+      )
+    ).toBe(true);
   });
 
   // Test 8: Empty instruction diffs
@@ -93,10 +137,24 @@ describe('Binary Diffing Engine Tests', () => {
   // Test 9: Instruction stream with only replaces
   it('should handle replaced instruction sequences', () => {
     const a: Instruction[] = [
-      { address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: '', size: 1, operands: [] }
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'nop',
+        opStr: '',
+        size: 1,
+        operands: [],
+      },
     ];
     const b: Instruction[] = [
-      { address: 0x1000, bytes: new Uint8Array([0xc3]), mnemonic: 'ret', opStr: '', size: 1, operands: [] }
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0xc3]),
+        mnemonic: 'ret',
+        opStr: '',
+        size: 1,
+        operands: [],
+      },
     ];
     const result = diffInstructions(a, b);
     expect(result.length).toBe(1);
@@ -106,11 +164,11 @@ describe('Binary Diffing Engine Tests', () => {
   // Test 10: Myers Diff fallback to fastGreedyDiff
   it('should fallback to fastGreedyDiff for large arrays', () => {
     const a = Array.from({ length: 50 }, (_, i) => i);
-    const b = Array.from({ length: 50 }, (_, i) => i === 25 ? 999 : i);
+    const b = Array.from({ length: 50 }, (_, i) => (i === 25 ? 999 : i));
     // Force low limit to trigger fallback
     const result = myersDiff(a, b, (x, y) => x === y, 20);
     expect(result.length).toBeGreaterThan(0);
-    const replaceOrDiff = result.filter(r => r.type !== 'equal');
+    const replaceOrDiff = result.filter((r) => r.type !== 'equal');
     expect(replaceOrDiff.length).toBeGreaterThan(0);
   });
 
@@ -151,15 +209,51 @@ describe('Binary Diffing Engine Tests', () => {
     const b = new Uint8Array([0xaa, 0xcc, 0xdd]);
     const result = diffBytes(a, b);
     expect(result.length).toBe(3);
-    expect(result[0]).toEqual({ type: 'equal', offset1: 0, offset2: 0, byte1: 0xaa, byte2: 0xaa });
-    expect(result[1]).toEqual({ type: 'replace', offset1: 1, offset2: 1, byte1: 0xbb, byte2: 0xcc });
-    expect(result[2]).toEqual({ type: 'insert', offset1: null, offset2: 2, byte1: null, byte2: 0xdd });
+    expect(result[0]).toEqual({
+      type: 'equal',
+      offset1: 0,
+      offset2: 0,
+      byte1: 0xaa,
+      byte2: 0xaa,
+    });
+    expect(result[1]).toEqual({
+      type: 'replace',
+      offset1: 1,
+      offset2: 1,
+      byte1: 0xbb,
+      byte2: 0xcc,
+    });
+    expect(result[2]).toEqual({
+      type: 'insert',
+      offset1: null,
+      offset2: 2,
+      byte1: null,
+      byte2: 0xdd,
+    });
   });
 
   // Test 15: diffInstructions with different opStr but same mnemonic
   it('should treat instructions with different opStr as different', () => {
-    const a: Instruction[] = [{ address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: 'rax', size: 1, operands: [] }];
-    const b: Instruction[] = [{ address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: 'rbx', size: 1, operands: [] }];
+    const a: Instruction[] = [
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'nop',
+        opStr: 'rax',
+        size: 1,
+        operands: [],
+      },
+    ];
+    const b: Instruction[] = [
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'nop',
+        opStr: 'rbx',
+        size: 1,
+        operands: [],
+      },
+    ];
     const result = diffInstructions(a, b);
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('replace');
@@ -167,8 +261,26 @@ describe('Binary Diffing Engine Tests', () => {
 
   // Test 16: diffInstructions with different bytes but same mnemonic and opStr
   it('should treat instructions with different bytes as different', () => {
-    const a: Instruction[] = [{ address: 0x1000, bytes: new Uint8Array([0x01]), mnemonic: 'nop', opStr: 'rax', size: 1, operands: [] }];
-    const b: Instruction[] = [{ address: 0x1000, bytes: new Uint8Array([0x02]), mnemonic: 'nop', opStr: 'rax', size: 1, operands: [] }];
+    const a: Instruction[] = [
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x01]),
+        mnemonic: 'nop',
+        opStr: 'rax',
+        size: 1,
+        operands: [],
+      },
+    ];
+    const b: Instruction[] = [
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x02]),
+        mnemonic: 'nop',
+        opStr: 'rax',
+        size: 1,
+        operands: [],
+      },
+    ];
     const result = diffInstructions(a, b);
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('replace');
@@ -176,8 +288,26 @@ describe('Binary Diffing Engine Tests', () => {
 
   // Test 17: diffInstructions with different mnemonic but same bytes and opStr
   it('should treat instructions with different mnemonics as different', () => {
-    const a: Instruction[] = [{ address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'nop', opStr: 'rax', size: 1, operands: [] }];
-    const b: Instruction[] = [{ address: 0x1000, bytes: new Uint8Array([0x90]), mnemonic: 'jmp', opStr: 'rax', size: 1, operands: [] }];
+    const a: Instruction[] = [
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'nop',
+        opStr: 'rax',
+        size: 1,
+        operands: [],
+      },
+    ];
+    const b: Instruction[] = [
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0x90]),
+        mnemonic: 'jmp',
+        opStr: 'rax',
+        size: 1,
+        operands: [],
+      },
+    ];
     const result = diffInstructions(a, b);
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('replace');
@@ -212,7 +342,9 @@ describe('Binary Diffing Engine Tests', () => {
     const result = myersDiff(a, b, (x, y) => x === y, 2);
     expect(result.length).toBeGreaterThan(0);
     // Should find the match at 2, 3, 4, 5
-    expect(result.some(r => r.type === 'equal' && r.original === 2)).toBe(true);
+    expect(result.some((r) => r.type === 'equal' && r.original === 2)).toBe(
+      true
+    );
   });
 
   // Test 21: fastGreedyDiff matching delete lookahead
@@ -221,7 +353,9 @@ describe('Binary Diffing Engine Tests', () => {
     const b = [1, 2, 3];
     const result = myersDiff(a, b, (x, y) => x === y, 2);
     expect(result.length).toBeGreaterThan(0);
-    expect(result.some(r => r.type === 'equal' && r.original === 2)).toBe(true);
+    expect(result.some((r) => r.type === 'equal' && r.original === 2)).toBe(
+      true
+    );
   });
 
   // Test 22: Myers Diff backtracking with no matches
@@ -252,8 +386,24 @@ describe('Binary Diffing Engine Tests', () => {
 
   // Extra Test 25: diffInstructions differing only by operands
   it('should identify replace when operands differ in diffInstructions', () => {
-    const a: Instruction[] = [{ address: 0x1000, mnemonic: 'mov', opStr: 'rax, rbx', size: 3, operands: [{ type: 'reg', reg: 'rax' }] }];
-    const b: Instruction[] = [{ address: 0x1000, mnemonic: 'mov', opStr: 'rax, rbx', size: 3, operands: [{ type: 'reg', reg: 'rcx' }] }];
+    const a: Instruction[] = [
+      {
+        address: 0x1000,
+        mnemonic: 'mov',
+        opStr: 'rax, rbx',
+        size: 3,
+        operands: [{ type: 'reg', reg: 'rax' }],
+      },
+    ];
+    const b: Instruction[] = [
+      {
+        address: 0x1000,
+        mnemonic: 'mov',
+        opStr: 'rax, rbx',
+        size: 3,
+        operands: [{ type: 'reg', reg: 'rcx' }],
+      },
+    ];
     const result = diffInstructions(a, b);
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('replace');
@@ -264,7 +414,7 @@ describe('Binary Diffing Engine Tests', () => {
     const a = [1, 2, 3];
     const b = [4, 5, 6];
     const result = myersDiff(a, b, () => true);
-    expect(result.every(r => r.type === 'equal')).toBe(true);
+    expect(result.every((r) => r.type === 'equal')).toBe(true);
   });
 
   // Extra Test 27: myersDiff with custom equality function always false
@@ -272,7 +422,7 @@ describe('Binary Diffing Engine Tests', () => {
     const a = [1, 2];
     const b = [3, 4];
     const result = myersDiff(a, b, () => false);
-    expect(result.some(r => r.type === 'equal')).toBe(false);
+    expect(result.some((r) => r.type === 'equal')).toBe(false);
   });
 
   // Extra Test 28: Myers diff trace limit exceeded parameter low
@@ -297,7 +447,7 @@ describe('Binary Diffing Engine Tests', () => {
     const a = [1, 2];
     const b = [3, 4];
     const result = myersDiff(a, b, (x, y) => x === y);
-    expect(result.some(r => r.type === 'replace')).toBe(true);
+    expect(result.some((r) => r.type === 'replace')).toBe(true);
   });
 
   // Extra Test 31: diffInstructions with empty input arrays
@@ -329,7 +479,7 @@ describe('Binary Diffing Engine Tests', () => {
     const a = new Uint8Array([0x90, 0x90, 0x90]);
     const b = new Uint8Array([0x90, 0x90, 0x90, 0x90]);
     const result = diffBytes(a, b);
-    expect(result.filter(r => r.type === 'insert').length).toBe(1);
+    expect(result.filter((r) => r.type === 'insert').length).toBe(1);
   });
 
   // Extra Test 35: diffBytes with alternate insertions and deletions
@@ -342,8 +492,12 @@ describe('Binary Diffing Engine Tests', () => {
 
   // Extra Test 36: diffInstructions with differing sizes but same mnemonics
   it('should handle same mnemonic but different instruction size', () => {
-    const a: Instruction[] = [{ address: 0x1000, mnemonic: 'nop', opStr: '', size: 1 }];
-    const b: Instruction[] = [{ address: 0x1000, mnemonic: 'nop', opStr: '', size: 2 }];
+    const a: Instruction[] = [
+      { address: 0x1000, mnemonic: 'nop', opStr: '', size: 1 },
+    ];
+    const b: Instruction[] = [
+      { address: 0x1000, mnemonic: 'nop', opStr: '', size: 2 },
+    ];
     const result = diffInstructions(a, b);
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('replace');
@@ -372,7 +526,7 @@ describe('Binary Diffing Engine Tests', () => {
     const b = [1, 2];
     const result = myersDiff(a, b, (x, y) => x === y, 0);
     expect(result.length).toBe(2);
-    expect(result.every(r => r.type === 'equal')).toBe(true);
+    expect(result.every((r) => r.type === 'equal')).toBe(true);
   });
 
   // Extra Test 40: diffInstructions with completely disjoint addresses
@@ -386,8 +540,24 @@ describe('Binary Diffing Engine Tests', () => {
 
   // Extra Test 41: diffInstructions where inst1 has null operands
   it('should handle null operands array in diffInstructions comparison', () => {
-    const a: Instruction[] = [{ address: 0x1000, mnemonic: 'mov', opStr: 'rax, rbx', size: 3, operands: undefined }];
-    const b: Instruction[] = [{ address: 0x1000, mnemonic: 'mov', opStr: 'rax, rbx', size: 3, operands: [] }];
+    const a: Instruction[] = [
+      {
+        address: 0x1000,
+        mnemonic: 'mov',
+        opStr: 'rax, rbx',
+        size: 3,
+        operands: undefined,
+      },
+    ];
+    const b: Instruction[] = [
+      {
+        address: 0x1000,
+        mnemonic: 'mov',
+        opStr: 'rax, rbx',
+        size: 3,
+        operands: [],
+      },
+    ];
     const result = diffInstructions(a, b);
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('equal');

@@ -37,7 +37,11 @@ export class SearchView {
     this.setupEvents();
   }
 
-  public updateData(instructions: Instruction[], strings: ExtractedString[], comments: Map<number, string>) {
+  public updateData(
+    instructions: Instruction[],
+    strings: ExtractedString[],
+    comments: Map<number, string>
+  ) {
     this.instructions = instructions;
     this.strings = strings;
     this.comments = comments;
@@ -46,7 +50,7 @@ export class SearchView {
 
   private initLayout() {
     this.container.innerHTML = '';
-    
+
     this.rootEl = document.createElement('div');
     this.rootEl.className = 'glass-panel search-panel';
     this.rootEl.style.height = '100%';
@@ -160,7 +164,8 @@ export class SearchView {
     this.inputEl = document.createElement('input');
     this.inputEl.type = 'text';
     this.inputEl.className = 'search-bar-input';
-    this.inputEl.placeholder = 'Search opcode, hex string, comments, strings...';
+    this.inputEl.placeholder =
+      'Search opcode, hex string, comments, strings...';
 
     this.typeSelectEl = document.createElement('select');
     this.typeSelectEl.className = 'search-select';
@@ -195,7 +200,9 @@ export class SearchView {
     this.typeSelectEl.addEventListener('change', handleInput);
 
     this.resultsEl.addEventListener('click', (e) => {
-      const item = (e.target as HTMLElement).closest('.search-result-item') as HTMLElement;
+      const item = (e.target as HTMLElement).closest(
+        '.search-result-item'
+      ) as HTMLElement;
       if (item && item.dataset.address) {
         const addr = parseInt(item.dataset.address, 10);
         this.onAddressSelect(addr);
@@ -291,7 +298,7 @@ export class SearchView {
       // Safe HTML highlight
       const contextSpan = document.createElement('span');
       contextSpan.className = 'result-context';
-      
+
       const safeContext = this.escapeHtml(res.context);
       const highlighted = safeContext.replace(
         new RegExp(this.escapeRegExp(res.matchedText), 'gi'),

@@ -8,7 +8,10 @@ import { Emulator } from '../emulator/emulator.js';
 import { Instruction, Section } from '../disassembler/types.js';
 
 export interface EmulatorPanelOptions {
-  onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
   onStep?: (rip: number) => void;
 }
 
@@ -333,14 +336,30 @@ export class EmulatorPanel {
     this.container.appendChild(this.rootEl);
 
     // Cache elements
-    this.regListEl = this.rootEl.querySelector('#emu-reg-grid') as HTMLDivElement;
-    this.stackListEl = this.rootEl.querySelector('#emu-stack-list') as HTMLDivElement;
-    this.memInspectInput = this.rootEl.querySelector('#emu-mem-input') as HTMLInputElement;
-    this.memContentEl = this.rootEl.querySelector('#emu-mem-content') as HTMLDivElement;
-    this.stepBtn = this.rootEl.querySelector('#emu-step-btn') as HTMLButtonElement;
-    this.runBtn = this.rootEl.querySelector('#emu-run-btn') as HTMLButtonElement;
-    this.resetBtn = this.rootEl.querySelector('#emu-reset-btn') as HTMLButtonElement;
-    this.statusTextEl = this.rootEl.querySelector('#emu-status-text') as HTMLDivElement;
+    this.regListEl = this.rootEl.querySelector(
+      '#emu-reg-grid'
+    ) as HTMLDivElement;
+    this.stackListEl = this.rootEl.querySelector(
+      '#emu-stack-list'
+    ) as HTMLDivElement;
+    this.memInspectInput = this.rootEl.querySelector(
+      '#emu-mem-input'
+    ) as HTMLInputElement;
+    this.memContentEl = this.rootEl.querySelector(
+      '#emu-mem-content'
+    ) as HTMLDivElement;
+    this.stepBtn = this.rootEl.querySelector(
+      '#emu-step-btn'
+    ) as HTMLButtonElement;
+    this.runBtn = this.rootEl.querySelector(
+      '#emu-run-btn'
+    ) as HTMLButtonElement;
+    this.resetBtn = this.rootEl.querySelector(
+      '#emu-reset-btn'
+    ) as HTMLButtonElement;
+    this.statusTextEl = this.rootEl.querySelector(
+      '#emu-status-text'
+    ) as HTMLDivElement;
   }
 
   private setupEvents() {
@@ -355,11 +374,15 @@ export class EmulatorPanel {
       this.updateUI();
     });
 
-    const inspectBtn = this.rootEl.querySelector('#emu-mem-inspect-btn') as HTMLButtonElement;
+    const inspectBtn = this.rootEl.querySelector(
+      '#emu-mem-inspect-btn'
+    ) as HTMLButtonElement;
     inspectBtn.addEventListener('click', () => {
       try {
         const val = this.memInspectInput.value.trim();
-        this.lastInspectedMemoryAddr = BigInt(val.startsWith('0x') ? val : '0x' + val);
+        this.lastInspectedMemoryAddr = BigInt(
+          val.startsWith('0x') ? val : '0x' + val
+        );
         this.updateMemoryView();
       } catch (err) {
         alert('Invalid memory address format');
@@ -374,10 +397,17 @@ export class EmulatorPanel {
       if (!reg) return;
 
       const currentVal = this.emulator.cpu.read(reg);
-      const newValStr = prompt(`Enter new value for ${reg.toUpperCase()} (hex or decimal):`, '0x' + currentVal.toString(16));
+      const newValStr = prompt(
+        `Enter new value for ${reg.toUpperCase()} (hex or decimal):`,
+        '0x' + currentVal.toString(16)
+      );
       if (newValStr !== null) {
         try {
-          const val = BigInt(newValStr.trim().startsWith('0x') ? newValStr.trim() : '0x' + newValStr.trim());
+          const val = BigInt(
+            newValStr.trim().startsWith('0x')
+              ? newValStr.trim()
+              : '0x' + newValStr.trim()
+          );
           this.emulator.cpu.write(reg, val);
           this.updateUI();
         } catch (err) {
@@ -477,13 +507,13 @@ export class EmulatorPanel {
     for (let i = -2; i < 10; i++) {
       const addr = rsp + BigInt(i * 8);
       const val = this.emulator.memory.read64(addr);
-      
+
       const item = document.createElement('div');
       item.className = 'stack-item';
       if (addr === rsp) {
         item.className += ' rsp-pointed';
       }
-      
+
       let desc = '';
       if (addr === rsp) desc = 'RSP';
       else if (addr === rsp + 8n) desc = 'RSP+8';
@@ -501,7 +531,7 @@ export class EmulatorPanel {
   private updateMemoryView() {
     this.memContentEl.innerHTML = '';
     const baseAddr = this.lastInspectedMemoryAddr;
-    
+
     // Renders 8 lines of hex view
     for (let line = 0; line < 8; line++) {
       const addr = baseAddr + BigInt(line * 16);
@@ -513,7 +543,7 @@ export class EmulatorPanel {
       for (let i = 0; i < 16; i++) {
         const b = lineBytes[i];
         hexStr += b.toString(16).padStart(2, '0') + ' ';
-        asciiStr += (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.';
+        asciiStr += b >= 32 && b <= 126 ? String.fromCharCode(b) : '.';
       }
 
       const lineEl = document.createElement('div');

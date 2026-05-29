@@ -8,7 +8,10 @@ import { Instruction, Section, Symbol } from '../disassembler/types.js';
 import { ExtractedString } from '../analyzer/strings.js';
 
 export interface SearchPanelOptions {
-  onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export interface SearchResult {
@@ -36,7 +39,7 @@ export class SearchPanel {
   private modeButtons: Map<string, HTMLButtonElement> = new Map();
   private activeMode: 'text' | 'hex' | 'instruction' = 'text';
   private resultsListEl!: HTMLDivElement;
-  
+
   // Filters
   private caseSensitiveCheckbox!: HTMLInputElement;
   private sectionSelect!: HTMLSelectElement;
@@ -44,10 +47,7 @@ export class SearchPanel {
   private maxAddrInput!: HTMLInputElement;
   private statusTextEl!: HTMLDivElement;
 
-  constructor(
-    container: HTMLElement,
-    options: SearchPanelOptions
-  ) {
+  constructor(container: HTMLElement, options: SearchPanelOptions) {
     this.container = container;
     this.options = options;
 
@@ -416,18 +416,32 @@ export class SearchPanel {
     // Mode Selector Row
     const modeSelector = document.createElement('div');
     modeSelector.className = 'search-mode-selector';
-    
+
     const modes = [
-      { id: 'text', label: '🔍 Text', placeholder: 'Search strings, symbols, or comments...' },
-      { id: 'hex', label: '🔢 Hex / Wildcard', placeholder: 'e.g. 55 ?? 48 8d or 89 05 ?? ?? ?? 00' },
-      { id: 'instruction', label: '⚙️ Instruction', placeholder: 'e.g. mov rax or jmp or add' }
+      {
+        id: 'text',
+        label: '🔍 Text',
+        placeholder: 'Search strings, symbols, or comments...',
+      },
+      {
+        id: 'hex',
+        label: '🔢 Hex / Wildcard',
+        placeholder: 'e.g. 55 ?? 48 8d or 89 05 ?? ?? ?? 00',
+      },
+      {
+        id: 'instruction',
+        label: '⚙️ Instruction',
+        placeholder: 'e.g. mov rax or jmp or add',
+      },
     ];
 
-    modes.forEach(mode => {
+    modes.forEach((mode) => {
       const btn = document.createElement('button');
       btn.className = `search-mode-btn ${this.activeMode === mode.id ? 'active' : ''}`;
       btn.innerHTML = mode.label;
-      btn.addEventListener('click', () => this.switchMode(mode.id as any, mode.placeholder));
+      btn.addEventListener('click', () =>
+        this.switchMode(mode.id as any, mode.placeholder)
+      );
       this.modeButtons.set(mode.id, btn);
       modeSelector.appendChild(btn);
     });
@@ -489,7 +503,7 @@ export class SearchPanel {
     const rangeLabel = document.createElement('span');
     rangeLabel.className = 'filter-label';
     rangeLabel.textContent = 'Addr Range:';
-    
+
     this.minAddrInput = document.createElement('input');
     this.minAddrInput.type = 'text';
     this.minAddrInput.className = 'search-numeric-input';
@@ -541,7 +555,10 @@ export class SearchPanel {
     `;
   }
 
-  private switchMode(mode: 'text' | 'hex' | 'instruction', placeholder: string) {
+  private switchMode(
+    mode: 'text' | 'hex' | 'instruction',
+    placeholder: string
+  ) {
     this.activeMode = mode;
     this.modeButtons.forEach((btn, id) => {
       if (id === mode) {
@@ -551,7 +568,7 @@ export class SearchPanel {
       }
     });
     this.queryInput.placeholder = placeholder;
-    
+
     // Toggle case sensitive checkbox relevance
     if (mode === 'hex') {
       this.caseSensitiveCheckbox.disabled = true;
@@ -566,7 +583,7 @@ export class SearchPanel {
 
   private setupEvents() {
     const triggerSearch = () => this.performSearch();
-    
+
     this.queryInput.addEventListener('input', triggerSearch);
     this.caseSensitiveCheckbox.addEventListener('change', triggerSearch);
     this.sectionSelect.addEventListener('change', triggerSearch);
@@ -577,7 +594,7 @@ export class SearchPanel {
   private populateSectionsFilter() {
     // Keep first option
     this.sectionSelect.innerHTML = '<option value="all">All Sections</option>';
-    this.sections.forEach(sec => {
+    this.sections.forEach((sec) => {
       const opt = document.createElement('option');
       opt.value = sec.name;
       opt.textContent = `${sec.name} (0x${sec.virtualAddress.toString(16)})`;
@@ -612,41 +629,57 @@ export class SearchPanel {
     let results: SearchResult[] = [];
 
     // Retrieve active executable section base for offset mapping
-    const executeSection = this.sections.find(s => s.flags.execute);
-    const textBaseAddress = executeSection ? executeSection.virtualAddress : 0x1000;
+    const executeSection = this.sections.find((s) => s.flags.execute);
+    const textBaseAddress = executeSection
+      ? executeSection.virtualAddress
+      : 0x1000;
 
     if (this.activeMode === 'text') {
       const lQuery = caseSensitive ? query : query.toLowerCase();
 
       // 1. Search symbols
-      this.symbols.forEach(sym => {
+      this.symbols.forEach((sym) => {
         const name = caseSensitive ? sym.name : sym.name.toLowerCase();
-        if (name.includes(lQuery) && sym.address >= minAddr && sym.address <= maxAddr) {
-          if (sectionName === 'all' || this.isAddressInSection(sym.address, sectionName)) {
+        if (
+          name.includes(lQuery) &&
+          sym.address >= minAddr &&
+          sym.address <= maxAddr
+        ) {
+          if (
+            sectionName === 'all' ||
+            this.isAddressInSection(sym.address, sectionName)
+          ) {
             results.push({
               address: sym.address,
               offset: sym.address - textBaseAddress,
               section: this.getSectionNameForAddress(sym.address),
               type: 'Symbol',
               preview: `Symbol: ${sym.name} [Type: ${sym.type}, Binding: ${sym.binding}]`,
-              matchedText: query
+              matchedText: query,
             });
           }
         }
       });
 
       // 2. Search extracted strings
-      this.strings.forEach(str => {
+      this.strings.forEach((str) => {
         const val = caseSensitive ? str.value : str.value.toLowerCase();
-        if (val.includes(lQuery) && str.virtualAddress >= minAddr && str.virtualAddress <= maxAddr) {
-          if (sectionName === 'all' || this.isAddressInSection(str.virtualAddress, sectionName)) {
+        if (
+          val.includes(lQuery) &&
+          str.virtualAddress >= minAddr &&
+          str.virtualAddress <= maxAddr
+        ) {
+          if (
+            sectionName === 'all' ||
+            this.isAddressInSection(str.virtualAddress, sectionName)
+          ) {
             results.push({
               address: str.virtualAddress,
               offset: str.offset,
               section: this.getSectionNameForAddress(str.virtualAddress),
               type: 'Text',
               preview: `"${str.value}" (${str.encoding})`,
-              matchedText: query
+              matchedText: query,
             });
           }
         }
@@ -656,20 +689,22 @@ export class SearchPanel {
       this.comments.forEach((comment, addr) => {
         const text = caseSensitive ? comment : comment.toLowerCase();
         if (text.includes(lQuery) && addr >= minAddr && addr <= maxAddr) {
-          if (sectionName === 'all' || this.isAddressInSection(addr, sectionName)) {
+          if (
+            sectionName === 'all' ||
+            this.isAddressInSection(addr, sectionName)
+          ) {
             results.push({
               address: addr,
               offset: addr - textBaseAddress,
               section: this.getSectionNameForAddress(addr),
               type: 'Text',
               preview: `// ${comment}`,
-              matchedText: query
+              matchedText: query,
             });
           }
         }
       });
-    } 
-    else if (this.activeMode === 'hex') {
+    } else if (this.activeMode === 'hex') {
       // Hex wildcard search on binaryData
       // Parse query tokens: e.g. "55 ?? 48 8d"
       const tokens = query.split(/\s+/);
@@ -708,15 +743,19 @@ export class SearchPanel {
               const secName = this.getSectionNameForAddress(addr);
               if (sectionName === 'all' || secName === sectionName) {
                 // Build a nice hex preview snippet
-                const matchBytes = Array.from(this.binaryData.slice(i, i + Math.max(pattern.length, 8)));
-                const hexStr = matchBytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+                const matchBytes = Array.from(
+                  this.binaryData.slice(i, i + Math.max(pattern.length, 8))
+                );
+                const hexStr = matchBytes
+                  .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
+                  .join(' ');
                 results.push({
                   address: addr,
                   offset: i,
                   section: secName,
                   type: 'Hex',
                   preview: hexStr,
-                  matchedText: query
+                  matchedText: query,
                 });
               }
             }
@@ -731,25 +770,35 @@ export class SearchPanel {
         `;
         return;
       }
-    } 
-    else if (this.activeMode === 'instruction') {
+    } else if (this.activeMode === 'instruction') {
       const lQuery = caseSensitive ? query : query.toLowerCase();
 
-      this.instructions.forEach(inst => {
+      this.instructions.forEach((inst) => {
         const fullInstText = `${inst.mnemonic} ${inst.opStr}`;
-        const searchTarget = caseSensitive ? fullInstText : fullInstText.toLowerCase();
+        const searchTarget = caseSensitive
+          ? fullInstText
+          : fullInstText.toLowerCase();
 
-        if (searchTarget.includes(lQuery) && inst.address >= minAddr && inst.address <= maxAddr) {
-          if (sectionName === 'all' || this.isAddressInSection(inst.address, sectionName)) {
+        if (
+          searchTarget.includes(lQuery) &&
+          inst.address >= minAddr &&
+          inst.address <= maxAddr
+        ) {
+          if (
+            sectionName === 'all' ||
+            this.isAddressInSection(inst.address, sectionName)
+          ) {
             // Build hex representation of instructions
-            const instHex = Array.from(inst.bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            const instHex = Array.from(inst.bytes)
+              .map((b) => b.toString(16).padStart(2, '0'))
+              .join(' ');
             results.push({
               address: inst.address,
               offset: inst.address - textBaseAddress,
               section: this.getSectionNameForAddress(inst.address),
               type: 'Instruction',
               preview: `${inst.mnemonic.toUpperCase()} ${inst.opStr}  ; (Hex: ${instHex})`,
-              matchedText: query
+              matchedText: query,
             });
           }
         }
@@ -812,9 +861,16 @@ export class SearchPanel {
       previewBox.className = 'result-preview-box';
 
       if (res.type === 'Hex') {
-        previewBox.innerHTML = this.highlightHexSnippet(res.preview, res.matchedText);
+        previewBox.innerHTML = this.highlightHexSnippet(
+          res.preview,
+          res.matchedText
+        );
       } else {
-        previewBox.innerHTML = this.highlightTextSnippet(res.preview, res.matchedText, this.caseSensitiveCheckbox.checked);
+        previewBox.innerHTML = this.highlightTextSnippet(
+          res.preview,
+          res.matchedText,
+          this.caseSensitiveCheckbox.checked
+        );
       }
       card.appendChild(previewBox);
 
@@ -825,17 +881,23 @@ export class SearchPanel {
       const asmBtn = document.createElement('button');
       asmBtn.className = 'action-nav-btn asm-btn';
       asmBtn.innerHTML = '⚡ Assembly';
-      asmBtn.addEventListener('click', () => this.options.onNavigate('assembly', res.address));
+      asmBtn.addEventListener('click', () =>
+        this.options.onNavigate('assembly', res.address)
+      );
 
       const hexBtn = document.createElement('button');
       hexBtn.className = 'action-nav-btn hex-btn';
       hexBtn.innerHTML = '🔢 Hex Viewer';
-      hexBtn.addEventListener('click', () => this.options.onNavigate('hex', res.address));
+      hexBtn.addEventListener('click', () =>
+        this.options.onNavigate('hex', res.address)
+      );
 
       const decBtn = document.createElement('button');
       decBtn.className = 'action-nav-btn dec-btn';
       decBtn.innerHTML = '⚙️ Decompiler';
-      decBtn.addEventListener('click', () => this.options.onNavigate('decompiler', res.address));
+      decBtn.addEventListener('click', () =>
+        this.options.onNavigate('decompiler', res.address)
+      );
 
       actionsDiv.appendChild(asmBtn);
       actionsDiv.appendChild(hexBtn);
@@ -847,7 +909,8 @@ export class SearchPanel {
 
     if (results.length > renderLimit) {
       const footerNotice = document.createElement('div');
-      footerNotice.style.cssText = 'text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1rem;';
+      footerNotice.style.cssText =
+        'text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1rem;';
       footerNotice.textContent = `Showing top 200 of ${results.length} results. Refine your query or filters for more precise matches.`;
       fragment.appendChild(footerNotice);
     }
@@ -855,13 +918,20 @@ export class SearchPanel {
     this.resultsListEl.appendChild(fragment);
   }
 
-  private highlightTextSnippet(text: string, match: string, caseSensitive: boolean): string {
+  private highlightTextSnippet(
+    text: string,
+    match: string,
+    caseSensitive: boolean
+  ): string {
     const escapedText = this.escapeHtml(text);
     if (!match) return escapedText;
-    
+
     const escapedMatch = this.escapeRegExp(match);
     const regex = new RegExp(`(${escapedMatch})`, caseSensitive ? 'g' : 'gi');
-    return escapedText.replace(regex, '<span class="highlight-match">$1</span>');
+    return escapedText.replace(
+      regex,
+      '<span class="highlight-match">$1</span>'
+    );
   }
 
   private highlightHexSnippet(previewHex: string, pattern: string): string {
@@ -888,13 +958,20 @@ export class SearchPanel {
   }
 
   private isAddressInSection(address: number, sectionName: string): boolean {
-    const sec = this.sections.find(s => s.name === sectionName);
+    const sec = this.sections.find((s) => s.name === sectionName);
     if (!sec) return false;
-    return address >= sec.virtualAddress && address < sec.virtualAddress + sec.virtualSize;
+    return (
+      address >= sec.virtualAddress &&
+      address < sec.virtualAddress + sec.virtualSize
+    );
   }
 
   private getSectionNameForAddress(address: number): string {
-    const sec = this.sections.find(s => address >= s.virtualAddress && address < s.virtualAddress + s.virtualSize);
+    const sec = this.sections.find(
+      (s) =>
+        address >= s.virtualAddress &&
+        address < s.virtualAddress + s.virtualSize
+    );
     return sec ? sec.name : '';
   }
 

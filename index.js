@@ -1,1 +1,1 @@
-console.log("Universal Reverse Engineering Tool loaded.");
+console.log('Universal Reverse Engineering Tool loaded.');

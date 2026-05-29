@@ -10,7 +10,7 @@ import {
   GDBProtocolParser,
   handleGDBCommand,
   X86_64_REGISTERS,
-  GDBPacket
+  GDBPacket,
 } from '../src/emulator/gdbProtocol.js';
 
 describe('GDB/LLDB RSP Protocol Tests', () => {
@@ -57,10 +57,7 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
 
       parser.feed('+');
       parser.feed('-');
-      expect(packets).toEqual([
-        { type: 'ack' },
-        { type: 'nak' },
-      ]);
+      expect(packets).toEqual([{ type: 'ack' }, { type: 'nak' }]);
     });
 
     it('should parse valid packets with correct checksum', () => {
@@ -68,9 +65,7 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
       const parser = new GDBProtocolParser((p) => packets.push(p));
 
       parser.feed('$OK#9a');
-      expect(packets).toEqual([
-        { type: 'packet', data: 'OK', raw: 'OK' },
-      ]);
+      expect(packets).toEqual([{ type: 'packet', data: 'OK', raw: 'OK' }]);
     });
 
     it('should parse packet with escaped characters', () => {
@@ -82,9 +77,7 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
       const chk = calculateChecksum(data).toString(16).padStart(2, '0');
       parser.feed(`$${data}#${chk}`);
 
-      expect(packets).toEqual([
-        { type: 'packet', data: 'a$b', raw: data },
-      ]);
+      expect(packets).toEqual([{ type: 'packet', data: 'a$b', raw: data }]);
     });
 
     it('should fail packet with invalid checksum', () => {
@@ -92,9 +85,7 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
       const parser = new GDBProtocolParser((p) => packets.push(p));
 
       parser.feed('$OK#00'); // incorrect checksum
-      expect(packets).toEqual([
-        { type: 'packet', data: undefined, raw: 'OK' },
-      ]);
+      expect(packets).toEqual([{ type: 'packet', data: undefined, raw: 'OK' }]);
     });
 
     it('should handle streaming data fed in chunks', () => {
@@ -105,9 +96,7 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
       parser.feed('K#9');
       parser.feed('a');
 
-      expect(packets).toEqual([
-        { type: 'packet', data: 'OK', raw: 'OK' },
-      ]);
+      expect(packets).toEqual([{ type: 'packet', data: 'OK', raw: 'OK' }]);
     });
   });
 
@@ -137,7 +126,10 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
       expect(gOutput.startsWith('1122334455667788')).toBe(true);
 
       // Write all registers via G
-      const customG = ''.padEnd(X86_64_REGISTERS.reduce((acc, r) => acc + r.size * 2, 0), 'f');
+      const customG = ''.padEnd(
+        X86_64_REGISTERS.reduce((acc, r) => acc + r.size * 2, 0),
+        'f'
+      );
       expect(handleGDBCommand('G' + customG, emulator)).toBe('OK');
       expect(emulator.cpu.read('rax')).toBe(0xffffffffffffffffn);
     });
@@ -174,8 +166,8 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
         size: 3,
         operands: [
           { type: 'reg', reg: 'rax' },
-          { type: 'reg', reg: 'rax' }
-        ]
+          { type: 'reg', reg: 'rax' },
+        ],
       });
 
       // Step should succeed and return stop reply S05
@@ -185,7 +177,7 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
 
       // Reset RIP to 0x1000 for continue test
       emulator.cpu.write('rip', 0x1000n);
-      
+
       // Continue should execute and halt (since there is nothing at 0x1003)
       const continueResponse = handleGDBCommand('c', emulator);
       expect(continueResponse).toBe('W00');

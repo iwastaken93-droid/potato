@@ -61,7 +61,7 @@ const MSVC_PRIMITIVES: Record<string, string> = {
  */
 export function demangle(mangled: string): DemangledSymbol {
   const trimmed = mangled.trim();
-  
+
   if (trimmed.startsWith('_Z')) {
     try {
       return parseItanium(trimmed);
@@ -100,18 +100,18 @@ function parseItanium(mangled: string): DemangledSymbol {
   // _ZNK3std6vectorIiSaIiEE9push_backERKi -> std::vector<int, std::allocator<int>>::push_back(const int&) const
   let index = 2; // skip '_Z'
   const modifiers: string[] = [];
-  
+
   // Check global modifiers or transaction info
   if (mangled[index] === 'G') {
     modifiers.push('global constructor');
     index++;
   }
-  
+
   let isNested = false;
   if (mangled[index] === 'N') {
     isNested = true;
     index++;
-    
+
     // Check nested const/volatile qualifiers
     if (mangled[index] === 'K') {
       modifiers.push('const');
@@ -139,12 +139,12 @@ function parseItanium(mangled: string): DemangledSymbol {
     if (len === 0) {
       throw new Error('Invalid name length');
     }
-    
+
     const end = index + len;
     if (end > mangled.length) {
       throw new Error('Name component length out of bounds');
     }
-    
+
     let nameStr = mangled.slice(index, end);
     index = end;
 
@@ -152,7 +152,7 @@ function parseItanium(mangled: string): DemangledSymbol {
     if (nameStr.startsWith('op')) {
       nameStr = 'operator ' + nameStr.slice(2);
     }
-    
+
     // Check if there are template parameters for this component (e.g. 'I...E')
     if (mangled[index] === 'I') {
       index++; // consume 'I'
@@ -172,9 +172,9 @@ function parseItanium(mangled: string): DemangledSymbol {
   // Parse type signatures (parameters or template args)
   function parseType(): string {
     if (index >= mangled.length) return '';
-    
+
     const char = mangled[index];
-    
+
     // Pointers, References, Const modifiers
     if (char === 'P') {
       index++;
@@ -196,7 +196,7 @@ function parseItanium(mangled: string): DemangledSymbol {
       index++;
       return 'volatile ' + parseType();
     }
-    
+
     // Arrays
     if (char === 'A') {
       index++;
@@ -233,13 +233,13 @@ function parseItanium(mangled: string): DemangledSymbol {
       index++;
       return ITANIUM_PRIMITIVES[char];
     }
-    
+
     // Substitution (S_ or S[a-z] or S[0-9A-Z]_)
     if (char === 'S') {
       index++;
       const nextChar = mangled[index];
       let baseType = 'std';
-      
+
       if (/[a-z]/.test(nextChar)) {
         index++; // consume standard substitution character
         if (nextChar === 'a') baseType = 'std::allocator';
@@ -307,14 +307,14 @@ function parseItanium(mangled: string): DemangledSymbol {
   }
 
   // Handle single 'void' parameter representation
-  const cleanParams = (params.length === 1 && params[0] === 'void') ? [] : params;
+  const cleanParams = params.length === 1 && params[0] === 'void' ? [] : params;
 
   // Heuristic rule for class name vs namespace
   const name = names[names.length - 1] || '';
   const remainingScopes = names.slice(0, -1);
   let className: string | null = null;
   let namespaces: string[] = [];
-  
+
   if (remainingScopes.length > 1) {
     className = remainingScopes[remainingScopes.length - 1];
     namespaces = remainingScopes.slice(0, -1);
@@ -325,7 +325,9 @@ function parseItanium(mangled: string): DemangledSymbol {
   let demangled = names.join('::');
   demangled += `(${cleanParams.join(', ')})`;
   if (modifiers.length > 0) {
-    demangled += ' ' + modifiers.filter(m => m === 'const' || m === 'volatile').join(' ');
+    demangled +=
+      ' ' +
+      modifiers.filter((m) => m === 'const' || m === 'volatile').join(' ');
   }
 
   return {
@@ -350,7 +352,7 @@ function parseMsvc(mangled: string): DemangledSymbol {
   // E.g. ?func@Class@Namespace@@YAXXZ -> void Namespace::Class::func(void)
   // ?add@Math@@YAHHH@Z -> int Math::add(int, int)
   let index = 1; // skip '?'
-  
+
   const endOfNames = mangled.indexOf('@@');
   if (endOfNames === -1) {
     throw new Error('Invalid MSVC mangled name');
@@ -366,7 +368,8 @@ function parseMsvc(mangled: string): DemangledSymbol {
   const reversedNames = [...names].reverse();
   const name = names[0] || '';
   const remaining = reversedNames.slice(0, -1);
-  const className = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+  const className =
+    remaining.length > 0 ? remaining[remaining.length - 1] : null;
   const namespaces = className ? remaining.slice(0, -1) : remaining;
 
   // Let's parse calling convention and return/params if present
@@ -377,7 +380,7 @@ function parseMsvc(mangled: string): DemangledSymbol {
 
   function parseMsvcType(): string {
     if (index >= mangled.length) return '';
-    
+
     // Check for pointer/reference prefix
     if (mangled[index] === 'P' || mangled[index] === 'A') {
       const isConst = mangled[index + 1] === 'B';
@@ -435,7 +438,7 @@ function parseMsvc(mangled: string): DemangledSymbol {
   if (index < mangled.length) {
     const callingConvCode = mangled[index];
     index++; // consume calling convention prefix (e.g. Y, Q, etc.)
-    
+
     // If it's a member function, there might be CV qualifiers for 'this'
     if (callingConvCode === 'Q' || callingConvCode === 'R') {
       modifiers.push('const');
@@ -443,14 +446,18 @@ function parseMsvc(mangled: string): DemangledSymbol {
 
     // Consume the actual calling convention code (A = __cdecl, I = __fastcall, etc.)
     if (index < mangled.length) {
-      index++; 
+      index++;
     }
 
     // Next is return type
     returnType = parseMsvcType();
 
     // Then parameters up to '@' or end of string
-    while (index < mangled.length && mangled[index] !== '@' && mangled[index] !== 'Z') {
+    while (
+      index < mangled.length &&
+      mangled[index] !== '@' &&
+      mangled[index] !== 'Z'
+    ) {
       const paramType = parseMsvcType();
       if (paramType) {
         params.push(paramType);
@@ -458,7 +465,7 @@ function parseMsvc(mangled: string): DemangledSymbol {
     }
   }
 
-  const cleanParams = (params.length === 1 && params[0] === 'void') ? [] : params;
+  const cleanParams = params.length === 1 && params[0] === 'void' ? [] : params;
 
   let demangled = returnType ? `${returnType} ` : '';
   demangled += reversedNames.join('::');

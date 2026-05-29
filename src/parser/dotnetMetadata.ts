@@ -60,30 +60,40 @@ export interface ParsedDotNetMetadata {
   };
 }
 
-export function readCompressedUint32(view: DataView, offset: number): { value: number; bytesRead: number } {
+export function readCompressedUint32(
+  view: DataView,
+  offset: number
+): { value: number; bytesRead: number } {
   if (offset >= view.byteLength) {
     return { value: 0, bytesRead: 0 };
   }
   const b1 = view.getUint8(offset);
   if ((b1 & 0x80) === 0) {
     return { value: b1, bytesRead: 1 };
-  } else if ((b1 & 0xC0) === 0x80) {
-    if (offset + 1 >= view.byteLength) return { value: b1 & 0x3F, bytesRead: 1 };
+  } else if ((b1 & 0xc0) === 0x80) {
+    if (offset + 1 >= view.byteLength)
+      return { value: b1 & 0x3f, bytesRead: 1 };
     const b2 = view.getUint8(offset + 1);
-    return { value: ((b1 & 0x3F) << 8) | b2, bytesRead: 2 };
+    return { value: ((b1 & 0x3f) << 8) | b2, bytesRead: 2 };
   } else {
     if (offset + 3 >= view.byteLength) return { value: 0, bytesRead: 0 };
     const b2 = view.getUint8(offset + 1);
     const b3 = view.getUint8(offset + 2);
     const b4 = view.getUint8(offset + 3);
-    return { value: ((b1 & 0x1F) << 24) | (b2 << 16) | (b3 << 8) | b4, bytesRead: 4 };
+    return {
+      value: ((b1 & 0x1f) << 24) | (b2 << 16) | (b3 << 8) | b4,
+      bytesRead: 4,
+    };
   }
 }
 
-const CODED_INDEX_SCHEMAS: Record<string, { tagBits: number; tables: number[] }> = {
+const CODED_INDEX_SCHEMAS: Record<
+  string,
+  { tagBits: number; tables: number[] }
+> = {
   TypeDefOrRef: {
     tagBits: 2,
-    tables: [0x02, 0x01, 0x1C], // TypeDef, TypeRef, TypeSpec
+    tables: [0x02, 0x01, 0x1c], // TypeDef, TypeRef, TypeSpec
   },
   HasConstant: {
     tagBits: 2,
@@ -92,9 +102,8 @@ const CODED_INDEX_SCHEMAS: Record<string, { tagBits: number; tables: number[] }>
   HasCustomAttribute: {
     tagBits: 5,
     tables: [
-      0x06, 0x04, 0x01, 0x02, 0x08, 0x09, 0x0A, 0x00,
-      0x11, 0x1A, 0x12, 0x1B, 0x1C, 0x1F, 0x23, 0x25,
-      0x26, 0x27, 0x2A, 0x2C, 0x2B
+      0x06, 0x04, 0x01, 0x02, 0x08, 0x09, 0x0a, 0x00, 0x11, 0x1a, 0x12, 0x1b,
+      0x1c, 0x1f, 0x23, 0x25, 0x26, 0x27, 0x2a, 0x2c, 0x2b,
     ],
   },
   HasFieldMarshal: {
@@ -103,11 +112,11 @@ const CODED_INDEX_SCHEMAS: Record<string, { tagBits: number; tables: number[] }>
   },
   HasDeclSecurity: {
     tagBits: 2,
-    tables: [0x02, 0x06, 0x1F],
+    tables: [0x02, 0x06, 0x1f],
   },
   MemberRefParent: {
     tagBits: 3,
-    tables: [0x02, 0x01, 0x1B, 0x06, 0x1C],
+    tables: [0x02, 0x01, 0x1b, 0x06, 0x1c],
   },
   HasSemantics: {
     tagBits: 1,
@@ -115,7 +124,7 @@ const CODED_INDEX_SCHEMAS: Record<string, { tagBits: number; tables: number[] }>
   },
   MethodDefOrRef: {
     tagBits: 1,
-    tables: [0x06, 0x0A],
+    tables: [0x06, 0x0a],
   },
   MemberForwarded: {
     tagBits: 1,
@@ -127,11 +136,11 @@ const CODED_INDEX_SCHEMAS: Record<string, { tagBits: number; tables: number[] }>
   },
   CustomAttributeType: {
     tagBits: 3,
-    tables: [0, 0, 0x06, 0x0A, 0],
+    tables: [0, 0, 0x06, 0x0a, 0],
   },
   ResolutionScope: {
     tagBits: 2,
-    tables: [0x00, 0x1B, 0x23, 0x01],
+    tables: [0x00, 0x1b, 0x23, 0x01],
   },
   TypeOrMethodDef: {
     tagBits: 1,
@@ -141,221 +150,224 @@ const CODED_INDEX_SCHEMAS: Record<string, { tagBits: number; tables: number[] }>
 
 interface ColumnSchema {
   name: string;
-  type: 'u8' | 'u16' | 'u32' | 'string' | 'guid' | 'blob' | { table: number } | { coded: string };
+  type:
+    | 'u8'
+    | 'u16'
+    | 'u32'
+    | 'string'
+    | 'guid'
+    | 'blob'
+    | { table: number }
+    | { coded: string };
 }
 
-const TABLE_SCHEMAS: Record<number, { name: string; columns: ColumnSchema[] }> = {
-  0x00: {
-    name: 'Module',
-    columns: [
-      { name: 'Generation', type: 'u16' },
-      { name: 'Name', type: 'string' },
-      { name: 'Mvid', type: 'guid' },
-      { name: 'EncId', type: 'guid' },
-      { name: 'EncBaseId', type: 'guid' },
-    ],
-  },
-  0x01: {
-    name: 'TypeRef',
-    columns: [
-      { name: 'ResolutionScope', type: { coded: 'ResolutionScope' } },
-      { name: 'TypeName', type: 'string' },
-      { name: 'TypeNamespace', type: 'string' },
-    ],
-  },
-  0x02: {
-    name: 'TypeDef',
-    columns: [
-      { name: 'Flags', type: 'u32' },
-      { name: 'TypeName', type: 'string' },
-      { name: 'TypeNamespace', type: 'string' },
-      { name: 'Extends', type: { coded: 'TypeDefOrRef' } },
-      { name: 'FieldList', type: { table: 0x04 } },
-      { name: 'MethodList', type: { table: 0x06 } },
-    ],
-  },
-  0x04: {
-    name: 'Field',
-    columns: [
-      { name: 'Flags', type: 'u16' },
-      { name: 'Name', type: 'string' },
-      { name: 'Signature', type: 'blob' },
-    ],
-  },
-  0x06: {
-    name: 'MethodDef',
-    columns: [
-      { name: 'RVA', type: 'u32' },
-      { name: 'ImplFlags', type: 'u16' },
-      { name: 'Flags', type: 'u16' },
-      { name: 'Name', type: 'string' },
-      { name: 'Signature', type: 'blob' },
-      { name: 'ParamList', type: { table: 0x08 } },
-    ],
-  },
-  0x08: {
-    name: 'Param',
-    columns: [
-      { name: 'Flags', type: 'u16' },
-      { name: 'Sequence', type: 'u16' },
-      { name: 'Name', type: 'string' },
-    ],
-  },
-  0x09: {
-    name: 'InterfaceImpl',
-    columns: [
-      { name: 'Class', type: { table: 0x02 } },
-      { name: 'Interface', type: { coded: 'TypeDefOrRef' } },
-    ],
-  },
-  0x0A: {
-    name: 'MemberRef',
-    columns: [
-      { name: 'Class', type: { coded: 'MemberRefParent' } },
-      { name: 'Name', type: 'string' },
-      { name: 'Signature', type: 'blob' },
-    ],
-  },
-  0x0C: {
-    name: 'Constant',
-    columns: [
-      { name: 'Type', type: 'u8' },
-      { name: 'Padding', type: 'u8' },
-      { name: 'Parent', type: { coded: 'HasConstant' } },
-      { name: 'Value', type: 'blob' },
-    ],
-  },
-  0x0E: {
-    name: 'CustomAttribute',
-    columns: [
-      { name: 'Parent', type: { coded: 'HasCustomAttribute' } },
-      { name: 'Type', type: { coded: 'CustomAttributeType' } },
-      { name: 'Value', type: 'blob' },
-    ],
-  },
-  0x11: {
-    name: 'FieldLayout',
-    columns: [
-      { name: 'Offset', type: 'u32' },
-      { name: 'Field', type: { table: 0x04 } },
-    ],
-  },
-  0x12: {
-    name: 'StandAloneSig',
-    columns: [
-      { name: 'Signature', type: 'blob' },
-    ],
-  },
-  0x14: {
-    name: 'EventMap',
-    columns: [
-      { name: 'Parent', type: { table: 0x02 } },
-      { name: 'EventList', type: { table: 0x16 } },
-    ],
-  },
-  0x16: {
-    name: 'Event',
-    columns: [
-      { name: 'EventFlags', type: 'u16' },
-      { name: 'Name', type: 'string' },
-      { name: 'EventType', type: { coded: 'TypeDefOrRef' } },
-    ],
-  },
-  0x17: {
-    name: 'PropertyMap',
-    columns: [
-      { name: 'Parent', type: { table: 0x02 } },
-      { name: 'PropertyList', type: { table: 0x18 } },
-    ],
-  },
-  0x18: {
-    name: 'Property',
-    columns: [
-      { name: 'Flags', type: 'u16' },
-      { name: 'Name', type: 'string' },
-      { name: 'Type', type: 'blob' },
-    ],
-  },
-  0x19: {
-    name: 'MethodSemantics',
-    columns: [
-      { name: 'Semantics', type: 'u16' },
-      { name: 'Method', type: { table: 0x06 } },
-      { name: 'Association', type: { coded: 'HasSemantics' } },
-    ],
-  },
-  0x1A: {
-    name: 'MethodImpl',
-    columns: [
-      { name: 'Class', type: { table: 0x02 } },
-      { name: 'MethodBody', type: { coded: 'MethodDefOrRef' } },
-      { name: 'MethodDeclaration', type: { coded: 'MethodDefOrRef' } },
-    ],
-  },
-  0x1B: {
-    name: 'ModuleRef',
-    columns: [
-      { name: 'Name', type: 'string' },
-    ],
-  },
-  0x1C: {
-    name: 'TypeSpec',
-    columns: [
-      { name: 'Signature', type: 'blob' },
-    ],
-  },
-  0x1F: {
-    name: 'Assembly',
-    columns: [
-      { name: 'HashAlgId', type: 'u32' },
-      { name: 'MajorVersion', type: 'u16' },
-      { name: 'MinorVersion', type: 'u16' },
-      { name: 'BuildNumber', type: 'u16' },
-      { name: 'RevisionNumber', type: 'u16' },
-      { name: 'Flags', type: 'u32' },
-      { name: 'PublicKey', type: 'blob' },
-      { name: 'Name', type: 'string' },
-      { name: 'Culture', type: 'string' },
-    ],
-  },
-  0x23: {
-    name: 'AssemblyRef',
-    columns: [
-      { name: 'MajorVersion', type: 'u16' },
-      { name: 'MinorVersion', type: 'u16' },
-      { name: 'BuildNumber', type: 'u16' },
-      { name: 'RevisionNumber', type: 'u16' },
-      { name: 'Flags', type: 'u32' },
-      { name: 'PublicKeyOrToken', type: 'blob' },
-      { name: 'Name', type: 'string' },
-      { name: 'Culture', type: 'string' },
-      { name: 'HashValue', type: 'blob' },
-    ],
-  },
-  0x29: {
-    name: 'NestedClass',
-    columns: [
-      { name: 'NestedClass', type: { table: 0x02 } },
-      { name: 'EnclosingClass', type: { table: 0x02 } },
-    ],
-  },
-  0x2A: {
-    name: 'GenericParam',
-    columns: [
-      { name: 'Number', type: 'u16' },
-      { name: 'Flags', type: 'u16' },
-      { name: 'Owner', type: { coded: 'TypeOrMethodDef' } },
-      { name: 'Name', type: 'string' },
-    ],
-  },
-  0x2B: {
-    name: 'MethodSpec',
-    columns: [
-      { name: 'Method', type: { coded: 'MethodDefOrRef' } },
-      { name: 'Instantiation', type: 'blob' },
-    ],
-  },
-};
+const TABLE_SCHEMAS: Record<number, { name: string; columns: ColumnSchema[] }> =
+  {
+    0x00: {
+      name: 'Module',
+      columns: [
+        { name: 'Generation', type: 'u16' },
+        { name: 'Name', type: 'string' },
+        { name: 'Mvid', type: 'guid' },
+        { name: 'EncId', type: 'guid' },
+        { name: 'EncBaseId', type: 'guid' },
+      ],
+    },
+    0x01: {
+      name: 'TypeRef',
+      columns: [
+        { name: 'ResolutionScope', type: { coded: 'ResolutionScope' } },
+        { name: 'TypeName', type: 'string' },
+        { name: 'TypeNamespace', type: 'string' },
+      ],
+    },
+    0x02: {
+      name: 'TypeDef',
+      columns: [
+        { name: 'Flags', type: 'u32' },
+        { name: 'TypeName', type: 'string' },
+        { name: 'TypeNamespace', type: 'string' },
+        { name: 'Extends', type: { coded: 'TypeDefOrRef' } },
+        { name: 'FieldList', type: { table: 0x04 } },
+        { name: 'MethodList', type: { table: 0x06 } },
+      ],
+    },
+    0x04: {
+      name: 'Field',
+      columns: [
+        { name: 'Flags', type: 'u16' },
+        { name: 'Name', type: 'string' },
+        { name: 'Signature', type: 'blob' },
+      ],
+    },
+    0x06: {
+      name: 'MethodDef',
+      columns: [
+        { name: 'RVA', type: 'u32' },
+        { name: 'ImplFlags', type: 'u16' },
+        { name: 'Flags', type: 'u16' },
+        { name: 'Name', type: 'string' },
+        { name: 'Signature', type: 'blob' },
+        { name: 'ParamList', type: { table: 0x08 } },
+      ],
+    },
+    0x08: {
+      name: 'Param',
+      columns: [
+        { name: 'Flags', type: 'u16' },
+        { name: 'Sequence', type: 'u16' },
+        { name: 'Name', type: 'string' },
+      ],
+    },
+    0x09: {
+      name: 'InterfaceImpl',
+      columns: [
+        { name: 'Class', type: { table: 0x02 } },
+        { name: 'Interface', type: { coded: 'TypeDefOrRef' } },
+      ],
+    },
+    0x0a: {
+      name: 'MemberRef',
+      columns: [
+        { name: 'Class', type: { coded: 'MemberRefParent' } },
+        { name: 'Name', type: 'string' },
+        { name: 'Signature', type: 'blob' },
+      ],
+    },
+    0x0c: {
+      name: 'Constant',
+      columns: [
+        { name: 'Type', type: 'u8' },
+        { name: 'Padding', type: 'u8' },
+        { name: 'Parent', type: { coded: 'HasConstant' } },
+        { name: 'Value', type: 'blob' },
+      ],
+    },
+    0x0e: {
+      name: 'CustomAttribute',
+      columns: [
+        { name: 'Parent', type: { coded: 'HasCustomAttribute' } },
+        { name: 'Type', type: { coded: 'CustomAttributeType' } },
+        { name: 'Value', type: 'blob' },
+      ],
+    },
+    0x11: {
+      name: 'FieldLayout',
+      columns: [
+        { name: 'Offset', type: 'u32' },
+        { name: 'Field', type: { table: 0x04 } },
+      ],
+    },
+    0x12: {
+      name: 'StandAloneSig',
+      columns: [{ name: 'Signature', type: 'blob' }],
+    },
+    0x14: {
+      name: 'EventMap',
+      columns: [
+        { name: 'Parent', type: { table: 0x02 } },
+        { name: 'EventList', type: { table: 0x16 } },
+      ],
+    },
+    0x16: {
+      name: 'Event',
+      columns: [
+        { name: 'EventFlags', type: 'u16' },
+        { name: 'Name', type: 'string' },
+        { name: 'EventType', type: { coded: 'TypeDefOrRef' } },
+      ],
+    },
+    0x17: {
+      name: 'PropertyMap',
+      columns: [
+        { name: 'Parent', type: { table: 0x02 } },
+        { name: 'PropertyList', type: { table: 0x18 } },
+      ],
+    },
+    0x18: {
+      name: 'Property',
+      columns: [
+        { name: 'Flags', type: 'u16' },
+        { name: 'Name', type: 'string' },
+        { name: 'Type', type: 'blob' },
+      ],
+    },
+    0x19: {
+      name: 'MethodSemantics',
+      columns: [
+        { name: 'Semantics', type: 'u16' },
+        { name: 'Method', type: { table: 0x06 } },
+        { name: 'Association', type: { coded: 'HasSemantics' } },
+      ],
+    },
+    0x1a: {
+      name: 'MethodImpl',
+      columns: [
+        { name: 'Class', type: { table: 0x02 } },
+        { name: 'MethodBody', type: { coded: 'MethodDefOrRef' } },
+        { name: 'MethodDeclaration', type: { coded: 'MethodDefOrRef' } },
+      ],
+    },
+    0x1b: {
+      name: 'ModuleRef',
+      columns: [{ name: 'Name', type: 'string' }],
+    },
+    0x1c: {
+      name: 'TypeSpec',
+      columns: [{ name: 'Signature', type: 'blob' }],
+    },
+    0x1f: {
+      name: 'Assembly',
+      columns: [
+        { name: 'HashAlgId', type: 'u32' },
+        { name: 'MajorVersion', type: 'u16' },
+        { name: 'MinorVersion', type: 'u16' },
+        { name: 'BuildNumber', type: 'u16' },
+        { name: 'RevisionNumber', type: 'u16' },
+        { name: 'Flags', type: 'u32' },
+        { name: 'PublicKey', type: 'blob' },
+        { name: 'Name', type: 'string' },
+        { name: 'Culture', type: 'string' },
+      ],
+    },
+    0x23: {
+      name: 'AssemblyRef',
+      columns: [
+        { name: 'MajorVersion', type: 'u16' },
+        { name: 'MinorVersion', type: 'u16' },
+        { name: 'BuildNumber', type: 'u16' },
+        { name: 'RevisionNumber', type: 'u16' },
+        { name: 'Flags', type: 'u32' },
+        { name: 'PublicKeyOrToken', type: 'blob' },
+        { name: 'Name', type: 'string' },
+        { name: 'Culture', type: 'string' },
+        { name: 'HashValue', type: 'blob' },
+      ],
+    },
+    0x29: {
+      name: 'NestedClass',
+      columns: [
+        { name: 'NestedClass', type: { table: 0x02 } },
+        { name: 'EnclosingClass', type: { table: 0x02 } },
+      ],
+    },
+    0x2a: {
+      name: 'GenericParam',
+      columns: [
+        { name: 'Number', type: 'u16' },
+        { name: 'Flags', type: 'u16' },
+        { name: 'Owner', type: { coded: 'TypeOrMethodDef' } },
+        { name: 'Name', type: 'string' },
+      ],
+    },
+    0x2b: {
+      name: 'MethodSpec',
+      columns: [
+        { name: 'Method', type: { coded: 'MethodDefOrRef' } },
+        { name: 'Instantiation', type: 'blob' },
+      ],
+    },
+  };
 
 export class DotNetMetadataParser {
   private view: DataView;
@@ -371,7 +383,10 @@ export class DotNetMetadataParser {
     let metadataRootOffset = 0;
 
     // Detect if we are parsing raw BSJB metadata root or a full PE file
-    if (this.view.byteLength >= 4 && this.view.getUint32(0, true) === 0x424A5342) {
+    if (
+      this.view.byteLength >= 4 &&
+      this.view.getUint32(0, true) === 0x424a5342
+    ) {
       metadataRootOffset = 0;
     } else {
       // Treat as PE
@@ -386,7 +401,10 @@ export class DotNetMetadataParser {
 
       const cliHeaderRva = dataDirs[14].virtualAddress;
       const cliHeaderOffset = this.rvaToOffset(cliHeaderRva, parsedPe.sections);
-      if (cliHeaderOffset === 0 || cliHeaderOffset + 72 > this.view.byteLength) {
+      if (
+        cliHeaderOffset === 0 ||
+        cliHeaderOffset + 72 > this.view.byteLength
+      ) {
         throw new Error('CLI Header RVA points outside the file bounds');
       }
 
@@ -426,7 +444,10 @@ export class DotNetMetadataParser {
         },
       };
 
-      metadataRootOffset = this.rvaToOffset(cliHeader.metaData.virtualAddress, parsedPe.sections);
+      metadataRootOffset = this.rvaToOffset(
+        cliHeader.metaData.virtualAddress,
+        parsedPe.sections
+      );
       if (metadataRootOffset === 0) {
         throw new Error('Metadata Root RVA points outside the file bounds');
       }
@@ -438,8 +459,10 @@ export class DotNetMetadataParser {
     }
 
     const signature = this.view.getUint32(metadataRootOffset, true);
-    if (signature !== 0x424A5342) {
-      throw new Error(`Invalid Metadata Root signature: 0x${signature.toString(16)} (expected BSJB)`);
+    if (signature !== 0x424a5342) {
+      throw new Error(
+        `Invalid Metadata Root signature: 0x${signature.toString(16)} (expected BSJB)`
+      );
     }
 
     const majorVersion = this.view.getUint16(metadataRootOffset + 4, true);
@@ -451,13 +474,22 @@ export class DotNetMetadataParser {
       throw new Error('Metadata version string points outside the file bounds');
     }
 
-    const versionBytes = new Uint8Array(this.buffer, metadataRootOffset + 16, versionLength);
+    const versionBytes = new Uint8Array(
+      this.buffer,
+      metadataRootOffset + 16,
+      versionLength
+    );
     // Find the first null character to truncate the version string
     let versionStrLength = 0;
-    while (versionStrLength < versionLength && versionBytes[versionStrLength] !== 0) {
+    while (
+      versionStrLength < versionLength &&
+      versionBytes[versionStrLength] !== 0
+    ) {
       versionStrLength++;
     }
-    const versionString = new TextDecoder('utf-8').decode(versionBytes.subarray(0, versionStrLength));
+    const versionString = new TextDecoder('utf-8').decode(
+      versionBytes.subarray(0, versionStrLength)
+    );
 
     let streamOffset = metadataRootOffset + 16 + versionLength;
     // Align version offset if necessary
@@ -583,14 +615,32 @@ export class DotNetMetadataParser {
       let curr = start;
       while (curr + 16 <= end) {
         // Format as standard GUID: 8-4-4-4-12
-        const p1 = this.view.getUint32(curr, true).toString(16).padStart(8, '0');
-        const p2 = this.view.getUint16(curr + 4, true).toString(16).padStart(4, '0');
-        const p3 = this.view.getUint16(curr + 6, true).toString(16).padStart(4, '0');
-        const p4_1 = this.view.getUint8(curr + 8).toString(16).padStart(2, '0');
-        const p4_2 = this.view.getUint8(curr + 9).toString(16).padStart(2, '0');
+        const p1 = this.view
+          .getUint32(curr, true)
+          .toString(16)
+          .padStart(8, '0');
+        const p2 = this.view
+          .getUint16(curr + 4, true)
+          .toString(16)
+          .padStart(4, '0');
+        const p3 = this.view
+          .getUint16(curr + 6, true)
+          .toString(16)
+          .padStart(4, '0');
+        const p4_1 = this.view
+          .getUint8(curr + 8)
+          .toString(16)
+          .padStart(2, '0');
+        const p4_2 = this.view
+          .getUint8(curr + 9)
+          .toString(16)
+          .padStart(2, '0');
         let p5 = '';
         for (let j = 10; j < 16; j++) {
-          p5 += this.view.getUint8(curr + j).toString(16).padStart(2, '0');
+          p5 += this.view
+            .getUint8(curr + j)
+            .toString(16)
+            .padStart(2, '0');
         }
         decodedGuids.push(`${p1}-${p2}-${p3}-${p4_1}${p4_2}-${p5}`);
         curr += 16;
@@ -638,9 +688,9 @@ export class DotNetMetadataParser {
         let currOffset = tableHeaderOffset;
 
         // Pre-calculate index sizes
-        const stringIndexSize = (heapSizes & 0x01) ? 4 : 2;
-        const guidIndexSize = (heapSizes & 0x02) ? 4 : 2;
-        const blobIndexSize = (heapSizes & 0x04) ? 4 : 2;
+        const stringIndexSize = heapSizes & 0x01 ? 4 : 2;
+        const guidIndexSize = heapSizes & 0x02 ? 4 : 2;
+        const blobIndexSize = heapSizes & 0x04 ? 4 : 2;
 
         const getTableIndexSize = (tableId: number): number => {
           const count = rows[tableId] || 0;
@@ -655,7 +705,7 @@ export class DotNetMetadataParser {
             const count = rows[tbl] || 0;
             if (count > maxRows) maxRows = count;
           }
-          return maxRows >= (1 << (16 - schema.tagBits)) ? 4 : 2;
+          return maxRows >= 1 << (16 - schema.tagBits) ? 4 : 2;
         };
 
         const readValue = (offset: number, size: number): number => {
@@ -699,7 +749,11 @@ export class DotNetMetadataParser {
               } else if (col.type === 'string') {
                 colSize = stringIndexSize;
                 const index = readValue(currOffset, stringIndexSize);
-                resolvedVal = this.getString(index, metadataRootOffset + (stringsStream?.offset || 0), stringsStream?.size || 0);
+                resolvedVal = this.getString(
+                  index,
+                  metadataRootOffset + (stringsStream?.offset || 0),
+                  stringsStream?.size || 0
+                );
               } else if (col.type === 'guid') {
                 colSize = guidIndexSize;
                 const index = readValue(currOffset, guidIndexSize);
@@ -707,7 +761,11 @@ export class DotNetMetadataParser {
               } else if (col.type === 'blob') {
                 colSize = blobIndexSize;
                 const index = readValue(currOffset, blobIndexSize);
-                resolvedVal = this.getBlob(index, metadataRootOffset + (blobStream?.offset || 0), blobStream?.size || 0);
+                resolvedVal = this.getBlob(
+                  index,
+                  metadataRootOffset + (blobStream?.offset || 0),
+                  blobStream?.size || 0
+                );
               } else if (typeof col.type === 'object' && 'table' in col.type) {
                 colSize = getTableIndexSize(col.type.table);
                 resolvedVal = readValue(currOffset, colSize);
@@ -753,7 +811,9 @@ export class DotNetMetadataParser {
     for (const section of sections) {
       if (
         rva >= section.virtualAddress &&
-        rva < section.virtualAddress + Math.max(section.virtualSize, section.sizeOfRawData)
+        rva <
+          section.virtualAddress +
+            Math.max(section.virtualSize, section.sizeOfRawData)
       ) {
         return rva - section.virtualAddress + section.pointerToRawData;
       }
@@ -761,7 +821,11 @@ export class DotNetMetadataParser {
     return 0;
   }
 
-  private getString(index: number, streamOffset: number, streamSize: number): string {
+  private getString(
+    index: number,
+    streamOffset: number,
+    streamSize: number
+  ): string {
     if (index === 0 || index >= streamSize) {
       return '';
     }
@@ -782,7 +846,11 @@ export class DotNetMetadataParser {
     return guids[index - 1];
   }
 
-  private getBlob(index: number, streamOffset: number, streamSize: number): Uint8Array {
+  private getBlob(
+    index: number,
+    streamOffset: number,
+    streamSize: number
+  ): Uint8Array {
     if (index === 0 || index >= streamSize) {
       return new Uint8Array(0);
     }
@@ -794,7 +862,10 @@ export class DotNetMetadataParser {
     return new Uint8Array(this.buffer, offset + bytesRead, len);
   }
 
-  private decodeCodedIndex(value: number, codedName: string): { tableName: string; rowIndex: number } | null {
+  private decodeCodedIndex(
+    value: number,
+    codedName: string
+  ): { tableName: string; rowIndex: number } | null {
     const schema = CODED_INDEX_SCHEMAS[codedName];
     if (!schema) return null;
 
@@ -810,7 +881,9 @@ export class DotNetMetadataParser {
     const tableSchema = TABLE_SCHEMAS[tableId];
 
     return {
-      tableName: tableSchema ? tableSchema.name : `Table_0x${tableId.toString(16)}`,
+      tableName: tableSchema
+        ? tableSchema.name
+        : `Table_0x${tableId.toString(16)}`,
       rowIndex,
     };
   }

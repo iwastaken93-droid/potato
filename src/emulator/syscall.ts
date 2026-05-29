@@ -18,7 +18,7 @@ export class SyscallHandler {
   private winHooks: Map<bigint, (emu: Emulator) => void> = new Map();
   private winHookNames: Map<string, bigint> = new Map();
   private nextHookAddress: bigint = 0x80000000n;
-  
+
   public context: SyscallContext = {
     stdout: '',
     stderr: '',
@@ -56,7 +56,11 @@ export class SyscallHandler {
       const write = (flProtect & 0x44) !== 0 || flProtect === 0x04; // PAGE_READWRITE / PAGE_EXECUTE_READWRITE
       const read = true;
 
-      emu.memory.map(allocAddr, dwSize, 'VirtualAlloc', { read, write, execute });
+      emu.memory.map(allocAddr, dwSize, 'VirtualAlloc', {
+        read,
+        write,
+        execute,
+      });
       this.context.allocatedRegions.push({ address: allocAddr, size: dwSize });
 
       emu.cpu.write('rax', allocAddr);
@@ -88,7 +92,10 @@ export class SyscallHandler {
         // Return dummy handle for current module
         emu.cpu.write('rax', 0x77000000n);
       } else {
-        const modName = this.readNullTerminatedString(emu.memory, lpModuleNamePtr);
+        const modName = this.readNullTerminatedString(
+          emu.memory,
+          lpModuleNamePtr
+        );
         emu.cpu.write('rax', 0x77000000n);
       }
     });
@@ -100,7 +107,10 @@ export class SyscallHandler {
         emu.cpu.write('rax', 0n);
         return;
       }
-      const libName = this.readNullTerminatedString(emu.memory, lpLibFileNamePtr);
+      const libName = this.readNullTerminatedString(
+        emu.memory,
+        lpLibFileNamePtr
+      );
       emu.cpu.write('rax', 0x78000000n); // dummy library handle
     });
   }
@@ -108,7 +118,10 @@ export class SyscallHandler {
   /**
    * Register a custom Windows API hook.
    */
-  public registerWindowsHook(name: string, handler: (emu: Emulator) => void): bigint {
+  public registerWindowsHook(
+    name: string,
+    handler: (emu: Emulator) => void
+  ): bigint {
     if (this.winHookNames.has(name)) {
       return this.winHookNames.get(name)!;
     }
@@ -132,7 +145,9 @@ export class SyscallHandler {
   public executeHook(address: bigint | number, emu: Emulator): void {
     const handler = this.winHooks.get(BigInt(address));
     if (!handler) {
-      throw new Error(`No hook registered at address 0x${BigInt(address).toString(16)}`);
+      throw new Error(
+        `No hook registered at address 0x${BigInt(address).toString(16)}`
+      );
     }
 
     handler(emu);

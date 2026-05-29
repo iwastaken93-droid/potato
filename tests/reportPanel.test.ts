@@ -34,17 +34,38 @@ describe('ReportPanel Unit Tests', () => {
         fileOffset: 0,
         fileSize: 1024,
         flags: { read: true, write: false, execute: true },
-        entropy: 4.5
-      }
+        entropy: 4.5,
+      },
     ];
     const symbols: Symbol[] = [
-      { name: 'main', address: 0x1000, type: 'function', binding: 'global', size: 16 }
+      {
+        name: 'main',
+        address: 0x1000,
+        type: 'function',
+        binding: 'global',
+        size: 16,
+      },
     ];
     const strings: ExtractedString[] = [
-      { offset: 0, virtualAddress: 0x1000, encoding: 'ascii', tags: ['path'], value: '/bin/sh' }
+      {
+        offset: 0,
+        virtualAddress: 0x1000,
+        encoding: 'ascii',
+        tags: ['path'],
+        value: '/bin/sh',
+      },
     ];
 
-    panel.updateData('test.bin', 2, binaryData, 'x86_64', 0x1000, sections, symbols, strings);
+    panel.updateData(
+      'test.bin',
+      2,
+      binaryData,
+      'x86_64',
+      0x1000,
+      sections,
+      symbols,
+      strings
+    );
 
     // Should display file metadata
     expect(container.textContent).toContain('test.bin');
@@ -60,7 +81,9 @@ describe('ReportPanel Unit Tests', () => {
 
     // Switch to markdown view
     panel.preview('markdown');
-    expect(container.querySelector('.markdown-preview-container')).not.toBeNull();
+    expect(
+      container.querySelector('.markdown-preview-container')
+    ).not.toBeNull();
 
     // Switch to json view
     panel.preview('json');
@@ -71,8 +94,10 @@ describe('ReportPanel Unit Tests', () => {
     const binaryData = new Uint8Array([0x90, 0x90]);
     panel.updateData('test.bin', 2, binaryData, 'x86_64', 0x1000, [], [], []);
 
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+
     panel.downloadJSON();
     expect(clickSpy).toHaveBeenCalled();
 

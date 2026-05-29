@@ -98,8 +98,28 @@ describe('Emulator Instruction Execution Tests', () => {
   it('should run MOV and ADD instructions', () => {
     const emu = new Emulator();
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'mov', opStr: 'rax, 0x100', operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 0x100n }], size: 4 },
-      { address: 0x1004, bytes: new Uint8Array([0]), mnemonic: 'add', opStr: 'rax, 0x50', operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 0x50n }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'mov',
+        opStr: 'rax, 0x100',
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'imm', imm: 0x100n },
+        ],
+        size: 4,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'add',
+        opStr: 'rax, 0x50',
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'imm', imm: 0x50n },
+        ],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
     emu.reset(0x1000);
@@ -128,8 +148,28 @@ describe('Emulator Instruction Execution Tests', () => {
 
     // mov rax, [rbx]
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'mov', opStr: 'rax, [rbx]', operands: [{ type: 'reg', reg: 'rax' }, { type: 'mem', mem: { base: 'rbx' } }], size: 4 },
-      { address: 0x1004, bytes: new Uint8Array([0]), mnemonic: 'lea', opStr: 'rcx, [rbx + 0x10]', operands: [{ type: 'reg', reg: 'rcx' }, { type: 'mem', mem: { base: 'rbx', disp: 0x10n } }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'mov',
+        opStr: 'rax, [rbx]',
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'mem', mem: { base: 'rbx' } },
+        ],
+        size: 4,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'lea',
+        opStr: 'rcx, [rbx + 0x10]',
+        operands: [
+          { type: 'reg', reg: 'rcx' },
+          { type: 'mem', mem: { base: 'rbx', disp: 0x10n } },
+        ],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
 
@@ -146,8 +186,22 @@ describe('Emulator Instruction Execution Tests', () => {
     emu.cpu.write('rax', 0xabcdefn);
 
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'push', opStr: 'rax', operands: [{ type: 'reg', reg: 'rax' }], size: 4 },
-      { address: 0x1004, bytes: new Uint8Array([0]), mnemonic: 'pop', opStr: 'rbx', operands: [{ type: 'reg', reg: 'rbx' }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'push',
+        opStr: 'rax',
+        operands: [{ type: 'reg', reg: 'rax' }],
+        size: 4,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'pop',
+        opStr: 'rbx',
+        operands: [{ type: 'reg', reg: 'rbx' }],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
 
@@ -166,8 +220,22 @@ describe('Emulator Instruction Execution Tests', () => {
     emu.reset(0x1000);
 
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'call', opStr: '0x2000', operands: [{ type: 'imm', imm: 0x2000n }], size: 4 },
-      { address: 0x2000, bytes: new Uint8Array([0]), mnemonic: 'ret', opStr: '', operands: [], size: 1 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'call',
+        opStr: '0x2000',
+        operands: [{ type: 'imm', imm: 0x2000n }],
+        size: 4,
+      },
+      {
+        address: 0x2000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'ret',
+        opStr: '',
+        operands: [],
+        size: 1,
+      },
     ];
     emu.loadInstructions(insts);
 
@@ -184,9 +252,33 @@ describe('Emulator Instruction Execution Tests', () => {
     emu.reset(0x1000);
 
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'cmp', opStr: 'rax, rbx', operands: [{ type: 'reg', reg: 'rax' }, { type: 'reg', reg: 'rbx' }], size: 4 },
-      { address: 0x1004, bytes: new Uint8Array([0]), mnemonic: 'je', opStr: '0x1010', operands: [{ type: 'imm', imm: 0x1010n }], size: 4 },
-      { address: 0x1008, bytes: new Uint8Array([0]), mnemonic: 'jmp', opStr: '0x1020', operands: [{ type: 'imm', imm: 0x1020n }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'cmp',
+        opStr: 'rax, rbx',
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'reg', reg: 'rbx' },
+        ],
+        size: 4,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'je',
+        opStr: '0x1010',
+        operands: [{ type: 'imm', imm: 0x1010n }],
+        size: 4,
+      },
+      {
+        address: 0x1008,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'jmp',
+        opStr: '0x1020',
+        operands: [{ type: 'imm', imm: 0x1020n }],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
 
@@ -215,9 +307,39 @@ describe('Emulator Instruction Execution Tests', () => {
     emu.reset(0x1000);
 
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'mov', opStr: 'rax, 1', operands: [{ type: 'reg', reg: 'rax' }, { type: 'imm', imm: 1n }], size: 4 },
-      { address: 0x1004, bytes: new Uint8Array([0]), mnemonic: 'mov', opStr: 'rbx, 2', operands: [{ type: 'reg', reg: 'rbx' }, { type: 'imm', imm: 2n }], size: 4 },
-      { address: 0x1008, bytes: new Uint8Array([0]), mnemonic: 'mov', opStr: 'rcx, 3', operands: [{ type: 'reg', reg: 'rcx' }, { type: 'imm', imm: 3n }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'mov',
+        opStr: 'rax, 1',
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'imm', imm: 1n },
+        ],
+        size: 4,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'mov',
+        opStr: 'rbx, 2',
+        operands: [
+          { type: 'reg', reg: 'rbx' },
+          { type: 'imm', imm: 2n },
+        ],
+        size: 4,
+      },
+      {
+        address: 0x1008,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'mov',
+        opStr: 'rcx, 3',
+        operands: [
+          { type: 'reg', reg: 'rcx' },
+          { type: 'imm', imm: 3n },
+        ],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
     emu.addBreakpoint(0x1008);
@@ -232,13 +354,16 @@ describe('Emulator Instruction Execution Tests', () => {
   });
 });
 
-
 describe('Memory State Management & Permissions Tests', () => {
   it('should initialize empty and allow mapping regions', () => {
     const mem = new Memory();
     expect(mem.getMemoryMap().length).toBe(0);
 
-    mem.map(0x1000n, 0x100, '.text', { read: true, write: false, execute: true });
+    mem.map(0x1000n, 0x100, '.text', {
+      read: true,
+      write: false,
+      execute: true,
+    });
     const map = mem.getMemoryMap();
     expect(map.length).toBe(1);
     expect(map[0].name).toBe('.text');
@@ -251,7 +376,11 @@ describe('Memory State Management & Permissions Tests', () => {
 
   it('should read/write values with correct endianness', () => {
     const mem = new Memory();
-    mem.map(0x2000n, 0x100, '.data', { read: true, write: true, execute: false });
+    mem.map(0x2000n, 0x100, '.data', {
+      read: true,
+      write: true,
+      execute: false,
+    });
 
     // 8-bit
     mem.write8(0x2000n, 0xef);
@@ -274,7 +403,11 @@ describe('Memory State Management & Permissions Tests', () => {
 
   it('should enforce write permissions', () => {
     const mem = new Memory();
-    mem.map(0x1000n, 0x100, '.rodata', { read: true, write: false, execute: false });
+    mem.map(0x1000n, 0x100, '.rodata', {
+      read: true,
+      write: false,
+      execute: false,
+    });
 
     // Read should succeed
     expect(mem.read8(0x1000n)).toBe(0);
@@ -293,7 +426,9 @@ describe('Memory State Management & Permissions Tests', () => {
 
   it('should load sections from a parsed binary', () => {
     const mem = new Memory();
-    const mockBinary = new Uint8Array([0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80]);
+    const mockBinary = new Uint8Array([
+      0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80,
+    ]);
     const sections: Section[] = [
       {
         name: '.text',
@@ -332,14 +467,22 @@ describe('Additional Emulator & Memory Edge Cases', () => {
 
   it('should resolve regions correctly using getRegionAt', () => {
     const mem = new Memory();
-    mem.map(0x1000n, 0x100, '.text', { read: true, write: false, execute: true });
+    mem.map(0x1000n, 0x100, '.text', {
+      read: true,
+      write: false,
+      execute: true,
+    });
     expect(mem.getRegionAt(0x1050n)?.name).toBe('.text');
     expect(mem.getRegionAt(0x2000n)).toBeNull();
   });
 
   it('should handle read/write across page boundaries', () => {
     const mem = new Memory();
-    mem.map(0xff0n, 0x20, '.boundary', { read: true, write: true, execute: false });
+    mem.map(0xff0n, 0x20, '.boundary', {
+      read: true,
+      write: true,
+      execute: false,
+    });
     // Write 32 bits spanning across page boundary if page size is 4096 (0x1000)
     // 0xffe, 0xfff, 0x1000, 0x1001
     mem.write32(0xffen, 0x11223344);
@@ -353,7 +496,17 @@ describe('Additional Emulator & Memory Edge Cases', () => {
   it('should handle XOR instruction and flags correctly', () => {
     const emu = new Emulator();
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'xor', opStr: 'rax, rax', operands: [{ type: 'reg', reg: 'rax' }, { type: 'reg', reg: 'rax' }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'xor',
+        opStr: 'rax, rax',
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'reg', reg: 'rax' },
+        ],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
     emu.reset(0x1000);
@@ -368,11 +521,25 @@ describe('Additional Emulator & Memory Edge Cases', () => {
   it('should handle various conditional jumps', () => {
     const emu = new Emulator();
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'jg', opStr: '0x2000', operands: [{ type: 'imm', imm: 0x2000n }], size: 4 },
-      { address: 0x1004, bytes: new Uint8Array([0]), mnemonic: 'jl', opStr: '0x3000', operands: [{ type: 'imm', imm: 0x3000n }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'jg',
+        opStr: '0x2000',
+        operands: [{ type: 'imm', imm: 0x2000n }],
+        size: 4,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'jl',
+        opStr: '0x3000',
+        operands: [{ type: 'imm', imm: 0x3000n }],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
-    
+
     // Case 1: jg (ZF=0, SF=OF) -> jump
     emu.reset(0x1000);
     emu.cpu.setFlag(RFlag.ZF, false);
@@ -393,8 +560,22 @@ describe('Additional Emulator & Memory Edge Cases', () => {
     const emu = new Emulator();
     // infinite loop using two alternating jumps
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'jmp', opStr: '0x1004', operands: [{ type: 'imm', imm: 0x1004n }], size: 4 },
-      { address: 0x1004, bytes: new Uint8Array([0]), mnemonic: 'jmp', opStr: '0x1000', operands: [{ type: 'imm', imm: 0x1000n }], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'jmp',
+        opStr: '0x1004',
+        operands: [{ type: 'imm', imm: 0x1004n }],
+        size: 4,
+      },
+      {
+        address: 0x1004,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'jmp',
+        opStr: '0x1000',
+        operands: [{ type: 'imm', imm: 0x1000n }],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
     emu.reset(0x1000);
@@ -409,7 +590,14 @@ describe('Additional Emulator & Memory Edge Cases', () => {
   it('should throw error for unsupported instructions', () => {
     const emu = new Emulator();
     const insts = [
-      { address: 0x1000, bytes: new Uint8Array([0]), mnemonic: 'invalid_op', opStr: 'rax, rbx', operands: [], size: 4 },
+      {
+        address: 0x1000,
+        bytes: new Uint8Array([0]),
+        mnemonic: 'invalid_op',
+        opStr: 'rax, rbx',
+        operands: [],
+        size: 4,
+      },
     ];
     emu.loadInstructions(insts);
     emu.reset(0x1000);
@@ -441,45 +629,69 @@ describe('Additional Emulator & Memory Edge Cases', () => {
   it('should enforce read permissions and bypass write permissions when requested', () => {
     const mem = new Memory();
     // Map a region that has write: true but read: false
-    mem.map(0x1000n, 0x100, '.writeonly', { read: false, write: true, execute: false });
+    mem.map(0x1000n, 0x100, '.writeonly', {
+      read: false,
+      write: true,
+      execute: false,
+    });
 
     // Write should succeed
-    mem.write8(0x1000n, 0xAA);
+    mem.write8(0x1000n, 0xaa);
     // Read should throw MemoryAccessError
     expect(() => mem.read8(0x1000n)).toThrow(MemoryAccessError);
 
     // Map a region that has read: true but write: false
-    mem.map(0x2000n, 0x100, '.readonly', { read: true, write: false, execute: false });
+    mem.map(0x2000n, 0x100, '.readonly', {
+      read: true,
+      write: false,
+      execute: false,
+    });
     // Write without bypass should throw
-    expect(() => mem.write8(0x2000n, 0xBB)).toThrow(MemoryAccessError);
+    expect(() => mem.write8(0x2000n, 0xbb)).toThrow(MemoryAccessError);
     // Write with bypass should succeed
-    mem.write8(0x2000n, 0xBB, true);
-    expect(mem.read8(0x2000n)).toBe(0xBB);
+    mem.write8(0x2000n, 0xbb, true);
+    expect(mem.read8(0x2000n)).toBe(0xbb);
   });
 
   it('should verify execute permissions using checkPermission', () => {
     const mem = new Memory();
-    mem.map(0x1000n, 0x100, '.noexec', { read: true, write: true, execute: false });
+    mem.map(0x1000n, 0x100, '.noexec', {
+      read: true,
+      write: true,
+      execute: false,
+    });
     // Accessing internal private checkPermission method using casting
-    expect(() => (mem as any).checkPermission(0x1000n, 'execute')).toThrow(MemoryAccessError);
+    expect(() => (mem as any).checkPermission(0x1000n, 'execute')).toThrow(
+      MemoryAccessError
+    );
 
     // Map executable region
-    mem.map(0x2000n, 0x100, '.exec', { read: true, write: true, execute: true });
-    expect(() => (mem as any).checkPermission(0x2000n, 'execute')).not.toThrow();
+    mem.map(0x2000n, 0x100, '.exec', {
+      read: true,
+      write: true,
+      execute: true,
+    });
+    expect(() =>
+      (mem as any).checkPermission(0x2000n, 'execute')
+    ).not.toThrow();
   });
 
   it('should support writeBuffer and readBuffer with bypass permissions', () => {
     const mem = new Memory();
-    mem.map(0x1000n, 0x100, '.readonly', { read: true, write: false, execute: false });
+    mem.map(0x1000n, 0x100, '.readonly', {
+      read: true,
+      write: false,
+      execute: false,
+    });
 
     const data = new Uint8Array([1, 2, 3, 4]);
     // Normal writeBuffer on readonly region should throw
-    expect(() => mem.writeBuffer(0x1000n, data, false)).toThrow(MemoryAccessError);
+    expect(() => mem.writeBuffer(0x1000n, data, false)).toThrow(
+      MemoryAccessError
+    );
 
     // Write with bypass should succeed
     mem.writeBuffer(0x1000n, data, true);
     expect(mem.readBuffer(0x1000n, 4)).toEqual(data);
   });
 });
-
-

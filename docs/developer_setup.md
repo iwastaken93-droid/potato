@@ -5,9 +5,11 @@ This document outlines the local setup, tooling configuration, testing standards
 ---
 
 ## 📋 Prerequisites
+
 DISSECT is built using modern TypeScript (ESNext target) and utilizes `pnpm` as its primary package manager.
-*   **Node.js**: Version 18 or higher (LTS recommended).
-*   **Package Manager**: `pnpm` (mandatory rule).
+
+- **Node.js**: Version 18 or higher (LTS recommended).
+- **Package Manager**: `pnpm` (mandatory rule).
 
 ---
 
@@ -16,26 +18,35 @@ DISSECT is built using modern TypeScript (ESNext target) and utilizes `pnpm` as 
 Inside the project root directory, run these scripts to execute operations:
 
 ### 📦 Package Installation
+
 Bootstrap development libraries and project modules:
+
 ```bash
 pnpm install
 ```
 
 ### 🏃 Running Locally (Development)
+
 Launches Vite's local dev server at `http://localhost:5173`. Modifying components or styles triggers Hot Module Replacement (HMR) instantly.
+
 ```bash
 pnpm dev
 ```
 
 ### 🧪 Executing Unit Tests
+
 DISSECT uses **Vitest** for running unit test suites. Run tests with:
+
 ```bash
 pnpm test
 ```
+
 The test suite validates parser correctness, CPU emulator execution (registers, flags, virtual memory paging), decompiler AST mapping, and UI utility components.
 
 ### 🏗️ Compiling a Production Build
+
 Bundles the code, styles, and template files into the production-ready static assets directory `dist/`:
+
 ```bash
 pnpm build
 ```
@@ -47,16 +58,21 @@ pnpm build
 To ensure codebase cleanliness and standard formatting across files, DISSECT includes:
 
 ### Prettier Styling Formatting
+
 Prettier rules are specified in [.prettierrc](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/.prettierrc) to govern tab sizing, bracket spacing, and quote preferences:
-*   **Tab Width**: 2 spaces
-*   **Quotes**: Single quotes
-*   **Trailing Commas**: ES5 compliance
+
+- **Tab Width**: 2 spaces
+- **Quotes**: Single quotes
+- **Trailing Commas**: ES5 compliance
 
 ### ESLint Rules
+
 Linting logic is declared in [eslint.config.js](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/eslint.config.js) leveraging TypeScript recommended practices.
 
 ### TypeScript Compilation Constraints
+
 Configure configurations in [tsconfig.json](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tsconfig.json):
-*   **Module Resolution**: `node16` / `nodenext` configuration is enforced, which mandates that all relative imports must include standard `.js` file extensions.
-*   **Bitness/Bignum Compatibility**: Requires the target version to support native JavaScript ESNext/ES2020 features (specifically `BigInt` operations).
-*   **Strict Checks**: `noImplicitAny: true` and `strict: true` settings are turned on to prevent type bypasses.
+
+- **Module Resolution**: `node16` / `nodenext` configuration is enforced, which mandates that all relative imports must include standard `.js` file extensions.
+- **Bitness/Bignum Compatibility**: Requires the target version to support native JavaScript ESNext/ES2020 features (specifically `BigInt` operations).
+- **Strict Checks**: `noImplicitAny: true` and `strict: true` settings are turned on to prevent type bypasses.

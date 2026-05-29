@@ -5,7 +5,11 @@
  */
 
 import { Section } from '../disassembler/types.js';
-import { calculateEntropy, findHighEntropyBlocks, EntropyBlock } from '../analyzer/entropy.js';
+import {
+  calculateEntropy,
+  findHighEntropyBlocks,
+  EntropyBlock,
+} from '../analyzer/entropy.js';
 
 export interface EntropyGraphOptions {
   onNavigate?: (offset: number, targetView: 'hex' | 'assembly') => void;
@@ -57,7 +61,7 @@ export class EntropyGraph {
    */
   private recalculate() {
     this.stride = Math.max(32, Math.floor(this.windowSize / 2));
-    
+
     // Scan the binary for sliding-window entropy blocks
     this.entropyBlocks = findHighEntropyBlocks(this.data, {
       blockSize: this.windowSize,
@@ -83,7 +87,7 @@ export class EntropyGraph {
 
   private initLayout() {
     this.container.innerHTML = '';
-    
+
     // Inject Styles if needed
     if (!document.getElementById('entropy-graph-styles')) {
       const style = document.createElement('style');
@@ -335,17 +339,25 @@ export class EntropyGraph {
 
     // Cache elements
     this.canvas = mainEl.querySelector('#entropy-canvas') as HTMLCanvasElement;
-    this.windowSelect = mainEl.querySelector('#entropy-window-select') as HTMLSelectElement;
-    this.thresholdInput = mainEl.querySelector('#entropy-threshold-input') as HTMLInputElement;
-    this.blocksListContainer = sidebarEl.querySelector('#entropy-blocks-list') as HTMLDivElement;
-    this.sectionsListContainer = sidebarEl.querySelector('#entropy-sections-list') as HTMLDivElement;
+    this.windowSelect = mainEl.querySelector(
+      '#entropy-window-select'
+    ) as HTMLSelectElement;
+    this.thresholdInput = mainEl.querySelector(
+      '#entropy-threshold-input'
+    ) as HTMLInputElement;
+    this.blocksListContainer = sidebarEl.querySelector(
+      '#entropy-blocks-list'
+    ) as HTMLDivElement;
+    this.sectionsListContainer = sidebarEl.querySelector(
+      '#entropy-sections-list'
+    ) as HTMLDivElement;
   }
 
   private renderSidebar() {
     // 1. Render High Entropy Blocks list
     this.blocksListContainer.innerHTML = '';
-    const highBlocks = this.entropyBlocks.filter(b => b.isHighEntropy);
-    
+    const highBlocks = this.entropyBlocks.filter((b) => b.isHighEntropy);
+
     if (highBlocks.length === 0) {
       this.blocksListContainer.innerHTML = `
         <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 2rem;">
@@ -353,10 +365,10 @@ export class EntropyGraph {
         </div>
       `;
     } else {
-      highBlocks.forEach(b => {
+      highBlocks.forEach((b) => {
         const card = document.createElement('div');
         card.className = 'entropy-block-card high-entropy';
-        
+
         card.innerHTML = `
           <div class="card-row">
             <span class="card-title">0x${b.start.toString(16).toUpperCase()} - 0x${b.end.toString(16).toUpperCase()}</span>
@@ -381,7 +393,7 @@ export class EntropyGraph {
         </div>
       `;
     } else {
-      this.sections.forEach(s => {
+      this.sections.forEach((s) => {
         const start = s.fileOffset;
         const end = Math.min(start + s.fileSize, this.data.length);
         let secEntropy = 0;
@@ -392,7 +404,7 @@ export class EntropyGraph {
         const isHigh = secEntropy >= this.threshold;
         const card = document.createElement('div');
         card.className = `entropy-section-card ${isHigh ? 'high-entropy' : ''}`;
-        
+
         card.innerHTML = `
           <div class="card-row">
             <span class="card-title" style="color: #60a5fa;">${s.name}</span>
@@ -439,12 +451,18 @@ export class EntropyGraph {
     this.canvas.addEventListener('click', (e) => this.handleMouseClick(e));
 
     // Jump buttons listeners in sidebar
-    this.blocksListContainer.addEventListener('click', (e) => this.handleSidebarClick(e));
-    this.sectionsListContainer.addEventListener('click', (e) => this.handleSidebarClick(e));
+    this.blocksListContainer.addEventListener('click', (e) =>
+      this.handleSidebarClick(e)
+    );
+    this.sectionsListContainer.addEventListener('click', (e) =>
+      this.handleSidebarClick(e)
+    );
   }
 
   private handleSidebarClick(e: MouseEvent) {
-    const btn = (e.target as HTMLElement).closest('.card-btn') as HTMLButtonElement;
+    const btn = (e.target as HTMLElement).closest(
+      '.card-btn'
+    ) as HTMLButtonElement;
     if (!btn) return;
     const action = btn.dataset.action as 'hex' | 'assembly';
     const offset = parseInt(btn.dataset.offset || '0');
@@ -466,7 +484,7 @@ export class EntropyGraph {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const dpr = window.devicePixelRatio || 1;
     const canvasWidth = this.canvas.width / dpr;
     const padding = { left: 50, right: 20, top: 20, bottom: 40 };
@@ -495,12 +513,16 @@ export class EntropyGraph {
   private handleMouseClick(e: MouseEvent) {
     if (this.hoveredBlock && this.options.onNavigate) {
       // By default jump to assembly if execution section, otherwise hex
-      const isExec = this.sections.some(s => 
-        this.hoveredBlock!.start >= s.fileOffset && 
-        this.hoveredBlock!.start < s.fileOffset + s.fileSize && 
-        s.flags.execute
+      const isExec = this.sections.some(
+        (s) =>
+          this.hoveredBlock!.start >= s.fileOffset &&
+          this.hoveredBlock!.start < s.fileOffset + s.fileSize &&
+          s.flags.execute
       );
-      this.options.onNavigate(this.hoveredBlock.start, isExec ? 'assembly' : 'hex');
+      this.options.onNavigate(
+        this.hoveredBlock.start,
+        isExec ? 'assembly' : 'hex'
+      );
     }
   }
 
@@ -534,7 +556,7 @@ export class EntropyGraph {
     ctx.textBaseline = 'middle';
 
     const yLevels = [0, 2, 4, 6, 8];
-    yLevels.forEach(val => {
+    yLevels.forEach((val) => {
       const y = padding.top + chartHeight - (val / 8) * chartHeight;
       // Grid line
       ctx.beginPath();
@@ -551,13 +573,15 @@ export class EntropyGraph {
     // 2. Map coordinates for each block
     const coords: { x: number; y: number; block: EntropyBlock }[] = [];
     this.entropyBlocks.forEach((block, idx) => {
-      const x = padding.left + (idx / (this.entropyBlocks.length - 1)) * chartWidth;
+      const x =
+        padding.left + (idx / (this.entropyBlocks.length - 1)) * chartWidth;
       const y = padding.top + chartHeight - (block.entropy / 8) * chartHeight;
       coords.push({ x, y, block });
     });
 
     // 3. Draw Threshold horizontal line
-    const threshY = padding.top + chartHeight - (this.threshold / 8) * chartHeight;
+    const threshY =
+      padding.top + chartHeight - (this.threshold / 8) * chartHeight;
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
     ctx.setLineDash([5, 5]);
     ctx.lineWidth = 1.5;
@@ -571,7 +595,11 @@ export class EntropyGraph {
     ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(`THRESHOLD (${this.threshold.toFixed(1)})`, padding.left + 5, threshY - 6);
+    ctx.fillText(
+      `THRESHOLD (${this.threshold.toFixed(1)})`,
+      padding.left + 5,
+      threshY - 6
+    );
 
     // 4. Draw Glow shadow & line path
     ctx.beginPath();
@@ -584,7 +612,12 @@ export class EntropyGraph {
     ctx.closePath();
 
     // Fill gradient
-    const fillGrad = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
+    const fillGrad = ctx.createLinearGradient(
+      0,
+      padding.top,
+      0,
+      padding.top + chartHeight
+    );
     fillGrad.addColorStop(0, 'rgba(139, 92, 246, 0.25)'); // Indigo/Purple
     fillGrad.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
     ctx.fillStyle = fillGrad;
@@ -599,8 +632,13 @@ export class EntropyGraph {
     ctx.lineWidth = 2.5;
 
     // Line gradient style: glow orange/red for high entropy, blue/violet for normal
-    const lineGrad = ctx.createLinearGradient(padding.left, 0, padding.left + chartWidth, 0);
-    coords.forEach(pt => {
+    const lineGrad = ctx.createLinearGradient(
+      padding.left,
+      0,
+      padding.left + chartWidth,
+      0
+    );
+    coords.forEach((pt) => {
       const progress = (pt.x - padding.left) / chartWidth;
       const color = pt.block.isHighEntropy ? '#ef4444' : '#6366f1';
       lineGrad.addColorStop(Math.min(1, Math.max(0, progress)), color);
@@ -612,9 +650,11 @@ export class EntropyGraph {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
     ctx.font = '8px monospace';
     ctx.textAlign = 'center';
-    this.sections.forEach(s => {
+    this.sections.forEach((s) => {
       const sStartPct = s.fileOffset / this.data.length;
-      const sEndPct = Math.min(s.fileOffset + s.fileSize, this.data.length) / this.data.length;
+      const sEndPct =
+        Math.min(s.fileOffset + s.fileSize, this.data.length) /
+        this.data.length;
       const x1 = padding.left + sStartPct * chartWidth;
       const x2 = padding.left + sEndPct * chartWidth;
 
@@ -622,7 +662,11 @@ export class EntropyGraph {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
         ctx.fillRect(x1, padding.top, x2 - x1, chartHeight);
         ctx.fillStyle = 'rgba(96, 165, 250, 0.3)';
-        ctx.fillText(s.name, x1 + (x2 - x1) / 2, padding.top + chartHeight + 12);
+        ctx.fillText(
+          s.name,
+          x1 + (x2 - x1) / 2,
+          padding.top + chartHeight + 12
+        );
       }
     });
 
@@ -637,7 +681,11 @@ export class EntropyGraph {
       const pct = i / (numTicks - 1);
       const offset = Math.round(pct * this.data.length);
       const x = padding.left + pct * chartWidth;
-      ctx.fillText(`0x${offset.toString(16).toUpperCase()}`, x, padding.top + chartHeight + 20);
+      ctx.fillText(
+        `0x${offset.toString(16).toUpperCase()}`,
+        x,
+        padding.top + chartHeight + 20
+      );
     }
 
     // 7. Interactive Crosshair and Tooltip
@@ -664,8 +712,10 @@ export class EntropyGraph {
         ctx.stroke();
 
         // Find enclosing section if any
-        const sec = this.sections.find(s => 
-          pt.block.start >= s.fileOffset && pt.block.start < s.fileOffset + s.fileSize
+        const sec = this.sections.find(
+          (s) =>
+            pt.block.start >= s.fileOffset &&
+            pt.block.start < s.fileOffset + s.fileSize
         );
         const sectionName = sec ? sec.name : 'N/A';
 
@@ -699,14 +749,20 @@ export class EntropyGraph {
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(`Offset: 0x${pt.block.start.toString(16).toUpperCase()}`, tooltipX + 12, tooltipY + 10);
+        ctx.fillText(
+          `Offset: 0x${pt.block.start.toString(16).toUpperCase()}`,
+          tooltipX + 12,
+          tooltipY + 10
+        );
 
         ctx.fillStyle = '#94a3b8';
         ctx.font = '10px monospace';
         ctx.fillText(`Dec: ${pt.block.start}`, tooltipX + 12, tooltipY + 28);
         ctx.fillText(`Section: ${sectionName}`, tooltipX + 12, tooltipY + 42);
 
-        const statusText = pt.block.isHighEntropy ? '⚠️ High Entropy' : '✓ Normal';
+        const statusText = pt.block.isHighEntropy
+          ? '⚠️ High Entropy'
+          : '✓ Normal';
         ctx.fillStyle = pt.block.isHighEntropy ? '#f87171' : '#34d399';
         ctx.font = 'bold 10px sans-serif';
         ctx.fillText(statusText, tooltipX + 12, tooltipY + 56);
@@ -714,11 +770,19 @@ export class EntropyGraph {
         ctx.fillStyle = '#f8fafc';
         ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'right';
-        ctx.fillText(pt.block.entropy.toFixed(3), tooltipX + tooltipWidth - 12, tooltipY + 10);
-        
+        ctx.fillText(
+          pt.block.entropy.toFixed(3),
+          tooltipX + tooltipWidth - 12,
+          tooltipY + 10
+        );
+
         ctx.fillStyle = '#64748b';
         ctx.font = '8px sans-serif';
-        ctx.fillText('Click to Jump', tooltipX + tooltipWidth - 12, tooltipY + tooltipHeight - 16);
+        ctx.fillText(
+          'Click to Jump',
+          tooltipX + tooltipWidth - 12,
+          tooltipY + tooltipHeight - 16
+        );
       }
     }
   }

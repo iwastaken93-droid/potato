@@ -29,7 +29,10 @@ export class AIExplanationEngine {
   /**
    * Analyzes a block of code (assembly or decompiled) and returns an AI explanation result.
    */
-  public static analyze(code: string, context?: { functionName?: string; arch?: string }): AIExplanationResult {
+  public static analyze(
+    code: string,
+    context?: { functionName?: string; arch?: string }
+  ): AIExplanationResult {
     const cleanCode = code.trim();
     const funcName = context?.functionName || 'unknown_function';
     const lowerCode = cleanCode.toLowerCase();
@@ -44,19 +47,81 @@ export class AIExplanationEngine {
     const suggestions: string[] = [];
 
     // Analyze specific patterns
-    const hasRC4 = lowerCode.includes('rc4') || (lowerCode.includes('256') && lowerCode.includes('swap') && lowerCode.includes('xor')) || (lowerCode.includes('s[i]') && lowerCode.includes('s[j]'));
-    const hasTEA = lowerCode.includes('0x9e3779b9') || lowerCode.includes('0x61c88647') || lowerCode.includes('tea') || lowerCode.includes('xtea');
-    const hasBase64 = lowerCode.includes('base64') || lowerCode.includes('abcdefghijklmnopqrstuvwxyz') || (lowerCode.includes('0x3f') && lowerCode.includes('>>') && lowerCode.includes('<<'));
-    const hasXorObfuscation = (lowerCode.includes('xor') && (lowerCode.includes('key') || lowerCode.includes('crypt') || lowerCode.includes('obfus') || lowerCode.includes('0xaa') || lowerCode.includes('0x55')));
-    const hasAntiDebug = lowerCode.includes('isdebuggerpresent') || lowerCode.includes('peb') || lowerCode.includes('ntglobalflag') || lowerCode.includes('fs:[0x30]') || lowerCode.includes('gs:[0x60]') || lowerCode.includes('ptrace');
-    const hasNetwork = lowerCode.includes('socket') || lowerCode.includes('connect') || lowerCode.includes('send') || lowerCode.includes('recv') || lowerCode.includes('http') || lowerCode.includes('socket');
-    const hasFileSystem = lowerCode.includes('fopen') || lowerCode.includes('fread') || lowerCode.includes('fwrite') || lowerCode.includes('fclose') || lowerCode.includes('createfile') || lowerCode.includes('readfile');
-    const hasStringManip = lowerCode.includes('strcmp') || lowerCode.includes('strlen') || lowerCode.includes('strcpy') || lowerCode.includes('strcat') || lowerCode.includes('memcpy') || lowerCode.includes('memset');
-    const hasMath = lowerCode.includes('imul') || lowerCode.includes('idiv') || lowerCode.includes('mul') || lowerCode.includes('div') || lowerCode.includes('sin') || lowerCode.includes('cos') || lowerCode.includes('sqrt');
-    const hasLoops = lowerCode.includes('while') || lowerCode.includes('for') || lowerCode.includes('loop') || lowerCode.includes('jz') || lowerCode.includes('jnz') || lowerCode.includes('jmp');
+    const hasRC4 =
+      lowerCode.includes('rc4') ||
+      (lowerCode.includes('256') &&
+        lowerCode.includes('swap') &&
+        lowerCode.includes('xor')) ||
+      (lowerCode.includes('s[i]') && lowerCode.includes('s[j]'));
+    const hasTEA =
+      lowerCode.includes('0x9e3779b9') ||
+      lowerCode.includes('0x61c88647') ||
+      lowerCode.includes('tea') ||
+      lowerCode.includes('xtea');
+    const hasBase64 =
+      lowerCode.includes('base64') ||
+      lowerCode.includes('abcdefghijklmnopqrstuvwxyz') ||
+      (lowerCode.includes('0x3f') &&
+        lowerCode.includes('>>') &&
+        lowerCode.includes('<<'));
+    const hasXorObfuscation =
+      lowerCode.includes('xor') &&
+      (lowerCode.includes('key') ||
+        lowerCode.includes('crypt') ||
+        lowerCode.includes('obfus') ||
+        lowerCode.includes('0xaa') ||
+        lowerCode.includes('0x55'));
+    const hasAntiDebug =
+      lowerCode.includes('isdebuggerpresent') ||
+      lowerCode.includes('peb') ||
+      lowerCode.includes('ntglobalflag') ||
+      lowerCode.includes('fs:[0x30]') ||
+      lowerCode.includes('gs:[0x60]') ||
+      lowerCode.includes('ptrace');
+    const hasNetwork =
+      lowerCode.includes('socket') ||
+      lowerCode.includes('connect') ||
+      lowerCode.includes('send') ||
+      lowerCode.includes('recv') ||
+      lowerCode.includes('http') ||
+      lowerCode.includes('socket');
+    const hasFileSystem =
+      lowerCode.includes('fopen') ||
+      lowerCode.includes('fread') ||
+      lowerCode.includes('fwrite') ||
+      lowerCode.includes('fclose') ||
+      lowerCode.includes('createfile') ||
+      lowerCode.includes('readfile');
+    const hasStringManip =
+      lowerCode.includes('strcmp') ||
+      lowerCode.includes('strlen') ||
+      lowerCode.includes('strcpy') ||
+      lowerCode.includes('strcat') ||
+      lowerCode.includes('memcpy') ||
+      lowerCode.includes('memset');
+    const hasMath =
+      lowerCode.includes('imul') ||
+      lowerCode.includes('idiv') ||
+      lowerCode.includes('mul') ||
+      lowerCode.includes('div') ||
+      lowerCode.includes('sin') ||
+      lowerCode.includes('cos') ||
+      lowerCode.includes('sqrt');
+    const hasLoops =
+      lowerCode.includes('while') ||
+      lowerCode.includes('for') ||
+      lowerCode.includes('loop') ||
+      lowerCode.includes('jz') ||
+      lowerCode.includes('jnz') ||
+      lowerCode.includes('jmp');
 
     // 1. MATCH: RC4 Stream Cipher
-    if (hasRC4 || funcName.toLowerCase().includes('rc4') || funcName.toLowerCase().includes('ksa') || funcName.toLowerCase().includes('prga')) {
+    if (
+      hasRC4 ||
+      funcName.toLowerCase().includes('rc4') ||
+      funcName.toLowerCase().includes('ksa') ||
+      funcName.toLowerCase().includes('prga')
+    ) {
       summary = `Implements the RC4 stream cipher algorithm, including either the Key Scheduling Algorithm (KSA) or the Pseudo-Random Generation Algorithm (PRGA).`;
       functionality.push(
         'Initializes an S-box array of 256 bytes with values from 0 to 255.',
@@ -67,8 +132,13 @@ export class AIExplanationEngine {
       patterns.push({
         name: 'RC4 Cryptographic Cipher',
         confidence: 95,
-        description: 'Symmetric stream cipher characterized by a state array of 256 bytes, swapping indexes, and XOR stream combining.',
-        matchedElements: ['S-box initialization loop (0..255)', 'S-box permutation based on key bytes', 'Index arithmetic wrapping modulo 256']
+        description:
+          'Symmetric stream cipher characterized by a state array of 256 bytes, swapping indexes, and XOR stream combining.',
+        matchedElements: [
+          'S-box initialization loop (0..255)',
+          'S-box permutation based on key bytes',
+          'Index arithmetic wrapping modulo 256',
+        ],
       });
       pseudocode = `void rc4_crypt(uint8_t *data, size_t data_len, const uint8_t *key, size_t key_len) {
     uint8_t S[256];
@@ -93,15 +163,21 @@ export class AIExplanationEngine {
         data[offset] ^= K; // Encrypt/Decrypt byte
     }
 }`;
-      timeComp = 'O(N) where N is the length of data (plus O(1) constant initialization overhead)';
-      spaceComp = 'O(1) auxiliary space (256 bytes on the stack for S-box state)';
+      timeComp =
+        'O(N) where N is the length of data (plus O(1) constant initialization overhead)';
+      spaceComp =
+        'O(1) auxiliary space (256 bytes on the stack for S-box state)';
       suggestions.push(
         'RC4 is cryptographically broken and vulnerable to various attacks (e.g., Fluhrer-Mantin-Shamir). Upgrade to AES-GCM or ChaCha20.',
         'Ensure the secret key is not hardcoded in the binary assets.'
       );
     }
     // 2. MATCH: TEA / XTEA Block Cipher
-    else if (hasTEA || funcName.toLowerCase().includes('tea') || funcName.toLowerCase().includes('xtea')) {
+    else if (
+      hasTEA ||
+      funcName.toLowerCase().includes('tea') ||
+      funcName.toLowerCase().includes('xtea')
+    ) {
       summary = `Implements the Tiny Encryption Algorithm (TEA or XTEA), a symmetric block cipher renowned for its simple design and compact code size.`;
       functionality.push(
         'Operates on 64-bit blocks of data split into two 32-bit halves (v0, v1).',
@@ -112,8 +188,13 @@ export class AIExplanationEngine {
       patterns.push({
         name: 'TEA/XTEA Block Cipher',
         confidence: 98,
-        description: 'Feistel cipher utilizing a delta constant of 0x9E3779B9 and repetitive bitwise shifts.',
-        matchedElements: ['Delta constant 0x9E3779B9', 'Bitwise shift operations (<< 4, >> 5)', 'Accumulative sum loop (usually 32 iterations)']
+        description:
+          'Feistel cipher utilizing a delta constant of 0x9E3779B9 and repetitive bitwise shifts.',
+        matchedElements: [
+          'Delta constant 0x9E3779B9',
+          'Bitwise shift operations (<< 4, >> 5)',
+          'Accumulative sum loop (usually 32 iterations)',
+        ],
       });
       pseudocode = `void xtea_encrypt(uint32_t num_rounds, uint32_t v[2], const uint32_t k[4]) {
     uint32_t v0 = v[0], v1 = v[1], sum = 0, delta = 0x9E3779B9;
@@ -124,7 +205,8 @@ export class AIExplanationEngine {
     }
     v[0] = v0; v[1] = v1;
 }`;
-      timeComp = 'O(R) where R is the number of rounds (typically 32 or 64, making it effectively O(1))';
+      timeComp =
+        'O(R) where R is the number of rounds (typically 32 or 64, making it effectively O(1))';
       spaceComp = 'O(1) storage in registers';
       suggestions.push(
         'TEA has a key-equivalence vulnerability (each key is equivalent to three others). Ensure XTEA or block padding is used correctly.',
@@ -132,7 +214,11 @@ export class AIExplanationEngine {
       );
     }
     // 3. MATCH: Base64 Encoding / Decoding
-    else if (hasBase64 || funcName.toLowerCase().includes('base64') || funcName.toLowerCase().includes('b64')) {
+    else if (
+      hasBase64 ||
+      funcName.toLowerCase().includes('base64') ||
+      funcName.toLowerCase().includes('b64')
+    ) {
       summary = `Implements Base64 processing (encoding or decoding) to represent binary data in an ASCII string format.`;
       functionality.push(
         'Processes data in chunks of 3 bytes (encoding) or 4 characters (decoding).',
@@ -142,8 +228,13 @@ export class AIExplanationEngine {
       patterns.push({
         name: 'Base64 Text Conversion',
         confidence: 90,
-        description: 'Binary-to-text encoding scheme utilizing a 64-character lookup table and bit-packing operations.',
-        matchedElements: ['Lookup alphabet: A-Z, a-z, 0-9, +, /', 'Bitwise masking (e.g., & 0x3F)', 'Modulo 3/4 padding blocks']
+        description:
+          'Binary-to-text encoding scheme utilizing a 64-character lookup table and bit-packing operations.',
+        matchedElements: [
+          'Lookup alphabet: A-Z, a-z, 0-9, +, /',
+          'Bitwise masking (e.g., & 0x3F)',
+          'Modulo 3/4 padding blocks',
+        ],
       });
       pseudocode = `char* base64_encode(const uint8_t* data, size_t input_len) {
     const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -171,7 +262,11 @@ export class AIExplanationEngine {
       );
     }
     // 4. MATCH: Anti-Debugging or Malware Obfuscation
-    else if (hasAntiDebug || funcName.toLowerCase().includes('debug') || funcName.toLowerCase().includes('anti')) {
+    else if (
+      hasAntiDebug ||
+      funcName.toLowerCase().includes('debug') ||
+      funcName.toLowerCase().includes('anti')
+    ) {
       summary = `Implements security protections or anti-analysis checks, aiming to determine if the process is currently being inspected inside a debugger or emulator.`;
       functionality.push(
         'Queries the Process Environment Block (PEB) for the BeingDebugged flag.',
@@ -182,8 +277,13 @@ export class AIExplanationEngine {
       patterns.push({
         name: 'Anti-Debugging & Evasion',
         confidence: 95,
-        description: 'Standard software protection / malware technique to inhibit reverse engineering.',
-        matchedElements: ['PEB dereference (fs:[0x30] or gs:[0x60])', 'API check: IsDebuggerPresent', 'Branching logic indicating execution deviation']
+        description:
+          'Standard software protection / malware technique to inhibit reverse engineering.',
+        matchedElements: [
+          'PEB dereference (fs:[0x30] or gs:[0x60])',
+          'API check: IsDebuggerPresent',
+          'Branching logic indicating execution deviation',
+        ],
       });
       pseudocode = `bool is_being_debugged() {
 #ifdef _WIN32
@@ -214,7 +314,11 @@ export class AIExplanationEngine {
       );
     }
     // 5. MATCH: XOR Cryptography / Obfuscation
-    else if (hasXorObfuscation || funcName.toLowerCase().includes('xor') || funcName.toLowerCase().includes('crypt')) {
+    else if (
+      hasXorObfuscation ||
+      funcName.toLowerCase().includes('xor') ||
+      funcName.toLowerCase().includes('crypt')
+    ) {
       summary = `Applies a XOR-based encryption or obfuscation routine to strings, binary contents, or communication buffers.`;
       functionality.push(
         'Iterates over an array or buffer of bytes.',
@@ -225,7 +329,11 @@ export class AIExplanationEngine {
         name: 'XOR Obfuscation / Decryption',
         confidence: 85,
         description: 'Simplistic symmetric operation for data masking.',
-        matchedElements: ['Loop containing XOR register or XOR byte instruction', 'Cyclic key indexing (modulo key length)', 'In-place buffer mutation']
+        matchedElements: [
+          'Loop containing XOR register or XOR byte instruction',
+          'Cyclic key indexing (modulo key length)',
+          'In-place buffer mutation',
+        ],
       });
       pseudocode = `void xor_cipher(uint8_t* data, size_t data_len, const uint8_t* key, size_t key_len) {
     for (size_t i = 0; i < data_len; i++) {
@@ -240,7 +348,12 @@ export class AIExplanationEngine {
       );
     }
     // 6. MATCH: Network Sockets
-    else if (hasNetwork || funcName.toLowerCase().includes('net') || funcName.toLowerCase().includes('socket') || funcName.toLowerCase().includes('http')) {
+    else if (
+      hasNetwork ||
+      funcName.toLowerCase().includes('net') ||
+      funcName.toLowerCase().includes('socket') ||
+      funcName.toLowerCase().includes('http')
+    ) {
       summary = `Manages network connectivity, opening a socket or making API calls to establish external communication.`;
       functionality.push(
         'Initializes socket libraries (e.g., WSAStartup on Windows).',
@@ -251,8 +364,13 @@ export class AIExplanationEngine {
       patterns.push({
         name: 'Network TCP/IP Socket client',
         confidence: 90,
-        description: 'Establishes a socket socket descriptor and attempts a socket connection to a remote IP address.',
-        matchedElements: ['socket() invocation', 'sockaddr_in structure configuration', 'connect() or send()/recv() flow']
+        description:
+          'Establishes a socket socket descriptor and attempts a socket connection to a remote IP address.',
+        matchedElements: [
+          'socket() invocation',
+          'sockaddr_in structure configuration',
+          'connect() or send()/recv() flow',
+        ],
       });
       pseudocode = `int establish_connection(const char* ip, int port) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -277,7 +395,12 @@ export class AIExplanationEngine {
       );
     }
     // 7. MATCH: File System I/O
-    else if (hasFileSystem || funcName.toLowerCase().includes('file') || funcName.toLowerCase().includes('write') || funcName.toLowerCase().includes('read')) {
+    else if (
+      hasFileSystem ||
+      funcName.toLowerCase().includes('file') ||
+      funcName.toLowerCase().includes('write') ||
+      funcName.toLowerCase().includes('read')
+    ) {
       summary = `Performs file system input/output operations, writing, reading, or creating files on disk.`;
       functionality.push(
         'Obtains a file descriptor or file handle using file paths.',
@@ -289,7 +412,11 @@ export class AIExplanationEngine {
         name: 'File System Access',
         confidence: 85,
         description: 'Read or write interface interacting with storage files.',
-        matchedElements: ['fopen / CreateFile call', 'fread / ReadFile or fwrite / WriteFile operations', 'fclose / CloseHandle cleanup']
+        matchedElements: [
+          'fopen / CreateFile call',
+          'fread / ReadFile or fwrite / WriteFile operations',
+          'fclose / CloseHandle cleanup',
+        ],
       });
       pseudocode = `size_t write_buffer_to_file(const char* filepath, const uint8_t* buffer, size_t size) {
     FILE* f = fopen(filepath, "wb");
@@ -306,7 +433,11 @@ export class AIExplanationEngine {
       );
     }
     // 8. MATCH: String Manipulation
-    else if (hasStringManip || funcName.toLowerCase().includes('string') || funcName.toLowerCase().includes('str')) {
+    else if (
+      hasStringManip ||
+      funcName.toLowerCase().includes('string') ||
+      funcName.toLowerCase().includes('str')
+    ) {
       summary = `Executes string manipulation or memory copying, typically checking string lengths, concatenating strings, or looking for specific substring tokens.`;
       functionality.push(
         'Loops through string pointers seeking null-terminator bytes.',
@@ -316,8 +447,13 @@ export class AIExplanationEngine {
       patterns.push({
         name: 'String / Buffer Processing',
         confidence: 80,
-        description: 'Common string utility logic often compiled inline or via runtime libc imports.',
-        matchedElements: ['Pointer arithmetic/iteration until null-byte', 'Comparison loops with offset increments', 'String functions like strcmp, strlen']
+        description:
+          'Common string utility logic often compiled inline or via runtime libc imports.',
+        matchedElements: [
+          'Pointer arithmetic/iteration until null-byte',
+          'Comparison loops with offset increments',
+          'String functions like strcmp, strlen',
+        ],
       });
       pseudocode = `size_t my_strlen(const char* str) {
     const char* s = str;
@@ -334,7 +470,11 @@ export class AIExplanationEngine {
       );
     }
     // 9. MATCH: General Math Calculation
-    else if (hasMath || funcName.toLowerCase().includes('math') || funcName.toLowerCase().includes('calc')) {
+    else if (
+      hasMath ||
+      funcName.toLowerCase().includes('math') ||
+      funcName.toLowerCase().includes('calc')
+    ) {
       summary = `Executes mathematical or numeric computations, likely processing geometry, checksums, hash constants, or statistical calculations.`;
       functionality.push(
         'Runs multiplicative and division operations on double/float or large integer types.',
@@ -344,7 +484,11 @@ export class AIExplanationEngine {
         name: 'Mathematical Routine',
         confidence: 75,
         description: 'General numeric processing function.',
-        matchedElements: ['imul / idiv / fmul instructions', 'Floating point operations', 'Mathematical formulas / lookup coefficients']
+        matchedElements: [
+          'imul / idiv / fmul instructions',
+          'Floating point operations',
+          'Mathematical formulas / lookup coefficients',
+        ],
       });
       pseudocode = `double calculate_hypotenuse(double side1, double side2) {
     return sqrt((side1 * side1) + (side2 * side2));
@@ -368,8 +512,13 @@ export class AIExplanationEngine {
         patterns.push({
           name: 'Looping Iterative Routine',
           confidence: 80,
-          description: 'Basic control loop evaluating a sequential block of instructions.',
-          matchedElements: ['Loop counter initialization', 'Conditional branches (JZ/JNZ/JNE/JLE)', 'Pointer step increment']
+          description:
+            'Basic control loop evaluating a sequential block of instructions.',
+          matchedElements: [
+            'Loop counter initialization',
+            'Conditional branches (JZ/JNZ/JNE/JLE)',
+            'Pointer step increment',
+          ],
         });
       }
       pseudocode = `void process_items(uint32_t* items, size_t count) {
@@ -394,9 +543,9 @@ export class AIExplanationEngine {
       pseudocode,
       complexity: {
         time: timeComp,
-        space: spaceComp
+        space: spaceComp,
       },
-      suggestions
+      suggestions,
     };
   }
 }

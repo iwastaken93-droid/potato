@@ -102,56 +102,66 @@ class BufferReader {
   }
 
   readU1(): number {
-    if (this.offset + 1 > this.view.byteLength) throw new Error('Unexpected EOF');
+    if (this.offset + 1 > this.view.byteLength)
+      throw new Error('Unexpected EOF');
     const val = this.bytes[this.offset];
     this.offset += 1;
     return val;
   }
 
   readU2(): number {
-    if (this.offset + 2 > this.view.byteLength) throw new Error('Unexpected EOF');
+    if (this.offset + 2 > this.view.byteLength)
+      throw new Error('Unexpected EOF');
     const val = this.view.getUint16(this.offset, false);
     this.offset += 2;
     return val;
   }
 
   readU4(): number {
-    if (this.offset + 4 > this.view.byteLength) throw new Error('Unexpected EOF');
+    if (this.offset + 4 > this.view.byteLength)
+      throw new Error('Unexpected EOF');
     const val = this.view.getUint32(this.offset, false);
     this.offset += 4;
     return val;
   }
 
   readU8(): bigint {
-    if (this.offset + 8 > this.view.byteLength) throw new Error('Unexpected EOF');
+    if (this.offset + 8 > this.view.byteLength)
+      throw new Error('Unexpected EOF');
     const val = this.view.getBigUint64(this.offset, false);
     this.offset += 8;
     return val;
   }
 
   readFloat(): number {
-    if (this.offset + 4 > this.view.byteLength) throw new Error('Unexpected EOF');
+    if (this.offset + 4 > this.view.byteLength)
+      throw new Error('Unexpected EOF');
     const val = this.view.getFloat32(this.offset, false);
     this.offset += 4;
     return val;
   }
 
   readDouble(): number {
-    if (this.offset + 8 > this.view.byteLength) throw new Error('Unexpected EOF');
+    if (this.offset + 8 > this.view.byteLength)
+      throw new Error('Unexpected EOF');
     const val = this.view.getFloat64(this.offset, false);
     this.offset += 8;
     return val;
   }
 
   readBytes(length: number): Uint8Array {
-    if (this.offset + length > this.view.byteLength) throw new Error('Unexpected EOF');
+    if (this.offset + length > this.view.byteLength)
+      throw new Error('Unexpected EOF');
     const val = this.bytes.subarray(this.offset, this.offset + length);
     this.offset += length;
     return val;
   }
 }
 
-export function formatAccessFlags(flags: number, type: 'class' | 'field' | 'method'): string[] {
+export function formatAccessFlags(
+  flags: number,
+  type: 'class' | 'field' | 'method'
+): string[] {
   const result: string[] = [];
   if (flags & 0x0001) result.push('PUBLIC');
   if (flags & 0x0002) result.push('PRIVATE');
@@ -189,7 +199,9 @@ export function parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass {
   // Validate Magic: 0xCAFEBABE
   const magic = reader.readU4();
   if (magic !== 0xcafebabe) {
-    throw new Error(`Invalid Java Class Magic: 0x${magic.toString(16).toUpperCase()}`);
+    throw new Error(
+      `Invalid Java Class Magic: 0x${magic.toString(16).toUpperCase()}`
+    );
   }
 
   const minorVersion = reader.readU2();
@@ -205,74 +217,88 @@ export function parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass {
     const entry: ConstantPoolEntry = { tag, tagName };
 
     switch (tag) {
-      case 1: { // Utf8
+      case 1: {
+        // Utf8
         const length = reader.readU2();
         const bytes = reader.readBytes(length);
         entry.value = new TextDecoder('utf-8').decode(bytes);
         break;
       }
-      case 3: { // Integer
+      case 3: {
+        // Integer
         entry.value = reader.readU4();
         break;
       }
-      case 4: { // Float
+      case 4: {
+        // Float
         entry.value = reader.readFloat();
         break;
       }
-      case 5: { // Long
+      case 5: {
+        // Long
         entry.value = reader.readU8();
         constantPool.push(entry);
         constantPool.push(null); // Second slot is empty/unused in JVM spec
         i++;
         continue;
       }
-      case 6: { // Double
+      case 6: {
+        // Double
         entry.value = reader.readDouble();
         constantPool.push(entry);
         constantPool.push(null); // Second slot is empty/unused in JVM spec
         i++;
         continue;
       }
-      case 7: { // Class
+      case 7: {
+        // Class
         entry.nameIndex = reader.readU2();
         break;
       }
-      case 8: { // String
+      case 8: {
+        // String
         entry.stringIndex = reader.readU2();
         break;
       }
       case 9: // Fieldref
       case 10: // Methodref
-      case 11: { // InterfaceMethodref
+      case 11: {
+        // InterfaceMethodref
         entry.classIndex = reader.readU2();
         entry.nameAndTypeIndex = reader.readU2();
         break;
       }
-      case 12: { // NameAndType
+      case 12: {
+        // NameAndType
         entry.nameIndex = reader.readU2();
         entry.descriptorIndex = reader.readU2();
         break;
       }
-      case 15: { // MethodHandle
+      case 15: {
+        // MethodHandle
         entry.referenceKind = reader.readU1();
         entry.referenceIndex = reader.readU2();
         break;
       }
-      case 16: { // MethodType
+      case 16: {
+        // MethodType
         entry.descriptorIndex = reader.readU2();
         break;
       }
       case 17: // Dynamic
-      case 18: { // InvokeDynamic
+      case 18: {
+        // InvokeDynamic
         entry.bootstrapMethodAttrIndex = reader.readU2();
         entry.nameAndTypeIndex = reader.readU2();
         break;
       }
-      case 19: { // Module
+      case 19: {
+        // Module
         entry.nameIndex = reader.readU2();
         break;
       }
-      case 20: { // Package
+      case 20: {
+        // Package
         entry.nameIndex = reader.readU2();
         break;
       }
@@ -318,7 +344,12 @@ export function parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass {
 
       try {
         if (name === 'Code') {
-          const codeReader = new BufferReader(info.buffer.slice(info.byteOffset, info.byteOffset + info.byteLength));
+          const codeReader = new BufferReader(
+            info.buffer.slice(
+              info.byteOffset,
+              info.byteOffset + info.byteLength
+            ) as ArrayBuffer
+          );
           const maxStack = codeReader.readU2();
           const maxLocals = codeReader.readU2();
           const codeLength = codeReader.readU4();
@@ -350,7 +381,12 @@ export function parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass {
             attributes: nestedAttributes,
           } as CodeAttribute;
         } else if (name === 'LineNumberTable') {
-          const lnReader = new BufferReader(info.buffer.slice(info.byteOffset, info.byteOffset + info.byteLength));
+          const lnReader = new BufferReader(
+            info.buffer.slice(
+              info.byteOffset,
+              info.byteOffset + info.byteLength
+            ) as ArrayBuffer
+          );
           const tableLength = lnReader.readU2();
           const lines: { startPc: number; lineNumber: number }[] = [];
           for (let j = 0; j < tableLength; j++) {
@@ -361,9 +397,20 @@ export function parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass {
           }
           attribute.decoded = lines;
         } else if (name === 'LocalVariableTable') {
-          const lvReader = new BufferReader(info.buffer.slice(info.byteOffset, info.byteOffset + info.byteLength));
+          const lvReader = new BufferReader(
+            info.buffer.slice(
+              info.byteOffset,
+              info.byteOffset + info.byteLength
+            ) as ArrayBuffer
+          );
           const tableLength = lvReader.readU2();
-          const variables: { startPc: number; length: number; name: string; descriptor: string; index: number }[] = [];
+          const variables: {
+            startPc: number;
+            length: number;
+            name: string;
+            descriptor: string;
+            index: number;
+          }[] = [];
           for (let j = 0; j < tableLength; j++) {
             const startPc = lvReader.readU2();
             const len = lvReader.readU2();
@@ -380,13 +427,23 @@ export function parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass {
           }
           attribute.decoded = variables;
         } else if (name === 'SourceFile') {
-          const sfReader = new BufferReader(info.buffer.slice(info.byteOffset, info.byteOffset + info.byteLength));
+          const sfReader = new BufferReader(
+            info.buffer.slice(
+              info.byteOffset,
+              info.byteOffset + info.byteLength
+            ) as ArrayBuffer
+          );
           if (info.byteLength >= 2) {
             const sfIdx = sfReader.readU2();
             attribute.decoded = getUtf8(sfIdx);
           }
         } else if (name === 'ConstantValue') {
-          const cvReader = new BufferReader(info.buffer.slice(info.byteOffset, info.byteOffset + info.byteLength));
+          const cvReader = new BufferReader(
+            info.buffer.slice(
+              info.byteOffset,
+              info.byteOffset + info.byteLength
+            ) as ArrayBuffer
+          );
           if (info.byteLength >= 2) {
             const cvIdx = cvReader.readU2();
             const entry = constantPool[cvIdx];

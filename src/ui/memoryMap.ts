@@ -26,7 +26,10 @@ export class MemoryMapOverlay {
     this.binaryData = binaryData;
     this.sections = sections;
     this.options = options;
-    this.cellBytesSize = Math.max(1, Math.ceil(this.binaryData.length / this.cellsCount));
+    this.cellBytesSize = Math.max(
+      1,
+      Math.ceil(this.binaryData.length / this.cellsCount)
+    );
 
     this.injectStyles();
     this.createOverlayDOM();
@@ -390,7 +393,10 @@ export class MemoryMapOverlay {
     this.container = container;
     this.overlayEl.classList.add('active');
     // Calculate sizing dynamically in case state changed
-    this.cellBytesSize = Math.max(1, Math.ceil(this.binaryData.length / this.cellsCount));
+    this.cellBytesSize = Math.max(
+      1,
+      Math.ceil(this.binaryData.length / this.cellsCount)
+    );
     const sizeLabel = this.overlayEl.querySelector('#cell-size-label');
     if (sizeLabel) sizeLabel.textContent = this.cellBytesSize.toLocaleString();
     this.render();
@@ -434,7 +440,10 @@ export class MemoryMapOverlay {
   }
 
   // Calculate local Shannon entropy for a block of binaryData
-  private calculateLocalEntropy(offsetStart: number, offsetEnd: number): number {
+  private calculateLocalEntropy(
+    offsetStart: number,
+    offsetEnd: number
+  ): number {
     const slice = this.binaryData.slice(offsetStart, offsetEnd);
     if (slice.length === 0) return 0;
     const counts = new Uint32Array(256);
@@ -454,7 +463,10 @@ export class MemoryMapOverlay {
   private getSectionForOffset(offset: number): Section | null {
     // Find section containing the offset
     for (const section of this.sections) {
-      if (offset >= section.fileOffset && offset < section.fileOffset + section.fileSize) {
+      if (
+        offset >= section.fileOffset &&
+        offset < section.fileOffset + section.fileSize
+      ) {
         return section;
       }
     }
@@ -478,7 +490,9 @@ export class MemoryMapOverlay {
     }
 
     const totalSize = Math.max(1, this.binaryData.length);
-    const sorted = [...this.sections].sort((a, b) => a.fileOffset - b.fileOffset);
+    const sorted = [...this.sections].sort(
+      (a, b) => a.fileOffset - b.fileOffset
+    );
 
     // Render bar segments representing each section
     sorted.forEach((section) => {
@@ -507,7 +521,10 @@ export class MemoryMapOverlay {
 
     for (let i = 0; i < this.cellsCount; i++) {
       const cellStart = i * this.cellBytesSize;
-      const cellEnd = Math.min(this.binaryData.length, cellStart + this.cellBytesSize);
+      const cellEnd = Math.min(
+        this.binaryData.length,
+        cellStart + this.cellBytesSize
+      );
       if (cellStart >= this.binaryData.length) break;
 
       const cell = document.createElement('div');
@@ -575,7 +592,10 @@ export class MemoryMapOverlay {
         { label: 'Low (0.0 - 2.0)', color: this.getEntropyColor(1.0) },
         { label: 'Medium (2.0 - 5.0)', color: this.getEntropyColor(3.5) },
         { label: 'High (5.0 - 7.0)', color: this.getEntropyColor(6.0) },
-        { label: 'Packed/Encrypted (7.0 - 8.0)', color: this.getEntropyColor(7.8) },
+        {
+          label: 'Packed/Encrypted (7.0 - 8.0)',
+          color: this.getEntropyColor(7.8),
+        },
       ];
       states.forEach((state) => {
         const item = document.createElement('div');
@@ -624,20 +644,33 @@ export class MemoryMapOverlay {
     }
 
     const cellStart = this.hoveredCellIndex * this.cellBytesSize;
-    const cellEnd = Math.min(this.binaryData.length, cellStart + this.cellBytesSize);
+    const cellEnd = Math.min(
+      this.binaryData.length,
+      cellStart + this.cellBytesSize
+    );
 
     const midOffset = Math.floor((cellStart + cellEnd) / 2);
     const section = this.getSectionForOffset(midOffset);
     const entropy = this.calculateLocalEntropy(cellStart, cellEnd);
 
     secEl.textContent = section ? section.name : 'Raw binary (No Section)';
-    offsetsEl.textContent = `0x${cellStart.toString(16).toUpperCase()} - 0x${Math.max(0, cellEnd - 1).toString(16).toUpperCase()}`;
+    offsetsEl.textContent = `0x${cellStart.toString(16).toUpperCase()} - 0x${Math.max(
+      0,
+      cellEnd - 1
+    )
+      .toString(16)
+      .toUpperCase()}`;
 
     // Map file offsets to virtual addresses if sections align
     if (section) {
       const vStart = section.virtualAddress + (cellStart - section.fileOffset);
       const vEnd = section.virtualAddress + (cellEnd - section.fileOffset);
-      addrsEl.textContent = `0x${vStart.toString(16).toUpperCase()} - 0x${Math.max(0, vEnd - 1).toString(16).toUpperCase()}`;
+      addrsEl.textContent = `0x${vStart.toString(16).toUpperCase()} - 0x${Math.max(
+        0,
+        vEnd - 1
+      )
+        .toString(16)
+        .toUpperCase()}`;
       permsEl.textContent = `${section.flags.read ? 'R' : '-'}${section.flags.write ? 'W' : '-'}${section.flags.execute ? 'X' : '-'}`;
     } else {
       addrsEl.textContent = 'N/A';
@@ -649,7 +682,7 @@ export class MemoryMapOverlay {
     // Hex preview of the first 16 bytes in this cell
     const previewSlice = this.binaryData.slice(cellStart, cellStart + 16);
     previewEl.innerHTML = '';
-    
+
     if (previewSlice.length === 0) {
       previewEl.innerHTML = `<span style="grid-column: span 4; color: var(--text-disabled);">No data</span>`;
       return;

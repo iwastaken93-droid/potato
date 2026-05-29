@@ -117,7 +117,10 @@ export function findHighEntropyBlocks(
  * @param sections - The array of binary sections to analyze.
  * @returns A new array of sections with the computed entropy field populated.
  */
-export function mapSectionEntropy(buffer: Uint8Array, sections: Section[]): Section[] {
+export function mapSectionEntropy(
+  buffer: Uint8Array,
+  sections: Section[]
+): Section[] {
   return sections.map((section) => {
     const start = section.fileOffset;
     const end = Math.min(start + section.fileSize, buffer.length);

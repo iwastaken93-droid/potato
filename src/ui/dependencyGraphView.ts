@@ -146,12 +146,18 @@ export class DependencyGraphView {
     const viewport = document.createElement('div');
     viewport.className = 'graph-viewport';
 
-    this.svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg') as unknown as SVGSVGElement;
+    this.svgEl = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'svg'
+    ) as unknown as SVGSVGElement;
     this.svgEl.setAttribute('class', 'dep-svg');
-    
+
     // Add arrow marker definitions
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    const marker = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'marker'
+    );
     marker.setAttribute('id', 'arrow');
     marker.setAttribute('viewBox', '0 0 10 10');
     marker.setAttribute('refX', '18');
@@ -159,11 +165,11 @@ export class DependencyGraphView {
     marker.setAttribute('markerWidth', '6');
     marker.setAttribute('markerHeight', '6');
     marker.setAttribute('orient', 'auto-start-reverse');
-    
+
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
     path.setAttribute('fill', 'rgba(255, 255, 255, 0.3)');
-    
+
     marker.appendChild(path);
     defs.appendChild(marker);
     this.svgEl.appendChild(defs);
@@ -185,8 +191,12 @@ export class DependencyGraphView {
     this.edges = [];
 
     // Create a local node for every local function, and imports/exports
-    const localSyms = this.symbols.filter(s => s.type === 'function' && s.binding !== 'global');
-    const globalSyms = this.symbols.filter(s => s.type === 'function' && s.binding === 'global');
+    const localSyms = this.symbols.filter(
+      (s) => s.type === 'function' && s.binding !== 'global'
+    );
+    const globalSyms = this.symbols.filter(
+      (s) => s.type === 'function' && s.binding === 'global'
+    );
 
     // 1. Add Local Nodes
     localSyms.forEach((sym, idx) => {
@@ -213,7 +223,15 @@ export class DependencyGraphView {
     });
 
     // 3. Add Mock Imports/System API Nodes
-    const importApis = ['GetProcAddress', 'VirtualAlloc', 'LoadLibraryA', 'ExitProcess', 'MessageBoxA', 'printf', 'malloc'];
+    const importApis = [
+      'GetProcAddress',
+      'VirtualAlloc',
+      'LoadLibraryA',
+      'ExitProcess',
+      'MessageBoxA',
+      'printf',
+      'malloc',
+    ];
     importApis.forEach((api, idx) => {
       this.nodes.push({
         id: api,
@@ -228,7 +246,8 @@ export class DependencyGraphView {
     if (this.nodes.length > 0) {
       // Connect subroutines to main/exports
       localSyms.forEach((sym) => {
-        const matchingExport = globalSyms[Math.floor(Math.random() * globalSyms.length)];
+        const matchingExport =
+          globalSyms[Math.floor(Math.random() * globalSyms.length)];
         if (matchingExport) {
           this.edges.push({
             source: matchingExport.name,
@@ -237,7 +256,8 @@ export class DependencyGraphView {
         }
 
         // Randomly call some import APIs
-        const randomApi = importApis[Math.floor(Math.random() * importApis.length)];
+        const randomApi =
+          importApis[Math.floor(Math.random() * importApis.length)];
         this.edges.push({
           source: sym.name,
           target: randomApi,
@@ -249,17 +269,20 @@ export class DependencyGraphView {
   private render() {
     // Clear old elements (keep defs)
     const elements = this.svgEl.querySelectorAll('g, line');
-    elements.forEach(el => el.remove());
+    elements.forEach((el) => el.remove());
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    
+
     // Draw edges
     this.edges.forEach((edge) => {
-      const srcNode = this.nodes.find(n => n.id === edge.source);
-      const tgtNode = this.nodes.find(n => n.id === edge.target);
+      const srcNode = this.nodes.find((n) => n.id === edge.source);
+      const tgtNode = this.nodes.find((n) => n.id === edge.target);
 
       if (srcNode && tgtNode) {
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        const line = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'line'
+        );
         line.setAttribute('class', 'dep-edge');
         line.setAttribute('x1', srcNode.x.toString());
         line.setAttribute('y1', srcNode.y.toString());
@@ -277,13 +300,16 @@ export class DependencyGraphView {
         g.setAttribute('data-addr', node.address.toString());
       }
 
-      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const rect = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'rect'
+      );
       rect.setAttribute('x', (node.x - 60).toString());
       rect.setAttribute('y', (node.y - 20).toString());
       rect.setAttribute('width', '120');
       rect.setAttribute('height', '40');
       rect.setAttribute('rx', '8');
-      
+
       // Node color coding
       let fill = 'rgba(99, 102, 241, 0.2)'; // indigo
       let stroke = '#6366f1';
@@ -299,11 +325,14 @@ export class DependencyGraphView {
       rect.setAttribute('stroke', stroke);
       rect.setAttribute('stroke-width', '1.5');
 
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const text = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'text'
+      );
       text.setAttribute('x', node.x.toString());
       text.setAttribute('y', (node.y + 4).toString());
       text.setAttribute('class', 'dep-node-text');
-      
+
       // Truncate label if too long
       let label = node.label;
       if (label.length > 14) {
@@ -320,7 +349,9 @@ export class DependencyGraphView {
 
     // Setup Click Event to navigate
     this.svgEl.addEventListener('click', (e) => {
-      const nodeEl = (e.target as HTMLElement).closest('.dep-node') as HTMLElement;
+      const nodeEl = (e.target as HTMLElement).closest(
+        '.dep-node'
+      ) as HTMLElement;
       if (nodeEl && nodeEl.dataset.addr) {
         const addr = parseInt(nodeEl.dataset.addr, 10);
         this.onAddressSelect(addr);

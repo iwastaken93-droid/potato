@@ -10,7 +10,9 @@ import { Instruction } from '../src/disassembler/types.js';
 
 describe('Binary Search and Pattern Matching Engine', () => {
   describe('Text Search', () => {
-    const textBuffer = new TextEncoder().encode('Hello, world! This is a Test buffer with some patterns.');
+    const textBuffer = new TextEncoder().encode(
+      'Hello, world! This is a Test buffer with some patterns.'
+    );
 
     it('should find exact text string matches (UTF-8/ASCII)', () => {
       const results = searchText(textBuffer, 'world');
@@ -33,7 +35,9 @@ describe('Binary Search and Pattern Matching Engine', () => {
       expect(results[0].offset).toBe(24);
       expect(results[0].match.toLowerCase()).toBe('test');
 
-      const caseSensitive = searchText(textBuffer, 'test', { caseInsensitive: false });
+      const caseSensitive = searchText(textBuffer, 'test', {
+        caseInsensitive: false,
+      });
       expect(caseSensitive).toHaveLength(0);
     });
 
@@ -49,7 +53,9 @@ describe('Binary Search and Pattern Matching Engine', () => {
 
       // Prepend and append some dummy bytes
       const fullBuffer = new Uint8Array([0xaa, 0xbb, ...wideBytes, 0xcc]);
-      const results = searchText(fullBuffer, 'WideString', { encoding: 'utf16le' });
+      const results = searchText(fullBuffer, 'WideString', {
+        encoding: 'utf16le',
+      });
       expect(results).toHaveLength(1);
       expect(results[0].offset).toBe(2);
       expect(results[0].match).toBe('WideString');
@@ -64,7 +70,12 @@ describe('Binary Search and Pattern Matching Engine', () => {
     it('should parse hex pattern with wildcards correctly', () => {
       expect(parseHexPattern('48 8d ?? 55')).toEqual([0x48, 0x8d, null, 0x55]);
       expect(parseHexPattern('488d?55')).toEqual([0x48, 0x8d, null, 0x55]);
-      expect(parseHexPattern('  FF   00  ??  aa ')).toEqual([0xff, 0x00, null, 0xaa]);
+      expect(parseHexPattern('  FF   00  ??  aa ')).toEqual([
+        0xff,
+        0x00,
+        null,
+        0xaa,
+      ]);
     });
 
     it('should throw error on invalid hex characters', () => {
@@ -72,34 +83,93 @@ describe('Binary Search and Pattern Matching Engine', () => {
     });
 
     it('should find exact hex pattern match', () => {
-      const buffer = new Uint8Array([0x48, 0x8d, 0x05, 0x55, 0x66, 0x48, 0x8d, 0x0a, 0x55]);
+      const buffer = new Uint8Array([
+        0x48, 0x8d, 0x05, 0x55, 0x66, 0x48, 0x8d, 0x0a, 0x55,
+      ]);
       const results = searchHex(buffer, '48 8d 05 55');
       expect(results).toHaveLength(1);
       expect(results[0].offset).toBe(0);
-      expect(results[0].bytes).toEqual(new Uint8Array([0x48, 0x8d, 0x05, 0x55]));
+      expect(results[0].bytes).toEqual(
+        new Uint8Array([0x48, 0x8d, 0x05, 0x55])
+      );
     });
 
     it('should find hex pattern matches with wildcards', () => {
-      const buffer = new Uint8Array([0x48, 0x8d, 0x05, 0x55, 0x66, 0x48, 0x8d, 0x99, 0x55]);
+      const buffer = new Uint8Array([
+        0x48, 0x8d, 0x05, 0x55, 0x66, 0x48, 0x8d, 0x99, 0x55,
+      ]);
       const results = searchHex(buffer, '48 8d ?? 55');
       expect(results).toHaveLength(2);
       expect(results[0].offset).toBe(0);
-      expect(results[0].bytes).toEqual(new Uint8Array([0x48, 0x8d, 0x05, 0x55]));
+      expect(results[0].bytes).toEqual(
+        new Uint8Array([0x48, 0x8d, 0x05, 0x55])
+      );
       expect(results[1].offset).toBe(5);
-      expect(results[1].bytes).toEqual(new Uint8Array([0x48, 0x8d, 0x99, 0x55]));
+      expect(results[1].bytes).toEqual(
+        new Uint8Array([0x48, 0x8d, 0x99, 0x55])
+      );
     });
   });
 
   describe('Instruction Search', () => {
     const dummyBytes = new Uint8Array(0);
     const instructions: Instruction[] = [
-      { address: 0x1000, bytes: dummyBytes, mnemonic: 'push', opStr: 'rbp', operands: [], size: 1 },
-      { address: 0x1001, bytes: dummyBytes, mnemonic: 'mov', opStr: 'rbp, rsp', operands: [], size: 3 },
-      { address: 0x1004, bytes: dummyBytes, mnemonic: 'sub', opStr: 'rsp, 0x20', operands: [], size: 4 },
-      { address: 0x1008, bytes: dummyBytes, mnemonic: 'mov', opStr: 'rax, [rbp - 0x8]', operands: [], size: 4 },
-      { address: 0x100c, bytes: dummyBytes, mnemonic: 'add', opStr: 'rax, 1', operands: [], size: 3 },
-      { address: 0x100f, bytes: dummyBytes, mnemonic: 'pop', opStr: 'rbp', operands: [], size: 1 },
-      { address: 0x1010, bytes: dummyBytes, mnemonic: 'ret', opStr: '', operands: [], size: 1 },
+      {
+        address: 0x1000,
+        bytes: dummyBytes,
+        mnemonic: 'push',
+        opStr: 'rbp',
+        operands: [],
+        size: 1,
+      },
+      {
+        address: 0x1001,
+        bytes: dummyBytes,
+        mnemonic: 'mov',
+        opStr: 'rbp, rsp',
+        operands: [],
+        size: 3,
+      },
+      {
+        address: 0x1004,
+        bytes: dummyBytes,
+        mnemonic: 'sub',
+        opStr: 'rsp, 0x20',
+        operands: [],
+        size: 4,
+      },
+      {
+        address: 0x1008,
+        bytes: dummyBytes,
+        mnemonic: 'mov',
+        opStr: 'rax, [rbp - 0x8]',
+        operands: [],
+        size: 4,
+      },
+      {
+        address: 0x100c,
+        bytes: dummyBytes,
+        mnemonic: 'add',
+        opStr: 'rax, 1',
+        operands: [],
+        size: 3,
+      },
+      {
+        address: 0x100f,
+        bytes: dummyBytes,
+        mnemonic: 'pop',
+        opStr: 'rbp',
+        operands: [],
+        size: 1,
+      },
+      {
+        address: 0x1010,
+        bytes: dummyBytes,
+        mnemonic: 'ret',
+        opStr: '',
+        operands: [],
+        size: 1,
+      },
     ];
 
     it('should find instruction by exact mnemonic', () => {
@@ -136,23 +206,76 @@ describe('Binary Search and Pattern Matching Engine', () => {
 
     it('should use custom filter functions', () => {
       const results = searchInstructions(instructions, {
-        filter: inst => inst.size === 1,
+        filter: (inst) => inst.size === 1,
       });
       expect(results).toHaveLength(3); // push, pop, ret
-      expect(results.map(r => r.instruction.mnemonic)).toEqual(['push', 'pop', 'ret']);
+      expect(results.map((r) => r.instruction.mnemonic)).toEqual([
+        'push',
+        'pop',
+        'ret',
+      ]);
     });
   });
 
   describe('Instruction Sequence Search', () => {
     const dummyBytes = new Uint8Array(0);
     const instructions: Instruction[] = [
-      { address: 0x1000, bytes: dummyBytes, mnemonic: 'push', opStr: 'rbp', operands: [], size: 1 },
-      { address: 0x1001, bytes: dummyBytes, mnemonic: 'mov', opStr: 'rbp, rsp', operands: [], size: 3 },
-      { address: 0x1004, bytes: dummyBytes, mnemonic: 'sub', opStr: 'rsp, 0x20', operands: [], size: 4 },
-      { address: 0x1008, bytes: dummyBytes, mnemonic: 'mov', opStr: 'rax, [rbp - 0x8]', operands: [], size: 4 },
-      { address: 0x100c, bytes: dummyBytes, mnemonic: 'push', opStr: 'rbp', operands: [], size: 1 },
-      { address: 0x100d, bytes: dummyBytes, mnemonic: 'mov', opStr: 'rbp, rsp', operands: [], size: 3 },
-      { address: 0x1010, bytes: dummyBytes, mnemonic: 'ret', opStr: '', operands: [], size: 1 },
+      {
+        address: 0x1000,
+        bytes: dummyBytes,
+        mnemonic: 'push',
+        opStr: 'rbp',
+        operands: [],
+        size: 1,
+      },
+      {
+        address: 0x1001,
+        bytes: dummyBytes,
+        mnemonic: 'mov',
+        opStr: 'rbp, rsp',
+        operands: [],
+        size: 3,
+      },
+      {
+        address: 0x1004,
+        bytes: dummyBytes,
+        mnemonic: 'sub',
+        opStr: 'rsp, 0x20',
+        operands: [],
+        size: 4,
+      },
+      {
+        address: 0x1008,
+        bytes: dummyBytes,
+        mnemonic: 'mov',
+        opStr: 'rax, [rbp - 0x8]',
+        operands: [],
+        size: 4,
+      },
+      {
+        address: 0x100c,
+        bytes: dummyBytes,
+        mnemonic: 'push',
+        opStr: 'rbp',
+        operands: [],
+        size: 1,
+      },
+      {
+        address: 0x100d,
+        bytes: dummyBytes,
+        mnemonic: 'mov',
+        opStr: 'rbp, rsp',
+        operands: [],
+        size: 3,
+      },
+      {
+        address: 0x1010,
+        bytes: dummyBytes,
+        mnemonic: 'ret',
+        opStr: '',
+        operands: [],
+        size: 1,
+      },
     ];
 
     it('should find sequences of consecutive instructions', () => {

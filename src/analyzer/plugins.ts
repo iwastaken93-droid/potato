@@ -109,12 +109,18 @@ export interface AnalyzerPlugin {
   /**
    * Optional lifecycle hook called before analysis starts.
    */
-  onBeforeAnalyze?(context: AnalyzerContext, options?: Record<string, any>): void | Promise<void>;
+  onBeforeAnalyze?(
+    context: AnalyzerContext,
+    options?: Record<string, any>
+  ): void | Promise<void>;
 
   /**
    * Optional lifecycle hook called after analysis finishes.
    */
-  onAfterAnalyze?(context: AnalyzerContext, result: AnalyzerResult): void | Promise<void>;
+  onAfterAnalyze?(
+    context: AnalyzerContext,
+    result: AnalyzerResult
+  ): void | Promise<void>;
 
   /**
    * Optional lifecycle hook called when the plugin is enabled.
@@ -135,7 +141,10 @@ export interface AnalyzerPlugin {
   /**
    * Executes the analysis logic against the binary context.
    */
-  analyze(context: AnalyzerContext, options?: Record<string, any>): AnalyzerResult | Promise<AnalyzerResult>;
+  analyze(
+    context: AnalyzerContext,
+    options?: Record<string, any>
+  ): AnalyzerResult | Promise<AnalyzerResult>;
 }
 
 /**
@@ -152,7 +161,7 @@ export class PluginManager {
 
   /**
    * Retrieve the singleton instance of the PluginManager.
-   * 
+   *
    * @returns The singleton PluginManager instance.
    */
   public static getInstance(): PluginManager {
@@ -171,9 +180,10 @@ export class PluginManager {
         metadata: {
           id: 'elf-hardening',
           name: 'ELF Hardening Analyzer',
-          description: 'Analyzes ELF binaries for security hardening features like Stack Canaries and NX bits.',
+          description:
+            'Analyzes ELF binaries for security hardening features like Stack Canaries and NX bits.',
           version: '1.0.0',
-          author: 'Dissect Core'
+          author: 'Dissect Core',
         },
         enabled: false,
         configSchema: {
@@ -181,69 +191,89 @@ export class PluginManager {
             type: 'boolean',
             default: true,
             label: 'Check Stack Canary',
-            description: 'Scan symbol table for compiler-inserted canary check functions (__stack_chk_fail).'
+            description:
+              'Scan symbol table for compiler-inserted canary check functions (__stack_chk_fail).',
           },
           checkNX: {
             type: 'boolean',
             default: true,
             label: 'Check NX (No-Execute)',
-            description: 'Verify if any sections have both write and execute permissions set.'
-          }
+            description:
+              'Verify if any sections have both write and execute permissions set.',
+          },
         },
         config: {
           checkCanary: true,
-          checkNX: true
+          checkNX: true,
         },
         analyze: (context) => {
           const findings: AnalysisFinding[] = [];
-          const isElf = context.binaryData[0] === 0x7f && context.binaryData[1] === 0x45 && context.binaryData[2] === 0x4c && context.binaryData[3] === 0x46;
-          
+          const isElf =
+            context.binaryData[0] === 0x7f &&
+            context.binaryData[1] === 0x45 &&
+            context.binaryData[2] === 0x4c &&
+            context.binaryData[3] === 0x46;
+
           if (!isElf) {
             return {
               pluginId: 'elf-hardening',
               success: true,
               findings: [],
-              summary: 'Skipped: Binary is not in ELF format.'
+              summary: 'Skipped: Binary is not in ELF format.',
             };
           }
 
-          const checkCanary = this.getPlugin('elf-hardening')?.config?.checkCanary ?? true;
-          const checkNX = this.getPlugin('elf-hardening')?.config?.checkNX ?? true;
+          const checkCanary =
+            this.getPlugin('elf-hardening')?.config?.checkCanary ?? true;
+          const checkNX =
+            this.getPlugin('elf-hardening')?.config?.checkNX ?? true;
 
           if (checkCanary) {
-            const hasCanaryFunc = context.symbols.some(s => s.name.includes('__stack_chk_fail'));
+            const hasCanaryFunc = context.symbols.some((s) =>
+              s.name.includes('__stack_chk_fail')
+            );
             if (hasCanaryFunc) {
               findings.push({
                 category: 'security',
                 severity: 'info',
-                description: 'Stack Canary protections detected (__stack_chk_fail present).',
-                evidence: 'Symbol table contains __stack_chk_fail'
+                description:
+                  'Stack Canary protections detected (__stack_chk_fail present).',
+                evidence: 'Symbol table contains __stack_chk_fail',
               });
             } else {
               findings.push({
                 category: 'security',
                 severity: 'high',
-                description: 'Stack Canary protection is missing or not found in symbols.',
-                evidence: 'No __stack_chk_fail symbol found'
+                description:
+                  'Stack Canary protection is missing or not found in symbols.',
+                evidence: 'No __stack_chk_fail symbol found',
               });
             }
           }
 
           if (checkNX) {
-            const wxSections = context.sections.filter(s => s.flags?.write && s.flags?.execute);
+            const wxSections = context.sections.filter(
+              (s) => s.flags?.write && s.flags?.execute
+            );
             if (wxSections.length > 0) {
               findings.push({
                 category: 'security',
                 severity: 'critical',
                 description: `Writable & Executable section(s) detected. This violates W^X safety.`,
-                evidence: wxSections.map(s => `${s.name} (Addr: 0x${s.virtualAddress.toString(16)})`).join(', ')
+                evidence: wxSections
+                  .map(
+                    (s) =>
+                      `${s.name} (Addr: 0x${s.virtualAddress.toString(16)})`
+                  )
+                  .join(', '),
               });
             } else {
               findings.push({
                 category: 'security',
                 severity: 'low',
-                description: 'W^X (Write XOR Execute) validation passed; no writable-executable sections found.',
-                evidence: 'All sections are NX compliant'
+                description:
+                  'W^X (Write XOR Execute) validation passed; no writable-executable sections found.',
+                evidence: 'All sections are NX compliant',
               });
             }
           }
@@ -252,17 +282,18 @@ export class PluginManager {
             pluginId: 'elf-hardening',
             success: true,
             findings,
-            summary: `Analyzed security hardening mitigations. Found ${findings.length} issues/notes.`
+            summary: `Analyzed security hardening mitigations. Found ${findings.length} issues/notes.`,
           };
-        }
+        },
       },
       {
         metadata: {
           id: 'crypto-scanner',
           name: 'Crypto Constants Detector',
-          description: 'Identifies common cryptographic constants inside the binary data.',
+          description:
+            'Identifies common cryptographic constants inside the binary data.',
           version: '1.0.0',
-          author: 'Dissect Core'
+          author: 'Dissect Core',
         },
         enabled: false,
         configSchema: {
@@ -270,24 +301,26 @@ export class PluginManager {
             type: 'boolean',
             default: true,
             label: 'Scan for AES',
-            description: 'Scans for AES Substitution Box (S-Box) constants.'
+            description: 'Scans for AES Substitution Box (S-Box) constants.',
           },
           scanMD5: {
             type: 'boolean',
             default: true,
             label: 'Scan for MD5',
-            description: 'Scans for MD5 buffer initialization constants.'
-          }
+            description: 'Scans for MD5 buffer initialization constants.',
+          },
         },
         config: {
           scanAES: true,
-          scanMD5: true
+          scanMD5: true,
         },
         analyze: (context) => {
           const findings: AnalysisFinding[] = [];
           const data = context.binaryData;
-          const scanAES = this.getPlugin('crypto-scanner')?.config?.scanAES ?? true;
-          const scanMD5 = this.getPlugin('crypto-scanner')?.config?.scanMD5 ?? true;
+          const scanAES =
+            this.getPlugin('crypto-scanner')?.config?.scanAES ?? true;
+          const scanMD5 =
+            this.getPlugin('crypto-scanner')?.config?.scanMD5 ?? true;
 
           // Helper to find sub-arrays
           const findPattern = (pattern: number[]): number[] => {
@@ -313,8 +346,9 @@ export class PluginManager {
               findings.push({
                 category: 'cryptography',
                 severity: 'medium',
-                description: 'AES S-Box constants detected. Binary likely contains AES encryption routines.',
-                evidence: `AES S-Box start sequence found at offset ${matches.map(m => '0x' + m.toString(16)).join(', ')}`
+                description:
+                  'AES S-Box constants detected. Binary likely contains AES encryption routines.',
+                evidence: `AES S-Box start sequence found at offset ${matches.map((m) => '0x' + m.toString(16)).join(', ')}`,
               });
             }
           }
@@ -327,8 +361,9 @@ export class PluginManager {
               findings.push({
                 category: 'cryptography',
                 severity: 'medium',
-                description: 'MD5 buffer initialization constants detected. Binary may implement MD5 hashing.',
-                evidence: `MD5 init sequence found at offset ${matches.map(m => '0x' + m.toString(16)).join(', ')}`
+                description:
+                  'MD5 buffer initialization constants detected. Binary may implement MD5 hashing.',
+                evidence: `MD5 init sequence found at offset ${matches.map((m) => '0x' + m.toString(16)).join(', ')}`,
               });
             }
           }
@@ -337,19 +372,21 @@ export class PluginManager {
             pluginId: 'crypto-scanner',
             success: true,
             findings,
-            summary: findings.length > 0 
-              ? `Detected cryptographic signatures: ${findings.map(f => f.description).join('; ')}`
-              : 'No common cryptographic constants detected.'
+            summary:
+              findings.length > 0
+                ? `Detected cryptographic signatures: ${findings.map((f) => f.description).join('; ')}`
+                : 'No common cryptographic constants detected.',
           };
-        }
+        },
       },
       {
         metadata: {
           id: 'suspicious-apis',
           name: 'Suspicious API Detector',
-          description: 'Identifies high-risk APIs in symbols or imports (e.g. dynamic allocation, networking, system execution).',
+          description:
+            'Identifies high-risk APIs in symbols or imports (e.g. dynamic allocation, networking, system execution).',
           version: '1.1.0',
-          author: 'Dissect Core'
+          author: 'Dissect Core',
         },
         enabled: false,
         configSchema: {
@@ -358,34 +395,66 @@ export class PluginManager {
             default: 'medium',
             label: 'Min Risk Level',
             description: 'Filter findings by minimum risk level.',
-            options: ['low', 'medium', 'high']
-          }
+            options: ['low', 'medium', 'high'],
+          },
         },
         config: {
-          riskLevel: 'medium'
+          riskLevel: 'medium',
         },
         analyze: (context) => {
           const findings: AnalysisFinding[] = [];
-          const riskLevel = this.getPlugin('suspicious-apis')?.config?.riskLevel ?? 'medium';
-          
-          const apiMap: Record<string, { severity: FindingSeverity; desc: string }> = {
-            'system': { severity: 'high', desc: 'Allows executing arbitrary system commands.' },
-            'execve': { severity: 'high', desc: 'Replaces the current process with a new process.' },
-            'VirtualAlloc': { severity: 'high', desc: 'Allocates virtual memory. Frequently used in process injection/shellcode loading.' },
-            'WriteProcessMemory': { severity: 'critical', desc: 'Writes memory to a remote process. High risk for shellcode/malware injection.' },
-            'CreateRemoteThread': { severity: 'critical', desc: 'Creates a thread in a remote process. High indicator of code injection.' },
-            'mprotect': { severity: 'medium', desc: 'Changes memory protection flags (potentially bypasses NX).' },
-            'connect': { severity: 'low', desc: 'Establishes a network socket connection.' },
-            'socket': { severity: 'low', desc: 'Creates a network communications endpoint.' },
-            'fork': { severity: 'low', desc: 'Creates a child process.' },
+          const riskLevel =
+            this.getPlugin('suspicious-apis')?.config?.riskLevel ?? 'medium';
+
+          const apiMap: Record<
+            string,
+            { severity: FindingSeverity; desc: string }
+          > = {
+            system: {
+              severity: 'high',
+              desc: 'Allows executing arbitrary system commands.',
+            },
+            execve: {
+              severity: 'high',
+              desc: 'Replaces the current process with a new process.',
+            },
+            VirtualAlloc: {
+              severity: 'high',
+              desc: 'Allocates virtual memory. Frequently used in process injection/shellcode loading.',
+            },
+            WriteProcessMemory: {
+              severity: 'critical',
+              desc: 'Writes memory to a remote process. High risk for shellcode/malware injection.',
+            },
+            CreateRemoteThread: {
+              severity: 'critical',
+              desc: 'Creates a thread in a remote process. High indicator of code injection.',
+            },
+            mprotect: {
+              severity: 'medium',
+              desc: 'Changes memory protection flags (potentially bypasses NX).',
+            },
+            connect: {
+              severity: 'low',
+              desc: 'Establishes a network socket connection.',
+            },
+            socket: {
+              severity: 'low',
+              desc: 'Creates a network communications endpoint.',
+            },
+            fork: { severity: 'low', desc: 'Creates a child process.' },
           };
 
           const severityOrder: Record<FindingSeverity, number> = {
-            'info': 0, 'low': 1, 'medium': 2, 'high': 3, 'critical': 4
+            info: 0,
+            low: 1,
+            medium: 2,
+            high: 3,
+            critical: 4,
           };
           const minRiskValue = severityOrder[riskLevel as FindingSeverity] ?? 2;
 
-          context.symbols.forEach(sym => {
+          context.symbols.forEach((sym) => {
             for (const api of Object.keys(apiMap)) {
               if (sym.name.includes(api)) {
                 const info = apiMap[api];
@@ -395,7 +464,7 @@ export class PluginManager {
                     severity: info.severity,
                     description: `Suspicious API "${api}" detected in symbols. ${info.desc}`,
                     evidence: `Symbol name: ${sym.name} at address 0x${sym.address.toString(16)}`,
-                    address: sym.address
+                    address: sym.address,
                   });
                 }
               }
@@ -406,17 +475,18 @@ export class PluginManager {
             pluginId: 'suspicious-apis',
             success: true,
             findings,
-            summary: `Scanned symbols for high-risk APIs. Found ${findings.length} matches.`
+            summary: `Scanned symbols for high-risk APIs. Found ${findings.length} matches.`,
           };
-        }
+        },
       },
       {
         metadata: {
           id: 'packer-detector',
           name: 'Packer & Entropy Analyzer',
-          description: 'Calculates file entropy and alerts if the executable appears to be packed or encrypted.',
+          description:
+            'Calculates file entropy and alerts if the executable appears to be packed or encrypted.',
           version: '1.0.0',
-          author: 'Dissect Core'
+          author: 'Dissect Core',
         },
         enabled: false,
         configSchema: {
@@ -424,11 +494,12 @@ export class PluginManager {
             type: 'number',
             default: 7.2,
             label: 'Entropy Threshold',
-            description: 'Entropy value (0.0 to 8.0) above which a binary is suspected to be packed.'
-          }
+            description:
+              'Entropy value (0.0 to 8.0) above which a binary is suspected to be packed.',
+          },
         },
         config: {
-          entropyThreshold: 7.2
+          entropyThreshold: 7.2,
         },
         analyze: (context) => {
           const data = context.binaryData;
@@ -437,7 +508,7 @@ export class PluginManager {
               pluginId: 'packer-detector',
               success: true,
               findings: [],
-              summary: 'Empty binary data.'
+              summary: 'Empty binary data.',
             };
           }
 
@@ -454,22 +525,23 @@ export class PluginManager {
             }
           }
 
-          const threshold = this.getPlugin('packer-detector')?.config?.entropyThreshold ?? 7.2;
+          const threshold =
+            this.getPlugin('packer-detector')?.config?.entropyThreshold ?? 7.2;
           const findings: AnalysisFinding[] = [];
-          
+
           if (entropy > threshold) {
             findings.push({
               category: 'obfuscation',
               severity: 'high',
               description: `High binary entropy detected (${entropy.toFixed(3)} / 8.000). The binary is likely packed, compressed, or encrypted.`,
-              evidence: `Calculated Shannon entropy: ${entropy.toFixed(4)}, Threshold: ${threshold}`
+              evidence: `Calculated Shannon entropy: ${entropy.toFixed(4)}, Threshold: ${threshold}`,
             });
           } else {
             findings.push({
               category: 'obfuscation',
               severity: 'info',
               description: `Binary entropy is normal (${entropy.toFixed(3)} / 8.000).`,
-              evidence: `Calculated Shannon entropy: ${entropy.toFixed(4)}, Threshold: ${threshold}`
+              evidence: `Calculated Shannon entropy: ${entropy.toFixed(4)}, Threshold: ${threshold}`,
             });
           }
 
@@ -477,16 +549,16 @@ export class PluginManager {
             pluginId: 'packer-detector',
             success: true,
             findings,
-            summary: `Binary entropy: ${entropy.toFixed(3)}. Packed status: ${entropy > threshold ? 'SUSPICIOUS' : 'NORMAL'}`
+            summary: `Binary entropy: ${entropy.toFixed(3)}. Packed status: ${entropy > threshold ? 'SUSPICIOUS' : 'NORMAL'}`,
           };
-        }
-      }
+        },
+      },
     ];
   }
 
   /**
    * Returns list of discoverable/available plugins that are not registered or are available to be installed.
-   * 
+   *
    * @returns An array of discoverable analyzer plugins.
    */
   public getDiscoverablePlugins(): AnalyzerPlugin[] {
@@ -495,14 +567,16 @@ export class PluginManager {
 
   /**
    * Installs a discoverable plugin by registering it in the active plugins list.
-   * 
+   *
    * @param id Unique identifier of the discoverable plugin.
    * @returns A promise that resolves when the plugin is successfully installed.
    */
   public async installPlugin(id: string): Promise<void> {
-    const disc = this.discoverablePlugins.find(p => p.metadata.id === id);
+    const disc = this.discoverablePlugins.find((p) => p.metadata.id === id);
     if (!disc) {
-      throw new Error(`Plugin with ID "${id}" is not in the discoverable registry.`);
+      throw new Error(
+        `Plugin with ID "${id}" is not in the discoverable registry.`
+      );
     }
     const cloned = { ...disc, enabled: true };
     await this.register(cloned);
@@ -510,7 +584,7 @@ export class PluginManager {
 
   /**
    * Uninstalls/unregisters a plugin.
-   * 
+   *
    * @param id Unique identifier of the plugin.
    * @returns A promise resolving to true if successfully uninstalled, false otherwise.
    */
@@ -520,17 +594,21 @@ export class PluginManager {
 
   /**
    * Registers a new plugin with the manager and runs its `init` lifecycle hook if present.
-   * 
+   *
    * @param plugin The analyzer plugin to register.
    * @throws {Error} If the plugin is missing metadata, has no ID, or if a plugin with the same ID is already registered.
    * @returns A promise that resolves when the plugin registration and initialization are complete.
    */
   public async register(plugin: AnalyzerPlugin): Promise<void> {
     if (!plugin.metadata || !plugin.metadata.id) {
-      throw new Error('Cannot register plugin: Missing metadata or metadata.id');
+      throw new Error(
+        'Cannot register plugin: Missing metadata or metadata.id'
+      );
     }
     if (this.plugins.has(plugin.metadata.id)) {
-      throw new Error(`Plugin with ID "${plugin.metadata.id}" is already registered.`);
+      throw new Error(
+        `Plugin with ID "${plugin.metadata.id}" is already registered.`
+      );
     }
 
     if (plugin.enabled === undefined) {
@@ -548,14 +626,17 @@ export class PluginManager {
       try {
         await plugin.onEnable();
       } catch (err) {
-        console.error(`Error in onEnable lifecycle hook for plugin "${plugin.metadata.id}":`, err);
+        console.error(
+          `Error in onEnable lifecycle hook for plugin "${plugin.metadata.id}":`,
+          err
+        );
       }
     }
   }
 
   /**
    * Unregisters an existing plugin by its ID and runs its `destroy` lifecycle hook if present.
-   * 
+   *
    * @param id The unique identifier of the plugin to unregister.
    * @returns A promise resolving to true if the plugin was successfully unregistered; false if the plugin was not found.
    */
@@ -569,7 +650,10 @@ export class PluginManager {
       try {
         await plugin.onDisable();
       } catch (err) {
-        console.error(`Error in onDisable lifecycle hook for plugin "${id}":`, err);
+        console.error(
+          `Error in onDisable lifecycle hook for plugin "${id}":`,
+          err
+        );
       }
     }
 
@@ -586,7 +670,7 @@ export class PluginManager {
 
   /**
    * Enable or disable a plugin, executing relevant lifecycle hooks.
-   * 
+   *
    * @param id The plugin ID to modify.
    * @param enabled The new active state.
    */
@@ -610,7 +694,7 @@ export class PluginManager {
 
   /**
    * Update configuration values for a registered plugin.
-   * 
+   *
    * @param id The plugin ID.
    * @param config The partial or complete configuration object.
    */
@@ -621,13 +705,13 @@ export class PluginManager {
     }
     plugin.config = {
       ...(plugin.config || {}),
-      ...config
+      ...config,
     };
   }
 
   /**
    * Retrieves a registered plugin by its ID.
-   * 
+   *
    * @param id The unique identifier of the plugin to retrieve.
    * @returns The registered plugin, or undefined if no plugin matches the given ID.
    */
@@ -637,7 +721,7 @@ export class PluginManager {
 
   /**
    * Returns a list of all currently registered plugins.
-   * 
+   *
    * @returns An array of all registered analyzer plugins.
    */
   public getPlugins(): AnalyzerPlugin[] {
@@ -646,7 +730,7 @@ export class PluginManager {
 
   /**
    * Clears all registered plugins, running their destroy methods.
-   * 
+   *
    * @returns A promise that resolves when all plugins have been unregistered and cleaned up.
    */
   public async clear(): Promise<void> {
@@ -658,12 +742,15 @@ export class PluginManager {
 
   /**
    * Runs analysis using all registered and compatible plugins.
-   * 
+   *
    * @param context The binary and symbols context provided for analysis.
    * @param options Optional configuration parameters for plugins, keyed by plugin ID.
    * @returns A promise resolving to an array of results from each executed plugin.
    */
-  public async runAll(context: AnalyzerContext, options?: Record<string, any>): Promise<AnalyzerResult[]> {
+  public async runAll(
+    context: AnalyzerContext,
+    options?: Record<string, any>
+  ): Promise<AnalyzerResult[]> {
     const results: AnalyzerResult[] = [];
 
     for (const plugin of this.plugins.values()) {
@@ -681,7 +768,10 @@ export class PluginManager {
         try {
           await plugin.onBeforeAnalyze(context, pluginOptions);
         } catch (err) {
-          console.error(`Error in onBeforeAnalyze lifecycle hook for plugin "${plugin.metadata.id}":`, err);
+          console.error(
+            `Error in onBeforeAnalyze lifecycle hook for plugin "${plugin.metadata.id}":`,
+            err
+          );
         }
       }
 
@@ -694,7 +784,10 @@ export class PluginManager {
           try {
             await plugin.onAfterAnalyze(context, result);
           } catch (err) {
-            console.error(`Error in onAfterAnalyze lifecycle hook for plugin "${plugin.metadata.id}":`, err);
+            console.error(
+              `Error in onAfterAnalyze lifecycle hook for plugin "${plugin.metadata.id}":`,
+              err
+            );
           }
         }
       } catch (err: any) {
@@ -702,7 +795,7 @@ export class PluginManager {
           pluginId: plugin.metadata.id,
           success: false,
           errors: [err?.message || String(err)],
-          findings: []
+          findings: [],
         };
         results.push(errResult);
 
@@ -711,7 +804,10 @@ export class PluginManager {
           try {
             await plugin.onAfterAnalyze(context, errResult);
           } catch (err) {
-            console.error(`Error in onAfterAnalyze lifecycle hook for plugin "${plugin.metadata.id}":`, err);
+            console.error(
+              `Error in onAfterAnalyze lifecycle hook for plugin "${plugin.metadata.id}":`,
+              err
+            );
           }
         }
       }
@@ -720,4 +816,3 @@ export class PluginManager {
     return results;
   }
 }
-

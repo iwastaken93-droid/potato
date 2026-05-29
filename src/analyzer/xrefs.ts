@@ -4,11 +4,11 @@ import { Instruction, Section, Symbol } from '../disassembler/types.js';
  * Types of cross-references (XRefs).
  */
 export type XRefType =
-  | 'CALL'         // Subroutine/function call (e.g., x86 call, ARM bl)
-  | 'JUMP'         // Control flow jump/branch (e.g., jmp, jne, b)
-  | 'DATA_READ'    // Reading from a memory or data address
-  | 'DATA_WRITE'   // Writing to a memory or data address
-  | 'DATA'         // Generic address reference (e.g., pointer in data block)
+  | 'CALL' // Subroutine/function call (e.g., x86 call, ARM bl)
+  | 'JUMP' // Control flow jump/branch (e.g., jmp, jne, b)
+  | 'DATA_READ' // Reading from a memory or data address
+  | 'DATA_WRITE' // Writing to a memory or data address
+  | 'DATA' // Generic address reference (e.g., pointer in data block)
   | 'UNKNOWN';
 
 /**
@@ -51,7 +51,7 @@ export class XRefEngine {
       this.xRefsTo.set(xref.to, []);
     }
     const toList = this.xRefsTo.get(xref.to)!;
-    if (!toList.some(x => x.from === xref.from && x.type === xref.type)) {
+    if (!toList.some((x) => x.from === xref.from && x.type === xref.type)) {
       toList.push(xref);
     }
 
@@ -60,7 +60,7 @@ export class XRefEngine {
       this.xRefsFrom.set(xref.from, []);
     }
     const fromList = this.xRefsFrom.get(xref.from)!;
-    if (!fromList.some(x => x.to === xref.to && x.type === xref.type)) {
+    if (!fromList.some((x) => x.to === xref.to && x.type === xref.type)) {
       fromList.push(xref);
     }
   }
@@ -101,14 +101,14 @@ export class XRefEngine {
    * Traces callers (incoming call references) of a given target address.
    */
   public getCallersOf(address: number): XRef[] {
-    return this.getXRefsTo(address).filter(x => x.type === 'CALL');
+    return this.getXRefsTo(address).filter((x) => x.type === 'CALL');
   }
 
   /**
    * Traces callees (outgoing call references) originating from a given function/source address.
    */
   public getCalleesOf(address: number): XRef[] {
-    return this.getXRefsFrom(address).filter(x => x.type === 'CALL');
+    return this.getXRefsFrom(address).filter((x) => x.type === 'CALL');
   }
 
   /**
@@ -119,7 +119,9 @@ export class XRefEngine {
       return address > 0 && address < 0xffffffffffffffff;
     }
     return sections.some(
-      sec => address >= sec.virtualAddress && address < sec.virtualAddress + sec.virtualSize
+      (sec) =>
+        address >= sec.virtualAddress &&
+        address < sec.virtualAddress + sec.virtualSize
     );
   }
 
@@ -167,12 +169,26 @@ export class XRefEngine {
         if (op.type === 'imm' && op.imm !== undefined) {
           const targetAddr = Number(op.imm);
           if (isCall) {
-            this.addXRef({ from: fromAddr, to: targetAddr, type: 'CALL', context });
+            this.addXRef({
+              from: fromAddr,
+              to: targetAddr,
+              type: 'CALL',
+              context,
+            });
           } else if (isJump) {
-            this.addXRef({ from: fromAddr, to: targetAddr, type: 'JUMP', context });
+            this.addXRef({
+              from: fromAddr,
+              to: targetAddr,
+              type: 'JUMP',
+              context,
+            });
           } else if (this.isValidAddress(targetAddr, sections)) {
             const type: XRefType =
-              op.access === 'w' ? 'DATA_WRITE' : op.access === 'r' ? 'DATA_READ' : 'DATA';
+              op.access === 'w'
+                ? 'DATA_WRITE'
+                : op.access === 'r'
+                  ? 'DATA_READ'
+                  : 'DATA';
             this.addXRef({ from: fromAddr, to: targetAddr, type, context });
           }
         } else if (op.type === 'mem' && op.mem !== undefined) {
@@ -185,14 +201,22 @@ export class XRefEngine {
             const targetAddr = nextInstAddr + Number(disp);
             if (this.isValidAddress(targetAddr, sections)) {
               const type: XRefType =
-                op.access === 'w' ? 'DATA_WRITE' : op.access === 'r' ? 'DATA_READ' : 'DATA';
+                op.access === 'w'
+                  ? 'DATA_WRITE'
+                  : op.access === 'r'
+                    ? 'DATA_READ'
+                    : 'DATA';
               this.addXRef({ from: fromAddr, to: targetAddr, type, context });
             }
           } else if (disp !== undefined) {
             const targetAddr = Number(disp);
             if (this.isValidAddress(targetAddr, sections)) {
               const type: XRefType =
-                op.access === 'w' ? 'DATA_WRITE' : op.access === 'r' ? 'DATA_READ' : 'DATA';
+                op.access === 'w'
+                  ? 'DATA_WRITE'
+                  : op.access === 'r'
+                    ? 'DATA_READ'
+                    : 'DATA';
               this.addXRef({ from: fromAddr, to: targetAddr, type, context });
             }
           }
@@ -207,11 +231,26 @@ export class XRefEngine {
             const targetAddr = parseInt(hexStr, 16);
             if (!isNaN(targetAddr)) {
               if (isCall) {
-                this.addXRef({ from: fromAddr, to: targetAddr, type: 'CALL', context });
+                this.addXRef({
+                  from: fromAddr,
+                  to: targetAddr,
+                  type: 'CALL',
+                  context,
+                });
               } else if (isJump) {
-                this.addXRef({ from: fromAddr, to: targetAddr, type: 'JUMP', context });
+                this.addXRef({
+                  from: fromAddr,
+                  to: targetAddr,
+                  type: 'JUMP',
+                  context,
+                });
               } else if (this.isValidAddress(targetAddr, sections)) {
-                this.addXRef({ from: fromAddr, to: targetAddr, type: 'DATA', context });
+                this.addXRef({
+                  from: fromAddr,
+                  to: targetAddr,
+                  type: 'DATA',
+                  context,
+                });
               }
             }
           }
@@ -233,7 +272,11 @@ export class XRefEngine {
     sections: Section[],
     baseAddress: number
   ): void {
-    const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    const view = new DataView(
+      buffer.buffer,
+      buffer.byteOffset,
+      buffer.byteLength
+    );
 
     // 32-bit pointer scanning (4-byte aligned)
     if (buffer.length >= 4) {
@@ -243,7 +286,11 @@ export class XRefEngine {
           const ptr32LE = view.getUint32(offset, true);
           const ptr32BE = view.getUint32(offset, false);
 
-          const fromAddr = this.offsetToVirtualAddress(offset, sections, baseAddress);
+          const fromAddr = this.offsetToVirtualAddress(
+            offset,
+            sections,
+            baseAddress
+          );
           if (fromAddr !== null) {
             if (this.isValidAddress(ptr32LE, sections)) {
               this.addXRef({
@@ -276,7 +323,11 @@ export class XRefEngine {
           const ptr64LE = Number(view.getBigUint64(offset, true));
           const ptr64BE = Number(view.getBigUint64(offset, false));
 
-          const fromAddr = this.offsetToVirtualAddress(offset, sections, baseAddress);
+          const fromAddr = this.offsetToVirtualAddress(
+            offset,
+            sections,
+            baseAddress
+          );
           if (fromAddr !== null) {
             if (this.isValidAddress(ptr64LE, sections)) {
               this.addXRef({

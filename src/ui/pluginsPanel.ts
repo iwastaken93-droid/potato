@@ -5,10 +5,19 @@
  */
 
 import { Section, Symbol, Instruction } from '../disassembler/types.js';
-import { PluginManager, AnalyzerPlugin, AnalyzerContext, AnalyzerResult, AnalysisFinding } from '../analyzer/plugins.js';
+import {
+  PluginManager,
+  AnalyzerPlugin,
+  AnalyzerContext,
+  AnalyzerResult,
+  AnalysisFinding,
+} from '../analyzer/plugins.js';
 
 export interface PluginsPanelOptions {
-  onNavigate?: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => void;
+  onNavigate?: (
+    targetView: 'assembly' | 'hex' | 'decompiler',
+    address: number
+  ) => void;
 }
 
 export class PluginsPanel {
@@ -379,11 +388,14 @@ export class PluginsPanel {
           binaryData: this.binaryData,
           sections: this.sections,
           symbols: this.symbols,
-          instructions: this.instructions
+          instructions: this.instructions,
         };
 
         this.lastResults = await this.manager.runAll(context);
-        this.showStatus(`Completed analysis with ${this.lastResults.length} plugins. Check the Findings tab!`, 'success');
+        this.showStatus(
+          `Completed analysis with ${this.lastResults.length} plugins. Check the Findings tab!`,
+          'success'
+        );
         this.renderFindings();
       } catch (err: any) {
         this.showStatus(`Analysis failed: ${err?.message || err}`, 'error');
@@ -418,11 +430,13 @@ export class PluginsPanel {
 
     if (activePlugins.length === 0) {
       const emptyMsg = document.createElement('div');
-      emptyMsg.style.cssText = 'color: var(--text-muted); font-size: 0.85rem; font-style: italic; margin-top: 1rem;';
-      emptyMsg.textContent = 'No plugins currently installed. Install from the discoverable list on the right!';
+      emptyMsg.style.cssText =
+        'color: var(--text-muted); font-size: 0.85rem; font-style: italic; margin-top: 1rem;';
+      emptyMsg.textContent =
+        'No plugins currently installed. Install from the discoverable list on the right!';
       this.activePluginsListEl.appendChild(emptyMsg);
     } else {
-      activePlugins.forEach(plugin => {
+      activePlugins.forEach((plugin) => {
         const card = document.createElement('div');
         card.className = 'plugin-card';
 
@@ -436,7 +450,8 @@ export class PluginsPanel {
         `;
 
         const toggleContainer = document.createElement('div');
-        toggleContainer.style.cssText = 'display: flex; gap: 0.5rem; align-items: center;';
+        toggleContainer.style.cssText =
+          'display: flex; gap: 0.5rem; align-items: center;';
 
         const statusLabel = document.createElement('span');
         statusLabel.style.cssText = 'font-size: 0.75rem; font-weight: bold;';
@@ -451,7 +466,10 @@ export class PluginsPanel {
           await this.manager.togglePlugin(plugin.metadata.id, checkbox.checked);
           statusLabel.textContent = checkbox.checked ? 'ACTIVE' : 'DISABLED';
           statusLabel.style.color = checkbox.checked ? '#10b981' : '#64748b';
-          this.showStatus(`Plugin "${plugin.metadata.name}" ${checkbox.checked ? 'enabled' : 'disabled'}.`, 'info');
+          this.showStatus(
+            `Plugin "${plugin.metadata.name}" ${checkbox.checked ? 'enabled' : 'disabled'}.`,
+            'info'
+          );
         });
 
         const uninstallBtn = document.createElement('button');
@@ -461,7 +479,10 @@ export class PluginsPanel {
         uninstallBtn.textContent = 'Uninstall';
         uninstallBtn.addEventListener('click', async () => {
           await this.manager.uninstallPlugin(plugin.metadata.id);
-          this.showStatus(`Plugin "${plugin.metadata.name}" uninstalled.`, 'success');
+          this.showStatus(
+            `Plugin "${plugin.metadata.name}" uninstalled.`,
+            'success'
+          );
           this.renderManagement();
         });
 
@@ -484,7 +505,7 @@ export class PluginsPanel {
           configSec.className = 'plugin-config-section';
           configSec.innerHTML = `<div class="plugin-config-title">Settings & Thresholds</div>`;
 
-          Object.keys(plugin.configSchema).forEach(key => {
+          Object.keys(plugin.configSchema).forEach((key) => {
             const schema = plugin.configSchema![key];
             const currentValue = plugin.config?.[key] ?? schema.default;
 
@@ -504,7 +525,9 @@ export class PluginsPanel {
               input.type = 'checkbox';
               input.checked = !!currentValue;
               input.addEventListener('change', () => {
-                this.manager.setPluginConfig(plugin.metadata.id, { [key]: input.checked });
+                this.manager.setPluginConfig(plugin.metadata.id, {
+                  [key]: input.checked,
+                });
               });
               field.appendChild(input);
             } else if (schema.type === 'number') {
@@ -517,14 +540,16 @@ export class PluginsPanel {
               input.addEventListener('input', () => {
                 const val = parseFloat(input.value);
                 if (!isNaN(val)) {
-                  this.manager.setPluginConfig(plugin.metadata.id, { [key]: val });
+                  this.manager.setPluginConfig(plugin.metadata.id, {
+                    [key]: val,
+                  });
                 }
               });
               field.appendChild(input);
             } else if (schema.type === 'string' && schema.options) {
               const select = document.createElement('select');
               select.className = 'config-input';
-              schema.options.forEach(opt => {
+              schema.options.forEach((opt) => {
                 const option = document.createElement('option');
                 option.value = opt;
                 option.textContent = opt;
@@ -532,7 +557,9 @@ export class PluginsPanel {
                 select.appendChild(option);
               });
               select.addEventListener('change', () => {
-                this.manager.setPluginConfig(plugin.metadata.id, { [key]: select.value });
+                this.manager.setPluginConfig(plugin.metadata.id, {
+                  [key]: select.value,
+                });
               });
               field.appendChild(select);
             } else {
@@ -541,7 +568,9 @@ export class PluginsPanel {
               input.type = 'text';
               input.value = String(currentValue);
               input.addEventListener('input', () => {
-                this.manager.setPluginConfig(plugin.metadata.id, { [key]: input.value });
+                this.manager.setPluginConfig(plugin.metadata.id, {
+                  [key]: input.value,
+                });
               });
               field.appendChild(input);
             }
@@ -562,16 +591,19 @@ export class PluginsPanel {
     `;
 
     const discoverable = this.manager.getDiscoverablePlugins();
-    const installedIds = activePlugins.map(p => p.metadata.id);
-    const uninstalled = discoverable.filter(p => !installedIds.includes(p.metadata.id));
+    const installedIds = activePlugins.map((p) => p.metadata.id);
+    const uninstalled = discoverable.filter(
+      (p) => !installedIds.includes(p.metadata.id)
+    );
 
     if (uninstalled.length === 0) {
       const emptyMsg = document.createElement('div');
-      emptyMsg.style.cssText = 'color: var(--text-muted); font-size: 0.8rem; font-style: italic; margin-top: 1rem;';
+      emptyMsg.style.cssText =
+        'color: var(--text-muted); font-size: 0.8rem; font-style: italic; margin-top: 1rem;';
       emptyMsg.textContent = 'All available plugins are installed.';
       this.discoverPluginsListEl.appendChild(emptyMsg);
     } else {
-      uninstalled.forEach(plugin => {
+      uninstalled.forEach((plugin) => {
         const item = document.createElement('div');
         item.style.cssText = `
           padding: 0.75rem;
@@ -599,7 +631,10 @@ export class PluginsPanel {
         installBtn.textContent = 'Install & Enable';
         installBtn.addEventListener('click', async () => {
           await this.manager.installPlugin(plugin.metadata.id);
-          this.showStatus(`Installed and initialized "${plugin.metadata.name}"!`, 'success');
+          this.showStatus(
+            `Installed and initialized "${plugin.metadata.name}"!`,
+            'success'
+          );
           this.renderManagement();
         });
 
@@ -616,15 +651,17 @@ export class PluginsPanel {
 
     if (this.lastResults.length === 0) {
       const msg = document.createElement('div');
-      msg.style.cssText = 'color: var(--text-muted); font-size: 0.85rem; font-style: italic; margin-top: 1rem; text-align: center;';
-      msg.textContent = 'No findings to display. Load a binary and click "Run All Enabled Plugins".';
+      msg.style.cssText =
+        'color: var(--text-muted); font-size: 0.85rem; font-style: italic; margin-top: 1rem; text-align: center;';
+      msg.textContent =
+        'No findings to display. Load a binary and click "Run All Enabled Plugins".';
       this.findingsListEl.appendChild(msg);
       return;
     }
 
     let totalFindingsCount = 0;
 
-    this.lastResults.forEach(res => {
+    this.lastResults.forEach((res) => {
       const plugin = this.manager.getPlugin(res.pluginId);
       const pluginName = plugin ? plugin.metadata.name : res.pluginId;
 
@@ -649,7 +686,7 @@ export class PluginsPanel {
       this.findingsListEl.appendChild(header);
 
       if (!res.success && res.errors) {
-        res.errors.forEach(err => {
+        res.errors.forEach((err) => {
           const errDiv = document.createElement('div');
           errDiv.style.cssText = `
             padding: 0.75rem;
@@ -667,24 +704,27 @@ export class PluginsPanel {
 
       if (res.findings.length === 0) {
         const noFind = document.createElement('div');
-        noFind.style.cssText = 'color: var(--text-muted); font-size: 0.8rem; font-style: italic; padding: 0.5rem 0 0.5rem 1rem;';
+        noFind.style.cssText =
+          'color: var(--text-muted); font-size: 0.8rem; font-style: italic; padding: 0.5rem 0 0.5rem 1rem;';
         noFind.textContent = 'No issues or insights detected by this plugin.';
         this.findingsListEl.appendChild(noFind);
       } else {
-        res.findings.forEach(finding => {
+        res.findings.forEach((finding) => {
           totalFindingsCount++;
           const row = document.createElement('div');
           row.className = `finding-row severity-${finding.severity}`;
 
           const topRow = document.createElement('div');
-          topRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;';
+          topRow.style.cssText =
+            'display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;';
 
           const badge = document.createElement('span');
           badge.className = `finding-badge badge-${finding.severity}`;
           badge.textContent = finding.severity;
 
           const cat = document.createElement('span');
-          cat.style.cssText = 'font-weight: 700; font-size: 0.8rem; color: var(--text-primary); text-transform: uppercase;';
+          cat.style.cssText =
+            'font-weight: 700; font-size: 0.8rem; color: var(--text-primary); text-transform: uppercase;';
           cat.textContent = finding.category;
 
           const left = document.createElement('div');
@@ -710,7 +750,8 @@ export class PluginsPanel {
           row.appendChild(topRow);
 
           const desc = document.createElement('div');
-          desc.style.cssText = 'font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.25rem;';
+          desc.style.cssText =
+            'font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.25rem;';
           desc.textContent = finding.description;
           row.appendChild(desc);
 
@@ -738,7 +779,10 @@ export class PluginsPanel {
     });
 
     if (totalFindingsCount > 0) {
-      this.showStatus(`Completed plugin execution successfully. Detected ${totalFindingsCount} findings/issues.`, 'success');
+      this.showStatus(
+        `Completed plugin execution successfully. Detected ${totalFindingsCount} findings/issues.`,
+        'success'
+      );
     }
   }
 }

@@ -42,7 +42,10 @@ export interface ParsedObjcMetadata {
 /**
  * Maps a VM address to a file offset within the Mach-O binary.
  */
-export function vmToOffset(vmAddr: bigint | number, segments: MachoSegment[]): number | null {
+export function vmToOffset(
+  vmAddr: bigint | number,
+  segments: MachoSegment[]
+): number | null {
   const addr = BigInt(vmAddr);
   for (const seg of segments) {
     const vmStart = BigInt(seg.vmaddr);
@@ -93,13 +96,20 @@ export function readCString(
   // Let's check if the target has a pointer to a string instead of string itself
   // (e.g. selector refs). If the first 4/8 bytes form a valid VM address that resolves
   // to an offset, let's dereference it first.
-  const possiblePtr = bytes.length - offset >= 8 
-    ? view.getBigUint64(offset, true) 
-    : (bytes.length - offset >= 4 ? BigInt(view.getUint32(offset, true)) : 0n);
-  
+  const possiblePtr =
+    bytes.length - offset >= 8
+      ? view.getBigUint64(offset, true)
+      : bytes.length - offset >= 4
+        ? BigInt(view.getUint32(offset, true))
+        : 0n;
+
   if (possiblePtr !== 0n) {
     const derefOffset = vmToOffset(possiblePtr, segments);
-    if (derefOffset !== null && derefOffset < bytes.length && bytes[derefOffset] !== 0) {
+    if (
+      derefOffset !== null &&
+      derefOffset < bytes.length &&
+      bytes[derefOffset] !== 0
+    ) {
       offset = derefOffset;
     }
   }
@@ -175,9 +185,27 @@ export function parseObjcMetadata(
 
       if (isRelative) {
         // Relative method_t (offsets are 32-bit signed integers)
-        const nameVm = resolveRelativeOffset(view, currentMethodVmAddr, 0, segments, isLittleEndian);
-        const typesVm = resolveRelativeOffset(view, currentMethodVmAddr, 4, segments, isLittleEndian);
-        const impVm = resolveRelativeOffset(view, currentMethodVmAddr, 8, segments, isLittleEndian);
+        const nameVm = resolveRelativeOffset(
+          view,
+          currentMethodVmAddr,
+          0,
+          segments,
+          isLittleEndian
+        );
+        const typesVm = resolveRelativeOffset(
+          view,
+          currentMethodVmAddr,
+          4,
+          segments,
+          isLittleEndian
+        );
+        const impVm = resolveRelativeOffset(
+          view,
+          currentMethodVmAddr,
+          8,
+          segments,
+          isLittleEndian
+        );
 
         if (nameVm) name = readCString(view, bytes, nameVm, segments) || '';
         if (typesVm) types = readCString(view, bytes, typesVm, segments) || '';
@@ -194,8 +222,12 @@ export function parseObjcMetadata(
           imp = impVm;
         } else {
           const nameVm = BigInt(view.getUint32(methodOffset, isLittleEndian));
-          const typesVm = BigInt(view.getUint32(methodOffset + 4, isLittleEndian));
-          const impVm = BigInt(view.getUint32(methodOffset + 8, isLittleEndian));
+          const typesVm = BigInt(
+            view.getUint32(methodOffset + 4, isLittleEndian)
+          );
+          const impVm = BigInt(
+            view.getUint32(methodOffset + 8, isLittleEndian)
+          );
 
           name = readCString(view, bytes, nameVm, segments) || '';
           types = readCString(view, bytes, typesVm, segments) || '';
@@ -309,17 +341,17 @@ export function parseObjcMetadata(
     if (listOffset === null || listOffset + 8 > view.byteLength) return [];
 
     const pointerSize = is64Bit ? 8 : 4;
-    const count = is64Bit 
+    const count = is64Bit
       ? Number(view.getBigUint64(listOffset, isLittleEndian))
       : view.getUint32(listOffset, isLittleEndian);
 
     const protoNames: string[] = [];
 
     for (let i = 0; i < count; i++) {
-      const fieldOffset = listOffset + pointerSize + (i * pointerSize);
+      const fieldOffset = listOffset + pointerSize + i * pointerSize;
       if (fieldOffset + pointerSize > view.byteLength) break;
 
-      const protoVm = is64Bit 
+      const protoVm = is64Bit
         ? view.getBigUint64(fieldOffset, isLittleEndian)
         : BigInt(view.getUint32(fieldOffset, isLittleEndian));
 
@@ -339,7 +371,13 @@ export function parseObjcMetadata(
     // We can extract a unique protocol by checking its name
     // Let's resolve the offset of name (isa is first pointer, name is second pointer)
     const namePtrOffset = protoVm + BigInt(is64Bit ? 8 : 4);
-    const nameVm = readPointer(view, namePtrOffset, segments, is64Bit, isLittleEndian);
+    const nameVm = readPointer(
+      view,
+      namePtrOffset,
+      segments,
+      is64Bit,
+      isLittleEndian
+    );
     if (!nameVm) return null;
 
     const name = readCString(view, bytes, nameVm, segments);
@@ -352,22 +390,64 @@ export function parseObjcMetadata(
     // Resolve pointers based on protocol_t offsets (64-bit offsets)
     // isa (8), name (8), protocols (8), instanceMethods (8), classMethods (8), optionalInstanceMethods (8), optionalClassMethods (8), instanceProperties (8)
     const pointerSize = BigInt(is64Bit ? 8 : 4);
-    
-    const protocolsPtr = readPointer(view, protoVm + 2n * pointerSize, segments, is64Bit, isLittleEndian) || 0n;
-    const instMethodsPtr = readPointer(view, protoVm + 3n * pointerSize, segments, is64Bit, isLittleEndian) || 0n;
-    const classMethodsPtr = readPointer(view, protoVm + 4n * pointerSize, segments, is64Bit, isLittleEndian) || 0n;
-    const optInstMethodsPtr = readPointer(view, protoVm + 5n * pointerSize, segments, is64Bit, isLittleEndian) || 0n;
-    const optClassMethodsPtr = readPointer(view, protoVm + 6n * pointerSize, segments, is64Bit, isLittleEndian) || 0n;
-    const instPropertiesPtr = readPointer(view, protoVm + 7n * pointerSize, segments, is64Bit, isLittleEndian) || 0n;
+
+    const protocolsPtr =
+      readPointer(
+        view,
+        protoVm + 2n * pointerSize,
+        segments,
+        is64Bit,
+        isLittleEndian
+      ) || 0n;
+    const instMethodsPtr =
+      readPointer(
+        view,
+        protoVm + 3n * pointerSize,
+        segments,
+        is64Bit,
+        isLittleEndian
+      ) || 0n;
+    const classMethodsPtr =
+      readPointer(
+        view,
+        protoVm + 4n * pointerSize,
+        segments,
+        is64Bit,
+        isLittleEndian
+      ) || 0n;
+    const optInstMethodsPtr =
+      readPointer(
+        view,
+        protoVm + 5n * pointerSize,
+        segments,
+        is64Bit,
+        isLittleEndian
+      ) || 0n;
+    const optClassMethodsPtr =
+      readPointer(
+        view,
+        protoVm + 6n * pointerSize,
+        segments,
+        is64Bit,
+        isLittleEndian
+      ) || 0n;
+    const instPropertiesPtr =
+      readPointer(
+        view,
+        protoVm + 7n * pointerSize,
+        segments,
+        is64Bit,
+        isLittleEndian
+      ) || 0n;
 
     const instanceMethods = [
       ...parseMethodList(instMethodsPtr),
-      ...parseMethodList(optInstMethodsPtr)
+      ...parseMethodList(optInstMethodsPtr),
     ];
 
     const classMethods = [
       ...parseMethodList(classMethodsPtr),
-      ...parseMethodList(optClassMethodsPtr)
+      ...parseMethodList(optClassMethodsPtr),
     ];
 
     const properties = parsePropertyList(instPropertiesPtr);
@@ -376,7 +456,7 @@ export function parseObjcMetadata(
       name,
       instanceMethods,
       classMethods,
-      properties
+      properties,
     };
 
     protocolCache.set(name, protocol);
@@ -385,7 +465,9 @@ export function parseObjcMetadata(
   };
 
   // Find classes section: typically __objc_classlist
-  const classListSection = macho.sections.find(s => s.sectname === '__objc_classlist');
+  const classListSection = macho.sections.find(
+    (s) => s.sectname === '__objc_classlist'
+  );
   if (classListSection) {
     const listOffset = classListSection.offset;
     const listSize = Number(classListSection.size);
@@ -393,10 +475,10 @@ export function parseObjcMetadata(
     const count = Math.floor(listSize / ptrSize);
 
     for (let i = 0; i < count; i++) {
-      const fieldOffset = listOffset + (i * ptrSize);
+      const fieldOffset = listOffset + i * ptrSize;
       if (fieldOffset + ptrSize > view.byteLength) break;
 
-      const classVm = is64Bit 
+      const classVm = is64Bit
         ? view.getBigUint64(fieldOffset, isLittleEndian)
         : BigInt(view.getUint32(fieldOffset, isLittleEndian));
 
@@ -405,7 +487,13 @@ export function parseObjcMetadata(
       // Parse class_t
       // isa (8), superclass (8), cache (16), vtable (8), data (8)
       const dataPtrOffset = classVm + BigInt(is64Bit ? 32 : 16);
-      const dataVm = readPointer(view, dataPtrOffset, segments, is64Bit, isLittleEndian);
+      const dataVm = readPointer(
+        view,
+        dataPtrOffset,
+        segments,
+        is64Bit,
+        isLittleEndian
+      );
       if (!dataVm) continue;
 
       // Mask out swift bits
@@ -414,7 +502,13 @@ export function parseObjcMetadata(
       // Parse class_ro_t
       // flags (4), instanceStart (4), instanceSize (4), [if 64bit: reserved (4)], ivarLayout (8), name (8), baseMethods (8), baseProtocols (8), ivars (8), weakIvarLayout (8), baseProperties (8)
       const nameFieldOffset = cleanDataVm + BigInt(is64Bit ? 24 : 12);
-      const nameVm = readPointer(view, nameFieldOffset, segments, is64Bit, isLittleEndian);
+      const nameVm = readPointer(
+        view,
+        nameFieldOffset,
+        segments,
+        is64Bit,
+        isLittleEndian
+      );
       if (!nameVm) continue;
 
       const name = readCString(view, bytes, nameVm, segments);
@@ -423,13 +517,31 @@ export function parseObjcMetadata(
       // Resolve superclass name
       let superclassName: string | null = null;
       const superclassPtrOffset = classVm + BigInt(is64Bit ? 8 : 4);
-      const superclassVm = readPointer(view, superclassPtrOffset, segments, is64Bit, isLittleEndian);
+      const superclassVm = readPointer(
+        view,
+        superclassPtrOffset,
+        segments,
+        is64Bit,
+        isLittleEndian
+      );
       if (superclassVm && superclassVm !== 0n) {
         // Superclass might be defined in this binary, so we can try to resolve its name
-        const superDataVm = readPointer(view, superclassVm + BigInt(is64Bit ? 32 : 16), segments, is64Bit, isLittleEndian);
+        const superDataVm = readPointer(
+          view,
+          superclassVm + BigInt(is64Bit ? 32 : 16),
+          segments,
+          is64Bit,
+          isLittleEndian
+        );
         if (superDataVm) {
           const cleanSuperDataVm = superDataVm & (is64Bit ? ~7n : ~3n);
-          const superNameVm = readPointer(view, cleanSuperDataVm + BigInt(is64Bit ? 24 : 12), segments, is64Bit, isLittleEndian);
+          const superNameVm = readPointer(
+            view,
+            cleanSuperDataVm + BigInt(is64Bit ? 24 : 12),
+            segments,
+            is64Bit,
+            isLittleEndian
+          );
           if (superNameVm) {
             superclassName = readCString(view, bytes, superNameVm, segments);
           }
@@ -443,10 +555,38 @@ export function parseObjcMetadata(
       const ivarsFieldOffset = cleanDataVm + BigInt(is64Bit ? 48 : 24);
       const propertiesFieldOffset = cleanDataVm + BigInt(is64Bit ? 64 : 32);
 
-      const baseMethodsVm = readPointer(view, methodsFieldOffset, segments, is64Bit, isLittleEndian) || 0n;
-      const baseProtocolsVm = readPointer(view, protocolsFieldOffset, segments, is64Bit, isLittleEndian) || 0n;
-      const ivarsVm = readPointer(view, ivarsFieldOffset, segments, is64Bit, isLittleEndian) || 0n;
-      const basePropertiesVm = readPointer(view, propertiesFieldOffset, segments, is64Bit, isLittleEndian) || 0n;
+      const baseMethodsVm =
+        readPointer(
+          view,
+          methodsFieldOffset,
+          segments,
+          is64Bit,
+          isLittleEndian
+        ) || 0n;
+      const baseProtocolsVm =
+        readPointer(
+          view,
+          protocolsFieldOffset,
+          segments,
+          is64Bit,
+          isLittleEndian
+        ) || 0n;
+      const ivarsVm =
+        readPointer(
+          view,
+          ivarsFieldOffset,
+          segments,
+          is64Bit,
+          isLittleEndian
+        ) || 0n;
+      const basePropertiesVm =
+        readPointer(
+          view,
+          propertiesFieldOffset,
+          segments,
+          is64Bit,
+          isLittleEndian
+        ) || 0n;
 
       const methods = parseMethodList(baseMethodsVm);
       const properties = parsePropertyList(basePropertiesVm);
@@ -459,13 +599,15 @@ export function parseObjcMetadata(
         methods,
         properties,
         protocols: classProtos,
-        ivars
+        ivars,
       });
     }
   }
 
   // Also search for standalone protocol list: __objc_protolist
-  const protolistSection = macho.sections.find(s => s.sectname === '__objc_protolist');
+  const protolistSection = macho.sections.find(
+    (s) => s.sectname === '__objc_protolist'
+  );
   if (protolistSection) {
     const listOffset = protolistSection.offset;
     const listSize = Number(protolistSection.size);
@@ -473,7 +615,7 @@ export function parseObjcMetadata(
     const count = Math.floor(listSize / ptrSize);
 
     for (let i = 0; i < count; i++) {
-      const fieldOffset = listOffset + (i * ptrSize);
+      const fieldOffset = listOffset + i * ptrSize;
       if (fieldOffset + ptrSize > view.byteLength) break;
 
       const protoVm = is64Bit
@@ -486,6 +628,6 @@ export function parseObjcMetadata(
 
   return {
     classes,
-    protocols
+    protocols,
   };
 }

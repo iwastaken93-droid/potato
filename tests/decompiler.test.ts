@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { Decompiler, BasicBlock, Instruction } from '../src/disassembler/decompiler.js';
+import {
+  Decompiler,
+  BasicBlock,
+  Instruction,
+  ASTPrinter,
+} from '../src/disassembler/decompiler.js';
 
 describe('Decompiler Core Analysis', () => {
   // Helper to construct basic blocks easily
-  function createBlock(id: string, successors: string[], instructions: Instruction[] = []): BasicBlock {
+  function createBlock(
+    id: string,
+    successors: string[],
+    instructions: Instruction[] = []
+  ): BasicBlock {
     return {
       id,
       instructions,
@@ -95,16 +104,25 @@ describe('Decompiler Core Analysis', () => {
   it('should reconstruct a struct correctly from field accesses', () => {
     // Struct pointer is in ESI. Field 0, 4, 8 are accessed.
     const blocks = [
-      createBlock('Entry', [], [
-        { address: 0x1000, op: 'MOV', args: ['eax', '[esi + 0]'] },
-        { address: 0x1004, op: 'MOV', args: ['[esi + 4]', 'ebx'] },
-        { address: 0x1008, op: 'MOV', args: ['[esi + 8]', '100'] },
-        { address: 0x100c, op: 'RET', args: [] },
-      ]),
+      createBlock(
+        'Entry',
+        [],
+        [
+          { address: 0x1000, op: 'MOV', args: ['eax', '[esi + 0]'] },
+          { address: 0x1004, op: 'MOV', args: ['[esi + 4]', 'ebx'] },
+          { address: 0x1008, op: 'MOV', args: ['[esi + 8]', '100'] },
+          { address: 0x100c, op: 'RET', args: [] },
+        ]
+      ),
     ];
 
     const decompiler = new Decompiler();
-    const decompiled = decompiler.decompile('test_func', ['esi', 'ebx'], blocks, 'Entry');
+    const decompiled = decompiler.decompile(
+      'test_func',
+      ['esi', 'ebx'],
+      blocks,
+      'Entry'
+    );
 
     expect(decompiled.structs).toBeDefined();
     expect(decompiled.structs!.length).toBe(1);
@@ -121,15 +139,24 @@ describe('Decompiler Core Analysis', () => {
   it('should reconstruct an array access pattern correctly', () => {
     // Array access using index register
     const blocks = [
-      createBlock('Entry', [], [
-        { address: 0x1000, op: 'MOV', args: ['eax', '[esi + edi * 4]'] },
-        { address: 0x1004, op: 'MOV', args: ['[esi + ecx * 4]', 'ebx'] },
-        { address: 0x1008, op: 'RET', args: [] },
-      ]),
+      createBlock(
+        'Entry',
+        [],
+        [
+          { address: 0x1000, op: 'MOV', args: ['eax', '[esi + edi * 4]'] },
+          { address: 0x1004, op: 'MOV', args: ['[esi + ecx * 4]', 'ebx'] },
+          { address: 0x1008, op: 'RET', args: [] },
+        ]
+      ),
     ];
 
     const decompiler = new Decompiler();
-    const decompiled = decompiler.decompile('array_test', ['esi', 'edi', 'ecx', 'ebx'], blocks, 'Entry');
+    const decompiled = decompiler.decompile(
+      'array_test',
+      ['esi', 'edi', 'ecx', 'ebx'],
+      blocks,
+      'Entry'
+    );
 
     expect(decompiled.pseudocode).toContain('eax = esi[edi]');
     expect(decompiled.pseudocode).toContain('esi[ecx] = ebx');
@@ -143,23 +170,34 @@ describe('Decompiler Core Analysis', () => {
     //    \       /
     //      Merge
     const blocks = [
-      createBlock('Entry', ['Then', 'Else'], [
-        { address: 0x1000, op: 'CMP', args: ['eax', '10'] },
-        { address: 0x1004, op: 'JE', args: ['Then'] },
-      ]),
-      createBlock('Then', ['Merge'], [
-        { address: 0x1008, op: 'MOV', args: ['ebx', '1'] },
-      ]),
-      createBlock('Else', ['Merge'], [
-        { address: 0x100c, op: 'MOV', args: ['ebx', '2'] },
-      ]),
-      createBlock('Merge', [], [
-        { address: 0x1010, op: 'RET', args: ['ebx'] },
-      ]),
+      createBlock(
+        'Entry',
+        ['Then', 'Else'],
+        [
+          { address: 0x1000, op: 'CMP', args: ['eax', '10'] },
+          { address: 0x1004, op: 'JE', args: ['Then'] },
+        ]
+      ),
+      createBlock(
+        'Then',
+        ['Merge'],
+        [{ address: 0x1008, op: 'MOV', args: ['ebx', '1'] }]
+      ),
+      createBlock(
+        'Else',
+        ['Merge'],
+        [{ address: 0x100c, op: 'MOV', args: ['ebx', '2'] }]
+      ),
+      createBlock('Merge', [], [{ address: 0x1010, op: 'RET', args: ['ebx'] }]),
     ];
 
     const decompiler = new Decompiler();
-    const decompiled = decompiler.decompile('branch_test', ['eax'], blocks, 'Entry');
+    const decompiled = decompiler.decompile(
+      'branch_test',
+      ['eax'],
+      blocks,
+      'Entry'
+    );
 
     expect(decompiled.pseudocode).toContain('if (je(eax, 10))');
     expect(decompiled.pseudocode).toContain('ebx = 1');
@@ -171,15 +209,24 @@ describe('Decompiler Core Analysis', () => {
   it('should propagate variable types correctly', () => {
     // Trace type from constant to local stack variables, then through registers
     const blocks = [
-      createBlock('Entry', [], [
-        { address: 0x1000, op: 'MOV', args: ['[ebp - 4]', '42'] }, // local_4 = int
-        { address: 0x1004, op: 'MOV', args: ['eax', '[ebp - 4]'] }, // eax = int
-        { address: 0x1008, op: 'RET', args: [] },
-      ]),
+      createBlock(
+        'Entry',
+        [],
+        [
+          { address: 0x1000, op: 'MOV', args: ['[ebp - 4]', '42'] }, // local_4 = int
+          { address: 0x1004, op: 'MOV', args: ['eax', '[ebp - 4]'] }, // eax = int
+          { address: 0x1008, op: 'RET', args: [] },
+        ]
+      ),
     ];
 
     const decompiler = new Decompiler();
-    const decompiled = decompiler.decompile('type_prop_test', [], blocks, 'Entry');
+    const decompiled = decompiler.decompile(
+      'type_prop_test',
+      [],
+      blocks,
+      'Entry'
+    );
 
     // Type of local_4 and eax should be int
     expect(decompiled.pseudocode).toContain('int local_4');
@@ -194,22 +241,30 @@ describe('Decompiler Core Analysis', () => {
     // Latch -> Header
     // Exit -> End
     const blocks = [
-      createBlock('Entry', ['Header'], [
-        { address: 0x1000, op: 'MOV', args: ['eax', '10'] },
-      ]),
-      createBlock('Header', ['Body', 'Exit'], [
-        { address: 0x1004, op: 'CMP', args: ['eax', '0'] },
-        { address: 0x1008, op: 'JLE', args: ['Exit'] },
-      ]),
-      createBlock('Body', ['Latch'], [
-        { address: 0x100c, op: 'SUB', args: ['eax', '1'] },
-      ]),
-      createBlock('Latch', ['Header'], [
-        { address: 0x1010, op: 'JMP', args: ['Header'] },
-      ]),
-      createBlock('Exit', [], [
-        { address: 0x1014, op: 'RET', args: ['eax'] },
-      ]),
+      createBlock(
+        'Entry',
+        ['Header'],
+        [{ address: 0x1000, op: 'MOV', args: ['eax', '10'] }]
+      ),
+      createBlock(
+        'Header',
+        ['Body', 'Exit'],
+        [
+          { address: 0x1004, op: 'CMP', args: ['eax', '0'] },
+          { address: 0x1008, op: 'JLE', args: ['Exit'] },
+        ]
+      ),
+      createBlock(
+        'Body',
+        ['Latch'],
+        [{ address: 0x100c, op: 'SUB', args: ['eax', '1'] }]
+      ),
+      createBlock(
+        'Latch',
+        ['Header'],
+        [{ address: 0x1010, op: 'JMP', args: ['Header'] }]
+      ),
+      createBlock('Exit', [], [{ address: 0x1014, op: 'RET', args: ['eax'] }]),
     ];
 
     const decompiler = new Decompiler();
@@ -228,30 +283,47 @@ describe('Decompiler Core Analysis', () => {
     // Else -> Merge
     // Merge -> Exit
     const blocks = [
-      createBlock('Entry', ['Then', 'Else'], [
-        { address: 0x2000, op: 'CMP', args: ['eax', '5'] },
-        { address: 0x2004, op: 'JG', args: ['Then'] },
-      ]),
-      createBlock('Then', ['ThenLeft', 'ThenRight'], [
-        { address: 0x2008, op: 'CMP', args: ['ebx', '10'] },
-        { address: 0x200c, op: 'JE', args: ['ThenLeft'] },
-      ]),
-      createBlock('ThenLeft', ['Merge'], [
-        { address: 0x2010, op: 'MOV', args: ['ecx', '1'] },
-      ]),
-      createBlock('ThenRight', ['Merge'], [
-        { address: 0x2014, op: 'MOV', args: ['ecx', '2'] },
-      ]),
-      createBlock('Else', ['Merge'], [
-        { address: 0x2018, op: 'MOV', args: ['ecx', '3'] },
-      ]),
-      createBlock('Merge', [], [
-        { address: 0x201c, op: 'RET', args: ['ecx'] },
-      ]),
+      createBlock(
+        'Entry',
+        ['Then', 'Else'],
+        [
+          { address: 0x2000, op: 'CMP', args: ['eax', '5'] },
+          { address: 0x2004, op: 'JG', args: ['Then'] },
+        ]
+      ),
+      createBlock(
+        'Then',
+        ['ThenLeft', 'ThenRight'],
+        [
+          { address: 0x2008, op: 'CMP', args: ['ebx', '10'] },
+          { address: 0x200c, op: 'JE', args: ['ThenLeft'] },
+        ]
+      ),
+      createBlock(
+        'ThenLeft',
+        ['Merge'],
+        [{ address: 0x2010, op: 'MOV', args: ['ecx', '1'] }]
+      ),
+      createBlock(
+        'ThenRight',
+        ['Merge'],
+        [{ address: 0x2014, op: 'MOV', args: ['ecx', '2'] }]
+      ),
+      createBlock(
+        'Else',
+        ['Merge'],
+        [{ address: 0x2018, op: 'MOV', args: ['ecx', '3'] }]
+      ),
+      createBlock('Merge', [], [{ address: 0x201c, op: 'RET', args: ['ecx'] }]),
     ];
 
     const decompiler = new Decompiler();
-    const decompiled = decompiler.decompile('nested_branch_test', ['eax', 'ebx'], blocks, 'Entry');
+    const decompiled = decompiler.decompile(
+      'nested_branch_test',
+      ['eax', 'ebx'],
+      blocks,
+      'Entry'
+    );
     expect(decompiled.pseudocode).toContain('if (jg(eax, 5))');
     expect(decompiled.pseudocode).toContain('if (je(ebx, 10))');
   });
@@ -259,20 +331,29 @@ describe('Decompiler Core Analysis', () => {
   it('should handle complex memory operands, constants, and default pointer formatting', () => {
     // Test complex addressing, default pointer fallback, empty operands, and type changes
     const blocks = [
-      createBlock('Entry', [], [
-        // Base + Index * Scale + Offset
-        { address: 0x3000, op: 'MOV', args: ['eax', '[esi + edi * 4 + 16]'] },
-        // Fallback memory syntax: *( base + offset ) - using ADD so it doesn't propagate struct type
-        { address: 0x3004, op: 'ADD', args: ['[edx + 8]', 'ebx'] },
-        // Empty instruction args handling or unknown op
-        { address: 0x3008, op: 'UNKNOWN_OP', args: [] },
-        { address: 0x300c, op: 'RET', args: [] },
-      ]),
+      createBlock(
+        'Entry',
+        [],
+        [
+          // Base + Index * Scale + Offset
+          { address: 0x3000, op: 'MOV', args: ['eax', '[esi + edi * 4 + 16]'] },
+          // Fallback memory syntax: *( base + offset ) - using ADD so it doesn't propagate struct type
+          { address: 0x3004, op: 'ADD', args: ['[edx + 8]', 'ebx'] },
+          // Empty instruction args handling or unknown op
+          { address: 0x3008, op: 'UNKNOWN_OP', args: [] },
+          { address: 0x300c, op: 'RET', args: [] },
+        ]
+      ),
     ];
 
     const decompiler = new Decompiler();
-    const decompiled = decompiler.decompile('mem_test', ['esi', 'edi', 'edx', 'ebx'], blocks, 'Entry');
-    
+    const decompiled = decompiler.decompile(
+      'mem_test',
+      ['esi', 'edi', 'edx', 'ebx'],
+      blocks,
+      'Entry'
+    );
+
     // Check fallback syntax
     expect(decompiled.pseudocode).toContain('add(*( edx + 8 ), ebx)');
     expect(decompiled.pseudocode).toContain('unknown_op()');
@@ -287,51 +368,87 @@ describe('Decompiler Core Analysis', () => {
     const blocks1 = [
       createBlock('Entry', ['Header']),
       createBlock('Header', ['Body']),
-      createBlock('Body', ['Latch'], [
-        { address: 0x4000, op: 'MOV', args: ['eax', '1'] }
-      ]),
-      createBlock('Latch', ['Header', 'Exit'], [
-        { address: 0x4004, op: 'CMP', args: ['eax', '10'] },
-        { address: 0x4008, op: 'JNE', args: ['Header'] }
-      ]),
-      createBlock('Exit', [], [
-        { address: 0x400c, op: 'RET', args: [] }
-      ])
+      createBlock(
+        'Body',
+        ['Latch'],
+        [{ address: 0x4000, op: 'MOV', args: ['eax', '1'] }]
+      ),
+      createBlock(
+        'Latch',
+        ['Header', 'Exit'],
+        [
+          { address: 0x4004, op: 'CMP', args: ['eax', '10'] },
+          { address: 0x4008, op: 'JNE', args: ['Header'] },
+        ]
+      ),
+      createBlock('Exit', [], [{ address: 0x400c, op: 'RET', args: [] }]),
     ];
 
     const decompiler = new Decompiler();
-    const decompiled1 = decompiler.decompile('dowhile_test', [], blocks1, 'Entry');
+    const decompiled1 = decompiler.decompile(
+      'dowhile_test',
+      [],
+      blocks1,
+      'Entry'
+    );
     expect(decompiled1.pseudocode).toContain('do {');
     expect(decompiled1.pseudocode).toContain('while (true);');
 
     // 2. Nested branches inside a branch that merges before the outer merge point,
     // sequential steps inside branches, and branches with no successors (RET)
     const blocks2 = [
-      createBlock('Entry', ['Then', 'Else'], [
-        { address: 0x5000, op: 'CMP', args: ['eax', '1'] },
-        { address: 0x5004, op: 'JE', args: ['Then'] }
-      ]),
+      createBlock(
+        'Entry',
+        ['Then', 'Else'],
+        [
+          { address: 0x5000, op: 'CMP', args: ['eax', '1'] },
+          { address: 0x5004, op: 'JE', args: ['Then'] },
+        ]
+      ),
       createBlock('Then', ['ThenSeq']),
-      createBlock('ThenSeq', ['ThenLeft', 'ThenRight'], [
-        { address: 0x5008, op: 'CMP', args: ['ebx', '2'] },
-        { address: 0x500c, op: 'JE', args: ['ThenLeft'] }
-      ]),
-      createBlock('ThenLeft', [], [
-        { address: 0x5010, op: 'RET', args: ['1'] } // 0 successors
-      ]),
-      createBlock('ThenRight', ['ThenMerge'], [
-        { address: 0x5014, op: 'MOV', args: ['ecx', '2'] }
-      ]),
+      createBlock(
+        'ThenSeq',
+        ['ThenLeft', 'ThenRight'],
+        [
+          { address: 0x5008, op: 'CMP', args: ['ebx', '2'] },
+          { address: 0x500c, op: 'JE', args: ['ThenLeft'] },
+        ]
+      ),
+      createBlock(
+        'ThenLeft',
+        [],
+        [
+          { address: 0x5010, op: 'RET', args: ['1'] }, // 0 successors
+        ]
+      ),
+      createBlock(
+        'ThenRight',
+        ['ThenMerge'],
+        [{ address: 0x5014, op: 'MOV', args: ['ecx', '2'] }]
+      ),
       createBlock('ThenMerge', ['ThenFinal']),
-      createBlock('ThenFinal', [], [
-        { address: 0x5018, op: 'RET', args: ['ecx'] } // 0 successors, making it end of branch
-      ]),
-      createBlock('Else', [], [
-        { address: 0x501c, op: 'RET', args: ['0'] } // 0 successors
-      ])
+      createBlock(
+        'ThenFinal',
+        [],
+        [
+          { address: 0x5018, op: 'RET', args: ['ecx'] }, // 0 successors, making it end of branch
+        ]
+      ),
+      createBlock(
+        'Else',
+        [],
+        [
+          { address: 0x501c, op: 'RET', args: ['0'] }, // 0 successors
+        ]
+      ),
     ];
 
-    const decompiled2 = decompiler.decompile('complex_branch_test', ['eax', 'ebx'], blocks2, 'Entry');
+    const decompiled2 = decompiler.decompile(
+      'complex_branch_test',
+      ['eax', 'ebx'],
+      blocks2,
+      'Entry'
+    );
     expect(decompiled2.pseudocode).toContain('if (je(eax, 1))');
     expect(decompiled2.pseudocode).toContain('if (je(ebx, 2))');
   });
@@ -358,8 +475,12 @@ describe('Decompiler Core Analysis', () => {
     }
 
     const decompiler = new Decompiler();
-    const dominators: Map<string, Set<string>> = (decompiler as any).computeDominators(blockMap, 'Entry');
-    const postDominators: Map<string, Set<string>> = (decompiler as any).computePostDominators(blockMap);
+    const dominators: Map<string, Set<string>> = (
+      decompiler as any
+    ).computeDominators(blockMap, 'Entry');
+    const postDominators: Map<string, Set<string>> = (
+      decompiler as any
+    ).computePostDominators(blockMap);
 
     expect(dominators).toBeDefined();
     expect(postDominators).toBeDefined();
@@ -387,5 +508,32 @@ describe('Decompiler Core Analysis', () => {
     expect(postDominators.get('C')?.has('D')).toBe(true);
     expect(postDominators.get('D')).toEqual(new Set(['D']));
   });
-});
 
+  it('should format BinaryExpr and AssignExpr correctly using ASTPrinter visitor', () => {
+    const printer = new ASTPrinter();
+
+    // 1. BinaryExpr
+    const binaryExpr = {
+      type: 'Binary' as const,
+      operator: '+',
+      left: { type: 'Identifier' as const, name: 'eax' },
+      right: { type: 'Constant' as const, value: '4' },
+    };
+    expect(printer.renderExpr(binaryExpr)).toBe('eax + 4');
+
+    // 2. AssignExpr
+    const assignExpr = {
+      type: 'Assign' as const,
+      left: { type: 'Identifier' as const, name: 'ebx' },
+      right: binaryExpr,
+    };
+    expect(printer.renderExpr(assignExpr)).toBe('ebx = eax + 4');
+
+    // 3. StatementNode
+    const statementNode = {
+      type: 'Statement' as const,
+      expr: assignExpr,
+    };
+    expect(printer.render(statementNode)).toBe('ebx = eax + 4;');
+  });
+});

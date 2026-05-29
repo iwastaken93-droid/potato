@@ -37,7 +37,9 @@ export class CapstoneWasmEngine {
    */
   public disassemble(data: Uint8Array, baseAddress: number): Instruction[] {
     if (!this.isLoaded) {
-      throw new Error('Capstone WASM module is not loaded. Call load() or loadSync() first.');
+      throw new Error(
+        'Capstone WASM module is not loaded. Call load() or loadSync() first.'
+      );
     }
 
     const instructions: Instruction[] = [];
@@ -58,18 +60,30 @@ export class CapstoneWasmEngine {
           mnemonic = 'push';
           opStr = 'rbp';
           size = 1;
-        } else if (b === 0x48 && data[offset + 1] === 0x89 && data[offset + 2] === 0xe5) {
+        } else if (
+          b === 0x48 &&
+          data[offset + 1] === 0x89 &&
+          data[offset + 2] === 0xe5
+        ) {
           mnemonic = 'mov';
           opStr = 'rbp, rsp';
           size = 3;
-        } else if (b === 0x48 && data[offset + 1] === 0x83 && data[offset + 2] === 0xec) {
+        } else if (
+          b === 0x48 &&
+          data[offset + 1] === 0x83 &&
+          data[offset + 2] === 0xec
+        ) {
           mnemonic = 'sub';
           const imm = data[offset + 3] ?? 0;
           opStr = `rsp, ${imm}`;
           size = 4;
         } else if (b === 0xb8) {
           mnemonic = 'mov';
-          const imm = (data[offset + 1] ?? 0) + ((data[offset + 2] ?? 0) << 8) + ((data[offset + 3] ?? 0) << 16) + ((data[offset + 4] ?? 0) * 0x1000000);
+          const imm =
+            (data[offset + 1] ?? 0) +
+            ((data[offset + 2] ?? 0) << 8) +
+            ((data[offset + 3] ?? 0) << 16) +
+            (data[offset + 4] ?? 0) * 0x1000000;
           opStr = `eax, 0x${imm.toString(16)}`;
           size = 5;
         } else if (b === 0xc3) {
@@ -96,12 +110,12 @@ export class CapstoneWasmEngine {
     } else if (this.arch === 'arm') {
       while (offset + 3 < data.length) {
         const address = baseAddress + offset;
-        const val = (
-          (data[offset] ?? 0) |
-          ((data[offset + 1] ?? 0) << 8) |
-          ((data[offset + 2] ?? 0) << 16) |
-          ((data[offset + 3] ?? 0) << 24)
-        ) >>> 0;
+        const val =
+          ((data[offset] ?? 0) |
+            ((data[offset + 1] ?? 0) << 8) |
+            ((data[offset + 2] ?? 0) << 16) |
+            ((data[offset + 3] ?? 0) << 24)) >>>
+          0;
         let mnemonic = 'db';
         let opStr = `0x${val.toString(16).padStart(8, '0')}`;
         const size = 4;
@@ -109,7 +123,7 @@ export class CapstoneWasmEngine {
         if (val === 0xd503201f) {
           mnemonic = 'nop';
           opStr = '';
-        } else if (((val & 0xfffffc1f) >>> 0) === 0xd65f0000) {
+        } else if ((val & 0xfffffc1f) >>> 0 === 0xd65f0000) {
           mnemonic = 'ret';
           opStr = '';
         } else {

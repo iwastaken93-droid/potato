@@ -14,7 +14,7 @@ export interface AIPanelOptions {
 export class AIPanel {
   private container: HTMLElement;
   private options: AIPanelOptions;
-  
+
   // State
   private currentSymbol: Symbol | null = null;
   private currentCode: string = '';
@@ -41,7 +41,7 @@ export class AIPanel {
     this.currentSymbol = symbol;
     this.currentCode = code;
     this.renderHeader();
-    
+
     // Automatically trigger explanation when symbol changes, unless empty
     if (code && code.trim()) {
       this.triggerAnalysis(code);
@@ -265,7 +265,7 @@ export class AIPanel {
           </button>
         </div>
       `;
-      
+
       const reBtn = this.statusHeaderEl.querySelector('#reanalyze-btn');
       reBtn?.addEventListener('click', () => {
         if (this.currentCode) {
@@ -285,15 +285,20 @@ export class AIPanel {
   private triggerAnalysis(code: string) {
     this.isAnalyzing = true;
     this.renderResults();
-    
+
     // Simulate loading/computation micro-delay for premium feel
     setTimeout(() => {
       try {
-        const symbolContext = this.currentSymbol ? {
-          functionName: this.currentSymbol.name,
-          arch: 'x86_64'
-        } : undefined;
-        this.explanationResult = AIExplanationEngine.analyze(code, symbolContext);
+        const symbolContext = this.currentSymbol
+          ? {
+              functionName: this.currentSymbol.name,
+              arch: 'x86_64',
+            }
+          : undefined;
+        this.explanationResult = AIExplanationEngine.analyze(
+          code,
+          symbolContext
+        );
       } catch (err) {
         console.error(err);
       } finally {
@@ -319,7 +324,14 @@ export class AIPanel {
       return;
     }
 
-    const { summary, functionality, patterns, pseudocode, complexity, suggestions } = this.explanationResult;
+    const {
+      summary,
+      functionality,
+      patterns,
+      pseudocode,
+      complexity,
+      suggestions,
+    } = this.explanationResult;
 
     this.contentEl.innerHTML = `
       <div class="ai-panel-grid">
@@ -345,7 +357,7 @@ export class AIPanel {
               📋 Detailed Functionality
             </div>
             <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.5rem;">
-              ${functionality.map(f => `<li>${f}</li>`).join('')}
+              ${functionality.map((f) => `<li>${f}</li>`).join('')}
             </ul>
           </div>
 
@@ -354,9 +366,14 @@ export class AIPanel {
             <div class="ai-card-title">
               🔍 Identified Code Patterns
             </div>
-            ${patterns.length === 0 ? `
+            ${
+              patterns.length === 0
+                ? `
               <div style="font-size: 0.85rem; color: var(--text-muted);">No highly confident cryptographic, system, or algorithmic signatures found. Just standard control loop structure.</div>
-            ` : patterns.map(p => `
+            `
+                : patterns
+                    .map(
+                      (p) => `
               <div class="pattern-item">
                 <div class="pattern-header">
                   <span class="pattern-name">${p.name}</span>
@@ -370,7 +387,10 @@ export class AIPanel {
                   <div class="pattern-bar" style="width: ${p.confidence}%;"></div>
                 </div>
               </div>
-            `).join('')}
+            `
+                    )
+                    .join('')
+            }
           </div>
         </div>
 
@@ -391,15 +411,23 @@ export class AIPanel {
             <div class="ai-card-title">
               ⚠️ Architecture & Security Warnings
             </div>
-            ${suggestions.length === 0 ? `
+            ${
+              suggestions.length === 0
+                ? `
               <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
                 ✅ No immediate security concerns or simple vulnerabilities found in this structure.
               </div>
-            ` : suggestions.map(s => `
+            `
+                : suggestions
+                    .map(
+                      (s) => `
               <div class="suggestion-box">
                 ${s}
               </div>
-            `).join('')}
+            `
+                    )
+                    .join('')
+            }
           </div>
           
           <!-- Paste New Code Button to reset sandbox -->
@@ -411,14 +439,18 @@ export class AIPanel {
     `;
 
     // Add event listeners
-    this.contentEl.querySelector('#ai-open-sandbox-btn')?.addEventListener('click', () => {
-      this.currentSymbol = null;
-      this.explanationResult = null;
-      this.renderHeader();
-      this.renderResults();
-    });
+    this.contentEl
+      .querySelector('#ai-open-sandbox-btn')
+      ?.addEventListener('click', () => {
+        this.currentSymbol = null;
+        this.explanationResult = null;
+        this.renderHeader();
+        this.renderResults();
+      });
 
-    const copyBtn = this.contentEl.querySelector('#ai-copy-pseudocode-btn') as HTMLButtonElement;
+    const copyBtn = this.contentEl.querySelector(
+      '#ai-copy-pseudocode-btn'
+    ) as HTMLButtonElement;
     copyBtn?.addEventListener('click', () => {
       navigator.clipboard.writeText(pseudocode).then(() => {
         copyBtn.textContent = 'Copied!';
@@ -455,8 +487,10 @@ export class AIPanel {
       </div>
     `;
 
-    this.customCodeTextarea = this.contentEl.querySelector('#ai-sandbox-textarea') as HTMLTextAreaElement;
-    
+    this.customCodeTextarea = this.contentEl.querySelector(
+      '#ai-sandbox-textarea'
+    ) as HTMLTextAreaElement;
+
     // Provide a default example block so the user can easily test it
     this.customCodeTextarea.value = `// Paste decompiled functions here. Example:
 void encrypt_block(uint32_t *v, uint32_t *k) {
@@ -471,12 +505,14 @@ void encrypt_block(uint32_t *v, uint32_t *k) {
     v[0] = v0; v[1] = v1;
 }`;
 
-    this.contentEl.querySelector('#ai-sandbox-explain-btn')?.addEventListener('click', () => {
-      const code = this.customCodeTextarea.value;
-      if (code && code.trim()) {
-        this.triggerAnalysis(code);
-      }
-    });
+    this.contentEl
+      .querySelector('#ai-sandbox-explain-btn')
+      ?.addEventListener('click', () => {
+        const code = this.customCodeTextarea.value;
+        if (code && code.trim()) {
+          this.triggerAnalysis(code);
+        }
+      });
   }
 
   private escapeHtml(text: string): string {

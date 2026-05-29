@@ -358,6 +358,7 @@ describe('E2E DOM Integration Tests', () => {
 
   it('should perform search query and mode switches in SearchPanel workflows', async () => {
     const coordinator = new ApplicationCoordinator();
+    await (coordinator.panelCoordinator as any).initSearchPanel();
 
     // Switch to search panel tab
     const tabButtons = document.querySelectorAll('.tab-btn');

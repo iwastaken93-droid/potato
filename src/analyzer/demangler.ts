@@ -416,7 +416,7 @@ function parseMsvc(mangled: string): DemangledSymbol {
       index++; // consume type descriptor
       const uNames: string[] = [];
       while (index < mangled.length && mangled[index] !== '@') {
-        let end = mangled.indexOf('@', index);
+        const end = mangled.indexOf('@', index);
         if (end === -1) {
           uNames.push(mangled.slice(index));
           index = mangled.length;

@@ -1,4 +1,6 @@
 import { computeMD5, computeSHA1, computeSHA256 } from '../analyzer/hashes.js';
+import { PEParser, ParsedResource } from '../parser/pe.js';
+
 
 export interface MetadataPanelData {
   fileName: string;
@@ -576,7 +578,7 @@ export class MetadataPanel {
       binaryData[1] === 0x5a
     ) {
       try {
-        const peParser = new PEParser(binaryData.buffer);
+        const peParser = new PEParser(binaryData.buffer as ArrayBuffer);
         const pe = peParser.parse();
         if (pe.resources && pe.resources.all && pe.resources.all.length > 0) {
           const r = pe.resources;
@@ -585,7 +587,7 @@ export class MetadataPanel {
             manifestSection = `
               <div style="margin-top: 1rem;">
                 <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-primary);">Manifest</h4>
-                <pre class="manifest-viewer">${r.manifests.map((m) => m.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('\n\n')}</pre>
+                <pre class="manifest-viewer">${r.manifests.map((m: string) => m.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('\n\n')}</pre>
               </div>
             `;
           }
@@ -638,7 +640,7 @@ export class MetadataPanel {
                   <tbody>
                     ${r.icons
                       .map(
-                        (i) => `
+                        (i: { type: number | string; size: number; offset: number }) => `
                       <tr>
                         <td style="color: var(--accent-end);">${i.type}</td>
                         <td style="font-family: var(--font-mono);">${i.size} B</td>
@@ -672,7 +674,7 @@ export class MetadataPanel {
                     <tbody>
                       ${r.all
                         .map(
-                          (res) => `
+                          (res: ParsedResource) => `
                         <tr>
                           <td><span class="badge" style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.4rem; border-radius: 3px;">${res.typeName}</span></td>
                           <td style="font-family: var(--font-mono);">${res.name}</td>

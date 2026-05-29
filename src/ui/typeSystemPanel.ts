@@ -963,7 +963,7 @@ struct PlayerInfo {
     const structs: StructDefinition[] = [];
 
     // Strip comments
-    let cleanSource = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    const cleanSource = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
 
     // Find struct definitions
     const structRegex = /struct\s+(\w+)\s*\{([^}]+)\}/g;
@@ -994,7 +994,7 @@ struct PlayerInfo {
           const arraySizeStr = fieldMatch[4];
 
           let size = 0;
-          let arrayLength = arraySizeStr
+          const arrayLength = arraySizeStr
             ? parseInt(arraySizeStr, 10)
             : undefined;
 

@@ -781,4 +781,256 @@ export class IROptimizer {
     }
     return cfg;
   }
+
+  /**
+   * Loop Invariant Code Motion (LICM): Hoists instructions whose inputs do not change
+   * within a loop to a pre-header block before the loop.
+   *
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph with loop invariant code hoisted.
+   */
+  public loopInvariantCodeMotion(cfg: IRCFG): IRCFG {
+    if (cfg.blocks.size === 0) return cfg;
+
+    // Find the entry block (the one with no predecessors, or the first block)
+    let entryBlockId = Array.from(cfg.blocks.keys())[0];
+    for (const [id, block] of cfg.blocks.entries()) {
+      if (block.predecessors.length === 0) {
+        entryBlockId = id;
+        break;
+      }
+    }
+
+    // 1. Compute dominators
+    const dominators = new Map<string, Set<string>>();
+    const allIds = Array.from(cfg.blocks.keys());
+
+    for (const id of allIds) {
+      if (id === entryBlockId) {
+        dominators.set(id, new Set([entryBlockId]));
+      } else {
+        dominators.set(id, new Set(allIds));
+      }
+    }
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const id of allIds) {
+        if (id === entryBlockId) continue;
+
+        const block = cfg.blocks.get(id)!;
+        if (block.predecessors.length === 0) continue;
+
+        let newDoms: Set<string> | null = null;
+        for (const predId of block.predecessors) {
+          const predDoms = dominators.get(predId);
+          if (!predDoms) continue;
+          if (newDoms === null) {
+            newDoms = new Set(predDoms);
+          } else {
+            for (const dom of newDoms) {
+              if (!predDoms.has(dom)) {
+                newDoms.delete(dom);
+              }
+            }
+          }
+        }
+
+        newDoms = newDoms ?? new Set<string>();
+        newDoms.add(id);
+
+        const currentDoms = dominators.get(id)!;
+        if (
+          newDoms.size !== currentDoms.size ||
+          Array.from(newDoms).some((d) => !currentDoms.has(d))
+        ) {
+          dominators.set(id, newDoms);
+          changed = true;
+        }
+      }
+    }
+
+    // 2. Find back-edges and identify natural loops
+    const backEdges: { from: string; to: string }[] = [];
+    for (const [id, block] of cfg.blocks.entries()) {
+      for (const succId of block.successors) {
+        if (dominators.get(id)?.has(succId)) {
+          backEdges.push({ from: id, to: succId });
+        }
+      }
+    }
+
+    // Find loops
+    const loops: { header: string; blocks: Set<string> }[] = [];
+    for (const edge of backEdges) {
+      const loopBlocks = new Set<string>([edge.to, edge.from]);
+      const stack = [edge.from];
+      while (stack.length > 0) {
+        const curr = stack.pop()!;
+        const block = cfg.blocks.get(curr);
+        if (!block) continue;
+        for (const predId of block.predecessors) {
+          if (!loopBlocks.has(predId)) {
+            loopBlocks.add(predId);
+            stack.push(predId);
+          }
+        }
+      }
+      loops.push({ header: edge.to, blocks: loopBlocks });
+    }
+
+    // Build variable definition-to-block lookup mapping
+    const defBlock = new Map<string, string>();
+    for (const block of cfg.blocks.values()) {
+      for (const inst of block.instructions) {
+        if (inst.dest && inst.dest.name && inst.dest.version !== undefined) {
+          defBlock.set(`${inst.dest.name}_${inst.dest.version}`, block.id);
+        }
+      }
+    }
+
+    // Process loops
+    for (const loop of loops) {
+      const L = loop.blocks;
+      const header = loop.header;
+      const headerBlock = cfg.blocks.get(header);
+      if (!headerBlock) continue;
+
+      const invariantVars = new Set<string>();
+      const invariantInstructions = new Set<IRInstruction>();
+
+      // Iteratively identify loop invariant instructions
+      let passChanged = true;
+      while (passChanged) {
+        passChanged = false;
+        for (const blockId of L) {
+          const block = cfg.blocks.get(blockId)!;
+          for (const inst of block.instructions) {
+            if (invariantInstructions.has(inst)) continue;
+
+            // Cannot hoist volatile instructions, phi nodes, or control flow
+            if (
+              [
+                IROp.STORE,
+                IROp.JMP,
+                IROp.BRANCH,
+                IROp.RET,
+                IROp.CALL,
+                IROp.PHI,
+              ].includes(inst.op)
+            ) {
+              continue;
+            }
+
+            if (!inst.dest || !inst.dest.name || inst.dest.version === undefined) {
+              continue;
+            }
+
+            // Check if all arguments are invariant
+            let allArgsInvariant = true;
+            for (const arg of inst.args) {
+              if (arg.type === 'imm') {
+                continue;
+              }
+              if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+                const defId = defBlock.get(`${arg.name}_${arg.version}`);
+                // Invariant if defined outside loop or is already marked invariant
+                if (defId && L.has(defId) && !invariantVars.has(`${arg.name}_${arg.version}`)) {
+                  allArgsInvariant = false;
+                  break;
+                }
+              } else {
+                allArgsInvariant = false;
+                break;
+              }
+            }
+
+            if (allArgsInvariant) {
+              invariantInstructions.add(inst);
+              invariantVars.add(`${inst.dest.name}_${inst.dest.version}`);
+              passChanged = true;
+            }
+          }
+        }
+      }
+
+      if (invariantInstructions.size === 0) continue;
+
+      // Filter out and collect invariant instructions in original block instruction order
+      const hoistedInsts: IRInstruction[] = [];
+      for (const blockId of L) {
+        const block = cfg.blocks.get(blockId)!;
+        const remaining: IRInstruction[] = [];
+        for (const inst of block.instructions) {
+          if (invariantInstructions.has(inst)) {
+            hoistedInsts.push(inst);
+          } else {
+            remaining.push(inst);
+          }
+        }
+        block.instructions = remaining;
+      }
+
+      // Create a pre-header block to host the instructions
+      const preheaderId = `${header}_preheader`;
+      const outsidePreds = headerBlock.predecessors.filter((p) => !L.has(p));
+
+      if (outsidePreds.length > 0) {
+        const preheaderBlock: IRBlock = {
+          id: preheaderId,
+          instructions: [
+            ...hoistedInsts,
+            {
+              op: IROp.JMP,
+              args: [{ type: 'temp', name: header }],
+            },
+          ],
+          predecessors: [...outsidePreds],
+          successors: [header],
+        };
+
+        // Update outside predecessors to jump to preheader instead of header
+        for (const predId of outsidePreds) {
+          const predBlock = cfg.blocks.get(predId)!;
+          predBlock.successors = predBlock.successors.map((s) =>
+            s === header ? preheaderId : s
+          );
+          for (const inst of predBlock.instructions) {
+            if (inst.op === IROp.JMP || inst.op === IROp.BRANCH) {
+              inst.args = inst.args.map((arg) => {
+                if (
+                  (arg.type === 'temp' || arg.type === 'var') &&
+                  arg.name === header
+                ) {
+                  return { ...arg, name: preheaderId };
+                }
+                return arg;
+              });
+            }
+          }
+        }
+
+        // Update header predecessors to replace outsidePreds with preheaderId
+        headerBlock.predecessors = headerBlock.predecessors.filter((p) =>
+          L.has(p)
+        );
+        headerBlock.predecessors.push(preheaderId);
+
+        cfg.blocks.set(preheaderId, preheaderBlock);
+
+        // Update variable definition locations for subsequently processed loops
+        for (const inst of hoistedInsts) {
+          if (inst.dest && inst.dest.name && inst.dest.version !== undefined) {
+            defBlock.set(
+              `${inst.dest.name}_${inst.dest.version}`,
+              preheaderId
+            );
+          }
+        }
+      }
+    }
+
+    return cfg;
+  }
 }

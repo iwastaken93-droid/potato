@@ -707,7 +707,7 @@ export class DiffPanel {
     syncScroll(contentLeft, contentRight);
     syncScroll(contentRight, contentLeft);
 
-    let stats = { equal: 0, insert: 0, delete: 0, replace: 0 };
+    const stats = { equal: 0, insert: 0, delete: 0, replace: 0 };
 
     if (this.mode === 'byte') {
       const diffs = diffBytes(this.binaryData1, this.binaryData2!);

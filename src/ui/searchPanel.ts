@@ -626,7 +626,7 @@ export class SearchPanel {
     if (isNaN(minAddr)) minAddr = 0;
     if (isNaN(maxAddr)) maxAddr = Infinity;
 
-    let results: SearchResult[] = [];
+    const results: SearchResult[] = [];
 
     // Retrieve active executable section base for offset mapping
     const executeSection = this.sections.find((s) => s.flags.execute);

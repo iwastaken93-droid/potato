@@ -419,7 +419,7 @@ export class GDBPanel {
   }
 
   private handleConsoleSend() {
-    let input = this.commandInputEl.value.trim();
+    const input = this.commandInputEl.value.trim();
     if (!input) return;
     this.commandInputEl.value = '';
 

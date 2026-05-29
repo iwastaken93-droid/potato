@@ -121,7 +121,7 @@ export function parseASN1(
   if (offset >= data.length) {
     throw new Error('ASN.1: empty data');
   }
-  let tagByte = data[offset++];
+  const tagByte = data[offset++];
   const tagClass = (tagByte & 0xc0) >> 6;
   const isConstructed = (tagByte & 0x20) !== 0;
   let tagNumber = tagByte & 0x1f;

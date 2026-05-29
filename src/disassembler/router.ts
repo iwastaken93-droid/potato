@@ -646,18 +646,25 @@ export class DisassemblerRouter {
       let size = 1;
       let operands: Operand[] = [];
 
-      // Check for REX prefix (0x40 - 0x4f)
-      const hasRex = b >= 0x40 && b <= 0x4f;
-      const isRexW = hasRex && (b & 0x08) !== 0;
-      const rexR = hasRex ? (b & 0x04) >> 2 : 0;
-      const rexX = hasRex ? (b & 0x02) >> 1 : 0;
-      const rexB = hasRex ? b & 0x01 : 0;
+      let prefix = 0;
+      let pos = i;
+      while (pos < data.length && (data[pos] === 0x66 || data[pos] === 0xf2 || data[pos] === 0xf3)) {
+        prefix = data[pos];
+        pos++;
+      }
 
-      const opIdx = hasRex ? i + 1 : i;
+      // Check for REX prefix (0x40 - 0x4f)
+      const hasRex = pos < data.length && data[pos] >= 0x40 && data[pos] <= 0x4f;
+      const isRexW = hasRex && (data[pos] & 0x08) !== 0;
+      const rexR = hasRex ? (data[pos] & 0x04) >> 2 : 0;
+      const rexX = hasRex ? (data[pos] & 0x02) >> 1 : 0;
+      const rexB = hasRex ? data[pos] & 0x01 : 0;
+
+      const opIdx = hasRex ? pos + 1 : pos;
 
       if (opIdx < data.length) {
         let opcode = data[opIdx];
-        let opSize = hasRex ? 2 : 1;
+        let opSize = opIdx - i + 1;
 
         // Multi-byte escape
         let isTwoByte = false;
@@ -1179,10 +1186,170 @@ export class DisassemblerRouter {
             operands = [];
             size = opSize;
           }
+          // AVX VEX instructions
+          else if ((opcode === 0xc5 || opcode === 0xc4) && opIdx + 2 < data.length) {
+            const isC5 = opcode === 0xc5;
+            let vexVal = 0;
+            let vex1 = 0;
+            let vex2 = 0;
+            let avxOpcode = 0;
+            let nextAvxByteIdx = 0;
+            let L = false;
+            let vreg = 0;
+            let avxRexR = 0;
+            let avxRexB = 0;
+
+            if (isC5) {
+              vexVal = data[opIdx + 1];
+              avxOpcode = data[opIdx + 2];
+              nextAvxByteIdx = opIdx + 3;
+              L = (vexVal & 0x04) !== 0;
+              vreg = (~vexVal >> 3) & 0x0f;
+              avxRexR = (vexVal & 0x80) ? 0 : 1;
+              avxRexB = 0;
+            } else {
+              vex1 = data[opIdx + 1];
+              vex2 = data[opIdx + 2];
+              avxOpcode = data[opIdx + 3];
+              nextAvxByteIdx = opIdx + 4;
+              L = (vex2 & 0x04) !== 0;
+              vreg = (~vex2 >> 3) & 0x0f;
+              avxRexR = (vex1 & 0x80) ? 0 : 1;
+              avxRexB = (vex1 & 0x20) ? 0 : 1;
+            }
+
+            if (nextAvxByteIdx < data.length) {
+              const modrm = data[nextAvxByteIdx];
+              const mod = (modrm & 0xc0) >> 6;
+              const regId = ((modrm & 0x38) >> 3) + (avxRexR << 3);
+              const rmId = (modrm & 0x07) + (avxRexB << 3);
+
+              const regPrefix = L ? 'ymm' : 'xmm';
+              const dst = `${regPrefix}${regId}`;
+              const src1 = `${regPrefix}${vreg}`;
+              let src2 = '';
+
+              let dispSize = 0;
+              if (mod === 1) dispSize = 1;
+              else if (mod === 2) dispSize = 4;
+              else if (mod === 0 && (rmId & 7) === 5) dispSize = 4;
+
+              if (mod === 3) {
+                src2 = `${regPrefix}${rmId}`;
+              } else if (nextAvxByteIdx + 1 + dispSize <= data.length) {
+                const disp =
+                  dispSize === 1
+                    ? this.signExtend8(data[nextAvxByteIdx + 1])
+                    : dispSize === 4
+                      ? this.readInt32LE(data, nextAvxByteIdx + 1)
+                      : 0;
+                const baseRegName = regs[rmId] || 'rax';
+                const memStr = disp ? `${baseRegName} + 0x${disp.toString(16)}` : baseRegName;
+                src2 = `ptr [${memStr}]`;
+              }
+
+              const avxOps: Record<number, string> = {
+                0x10: 'vmovups',
+                0x11: 'vmovups',
+                0x28: 'vmovaps',
+                0x29: 'vmovaps',
+                0x58: 'vaddps',
+                0x5c: 'vsubps',
+                0x59: 'vmulps',
+                0x5e: 'vdivps',
+                0x57: 'vxorps',
+                0x54: 'vandps',
+                0x56: 'vorps',
+              };
+
+              const avxMnemonic = avxOps[avxOpcode];
+              if (avxMnemonic) {
+                mnemonic = avxMnemonic;
+                if (avxOpcode === 0x11 || avxOpcode === 0x29) {
+                  opStr = `${src2}, ${dst}`;
+                  operands = [
+                    mod === 3 ? { type: 'reg', reg: src2 } : { type: 'mem', mem: { base: regs[rmId] || 'rax', disp: 0 } },
+                    { type: 'reg', reg: dst }
+                  ];
+                } else if (avxOpcode === 0x10 || avxOpcode === 0x28) {
+                  opStr = `${dst}, ${src2}`;
+                  operands = [
+                    { type: 'reg', reg: dst },
+                    mod === 3 ? { type: 'reg', reg: src2 } : { type: 'mem', mem: { base: regs[rmId] || 'rax', disp: 0 } }
+                  ];
+                } else {
+                  opStr = `${dst}, ${src1}, ${src2}`;
+                  operands = [
+                    { type: 'reg', reg: dst },
+                    { type: 'reg', reg: src1 },
+                    mod === 3 ? { type: 'reg', reg: src2 } : { type: 'mem', mem: { base: regs[rmId] || 'rax', disp: 0 } }
+                  ];
+                }
+                size = nextAvxByteIdx - i + 1 + dispSize;
+              }
+            }
+          }
         } else {
           // Two-byte opcode escape (0x0f opcode ...)
+          const sseOps: Record<number, string> = {
+            0x10: prefix === 0x66 ? 'movupd' : prefix === 0xf3 ? 'movss' : prefix === 0xf2 ? 'movsd' : 'movups',
+            0x11: prefix === 0x66 ? 'movupd' : prefix === 0xf3 ? 'movss' : prefix === 0xf2 ? 'movsd' : 'movups',
+            0x28: prefix === 0x66 ? 'movapd' : 'movaps',
+            0x29: prefix === 0x66 ? 'movapd' : 'movaps',
+            0x58: prefix === 0x66 ? 'addpd' : prefix === 0xf3 ? 'addss' : prefix === 0xf2 ? 'addsd' : 'addps',
+            0x5c: prefix === 0x66 ? 'subpd' : prefix === 0xf3 ? 'subss' : prefix === 0xf2 ? 'subsd' : 'subps',
+            0x59: prefix === 0x66 ? 'mulpd' : prefix === 0xf3 ? 'mulss' : prefix === 0xf2 ? 'mulsd' : 'mulps',
+            0x5e: prefix === 0x66 ? 'divpd' : prefix === 0xf3 ? 'divss' : prefix === 0xf2 ? 'divsd' : 'divps',
+            0x57: prefix === 0x66 ? 'xorpd' : 'xorps',
+            0x54: prefix === 0x66 ? 'andpd' : 'andps',
+            0x56: prefix === 0x66 ? 'orpd' : 'orps',
+          };
+
+          if (sseOps[opcode] !== undefined && nextByteIdx < data.length) {
+            mnemonic = sseOps[opcode];
+            const modrm = data[nextByteIdx];
+            const mod = (modrm & 0xc0) >> 6;
+            const reg = ((modrm & 0x38) >> 3) + (rexR << 3);
+            const rm = (modrm & 0x07) + (rexB << 3);
+
+            const dst = `xmm${reg}`;
+            let src = '';
+            let dispSize = 0;
+            if (mod === 1) dispSize = 1;
+            else if (mod === 2) dispSize = 4;
+            else if (mod === 0 && (rm & 7) === 5) dispSize = 4;
+
+            if (mod === 3) {
+              src = `xmm${rm}`;
+            } else if (nextByteIdx + 1 + dispSize <= data.length) {
+              const disp =
+                dispSize === 1
+                  ? this.signExtend8(data[nextByteIdx + 1])
+                  : dispSize === 4
+                    ? this.readInt32LE(data, nextByteIdx + 1)
+                    : 0;
+              const baseRegName = regs[rm] || 'rax';
+              const memStr = disp ? `${baseRegName} + 0x${disp.toString(16)}` : baseRegName;
+              src = `ptr [${memStr}]`;
+            }
+
+            if (opcode === 0x11 || opcode === 0x29) {
+              opStr = `${src}, ${dst}`;
+              operands = [
+                mod === 3 ? { type: 'reg', reg: src } : { type: 'mem', mem: { base: regs[rm] || 'rax', disp: 0 } },
+                { type: 'reg', reg: dst },
+              ];
+            } else {
+              opStr = `${dst}, ${src}`;
+              operands = [
+                { type: 'reg', reg: dst },
+                mod === 3 ? { type: 'reg', reg: src } : { type: 'mem', mem: { base: regs[rm] || 'rax', disp: 0 } },
+              ];
+            }
+            size = nextByteIdx - i + 1 + dispSize;
+          }
           // Conditional Jumps near (0x0f 0x80 - 0x0f 0x8f)
-          if (
+          else if (
             opcode >= 0x80 &&
             opcode <= 0x8f &&
             nextByteIdx + 3 < data.length
@@ -1364,6 +1531,78 @@ export class DisassemblerRouter {
       if (val === 0xd503201f) {
         mnemonic = 'nop';
         opStr = '';
+      }
+      // ADR / ADRP
+      else if ((val & 0x9f000000) === 0x90000000) {
+        mnemonic = (val & 0x80000000) !== 0 ? 'adrp' : 'adr';
+        const rd = val & 0x1f;
+        const rdName = regs[rd] || 'x0';
+        const immhi = (val >> 5) & 0x7ffff;
+        const immlo = (val >> 29) & 3;
+        const imm = (immhi << 2) | immlo;
+        const signExt = imm & 0x100000 ? imm | ~0x1fffff : imm;
+        const dest = mnemonic === 'adrp' ? ((addr & ~0xfff) + signExt * 4096) : (addr + signExt);
+        opStr = `${rdName}, 0x${dest.toString(16)}`;
+        operands = [
+          { type: 'reg', reg: rdName },
+          { type: 'imm', imm: dest },
+        ];
+      }
+      // FADD / FSUB / FMUL / FDIV (scalar floating point)
+      else if ((val & 0xffa0fc00) === 0x1e202800 || (val & 0xffa0fc00) === 0x1e203800 || (val & 0xffa0fc00) === 0x1e200800 || (val & 0xffa0fc00) === 0x1e201800) {
+        const sz = (val >> 22) & 1;
+        const regPrefix = sz === 1 ? 'd' : 's';
+        const rd = val & 0x1f;
+        const rn = (val >> 5) & 0x1f;
+        const rm = (val >> 16) & 0x1f;
+        
+        const rdName = regPrefix + rd;
+        const rnName = regPrefix + rn;
+        const rmName = regPrefix + rm;
+
+        const fOps: Record<number, string> = {
+          0x1e202800: 'fadd',
+          0x1e203800: 'fsub',
+          0x1e200800: 'fmul',
+          0x1e201800: 'fdiv',
+        };
+        mnemonic = fOps[val & 0xffa0fc00];
+        opStr = `${rdName}, ${rnName}, ${rmName}`;
+        operands = [
+          { type: 'reg', reg: rdName },
+          { type: 'reg', reg: rnName },
+          { type: 'reg', reg: rmName },
+        ];
+      }
+      // CSEL (Conditional Select)
+      else if ((val & 0xffe00c00) === 0x1a800000) {
+        mnemonic = 'csel';
+        const condNames = [
+          'eq', 'ne', 'cs', 'cc', 'mi', 'pl', 'vs', 'vc',
+          'hi', 'ls', 'ge', 'lt', 'gt', 'le', 'al', 'nv'
+        ];
+        const rd = val & 0x1f;
+        const rn = (val >> 5) & 0x1f;
+        const rm = (val >> 16) & 0x1f;
+        const cond = (val >> 12) & 0xf;
+        const sf = (val >> 31) & 1;
+
+        const getArmReg = (id: number, is64: number) => {
+          if (id === 31) return is64 ? 'xzr' : 'wzr';
+          return (is64 ? 'x' : 'w') + id;
+        };
+
+        const rdName = getArmReg(rd, sf);
+        const rnName = getArmReg(rn, sf);
+        const rmName = getArmReg(rm, sf);
+        const condName = condNames[cond] || 'al';
+
+        opStr = `${rdName}, ${rnName}, ${rmName}, ${condName}`;
+        operands = [
+          { type: 'reg', reg: rdName },
+          { type: 'reg', reg: rnName },
+          { type: 'reg', reg: rmName },
+        ];
       }
       // RET (typically 0xd65f03c0 for x30)
       else if ((val & 0xfffffc1f) >>> 0 === 0xd65f0000) {

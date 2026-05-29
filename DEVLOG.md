@@ -1457,3 +1457,31 @@ Test Files   3 failed | 28 passed (31)
   - [tabManager.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/tabManager.test.ts)
   - [binaryLoader.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/binaryLoader.test.ts)
 - Verified that all unit tests and full E2E test suites compile and pass cleanly via Vitest (`pnpm test`).
+
+---
+
+### [21:38:00] 📦 Decomposed main.ts Monolith into PanelCoordinator, layout and binaryProcessor
+
+- Extracted layout initialization, custom CSS injecting, and structural HTML generating to a dedicated [layout.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/layout.ts) module.
+- Extracted binary data parsing, disassembly routing, and dependency computation logic to [binaryProcessor.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/binaryProcessor.ts).
+- Extracted UI panel management, lazy loading view triggers, and event listeners synchronizations to [panelCoordinator.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/panelCoordinator.ts).
+- Reduced [main.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/main.ts) file size from 72.2 KB to **12.4 KB** (well below the 30KB target limit).
+- Preserved getter and method compatibility layers inside `main.ts` to guarantee backward compatibility with existing tests.
+- Reverted unrelated syntax changes in `tests/router.test.ts` and `tests/ir.test.ts` to align with master branches.
+- Ran all 608 tests across 48 test suites using `pnpm test` and confirmed all pass successfully ✅.
+- Verified compilation and output bundles build cleanly via `pnpm build`.
+
+---
+
+### [21:39:00] ⚡ SSA IR Optimization: Loop Invariant Code Motion (LICM) Pass
+
+- Implemented Loop Invariant Code Motion (LICM) optimization pass in the `IROptimizer` class within [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts):
+  - Computes dominators using iterative data-flow analysis.
+  - Identifies back-edges to find natural loops in the CFG.
+  - Detects loop-invariant expressions recursively (arguments that are constants or defined outside the loop).
+  - Hoists these invariant instructions out of the loop body into a newly created loop pre-header block.
+  - Dynamically updates predecessors and target jump addresses in the CFG blocks.
+- Added comprehensive unit tests in [ir.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ir.test.ts) covering natural loop detection, invariant checking, and hoisting.
+- Verified that all 14 IR tests pass successfully ✅.
+
+

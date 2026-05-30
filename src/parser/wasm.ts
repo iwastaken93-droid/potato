@@ -129,7 +129,7 @@ export class WasmReader {
     if (buffer instanceof Uint8Array) {
       this.bytes = buffer;
       this.view = new DataView(
-        buffer.buffer,
+        buffer.buffer as ArrayBuffer,
         buffer.byteOffset,
         buffer.byteLength
       );
@@ -223,12 +223,18 @@ export class WasmReader {
   }
 
   readF32(): number {
+    if (this.pos + 4 > this.bytes.length) {
+      throw new Error(`Unexpected EOF reading f32 at offset ${this.pos}`);
+    }
     const val = this.view.getFloat32(this.pos, true);
     this.pos += 4;
     return val;
   }
 
   readF64(): number {
+    if (this.pos + 8 > this.bytes.length) {
+      throw new Error(`Unexpected EOF reading f64 at offset ${this.pos}`);
+    }
     const val = this.view.getFloat64(this.pos, true);
     this.pos += 8;
     return val;
@@ -456,6 +462,9 @@ export function parseInstructions(
   reader: WasmReader,
   endOffset: number
 ): Instruction[] {
+  if (endOffset > reader.bytes.length) {
+    throw new Error(`endOffset ${endOffset} extends beyond EOF`);
+  }
   const instructions: Instruction[] = [];
 
   while (reader.pos < endOffset) {
@@ -591,6 +600,10 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
     const sectionSize = reader.readVarUint();
     const sectionEnd = reader.pos + sectionSize;
 
+    if (sectionEnd > reader.bytes.length) {
+      throw new Error(`Section size ${sectionSize} extends beyond EOF`);
+    }
+
     switch (sectionId) {
       case SectionId.Type: {
         module.types = reader.readVector(() => {
@@ -616,7 +629,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
           const modName = reader.readString();
           const fieldName = reader.readString();
           const kind = reader.readByte() as ExportKind;
-          let typeIndexOrDesc: any;
+          let typeIndexOrDesc: number | object;
 
           if (kind === ExportKind.Func) {
             typeIndexOrDesc = reader.readVarUint();
@@ -753,6 +766,10 @@ export function parseNameSection(payload: Uint8Array): WasmNames {
       const subId = reader.readByte();
       const subSize = reader.readVarUint();
       const subEnd = reader.pos + subSize;
+
+      if (subEnd > reader.bytes.length) {
+        throw new Error(`Sub-section size ${subSize} extends beyond EOF`);
+      }
 
       if (subId === 0) {
         // Module name

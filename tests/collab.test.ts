@@ -185,6 +185,25 @@ describe('CollabEngine & CollabPanel Sync Tests', () => {
     peerA.disconnect();
     peerB.disconnect();
   });
+
+  it('should sync cursor positions and trigger callbacks', () => {
+    engine.connect('test-room', 'Explorer');
+
+    const callback = vi.fn();
+    engine.subscribeCursor(callback);
+
+    engine.sendCursor(0x3000, 'decompiler');
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    const mockArg = callback.mock.calls[0][0];
+    expect(mockArg.address).toBe(0x3000);
+    expect(mockArg.view).toBe('decompiler');
+    expect(mockArg.peerName).toBe('Explorer');
+
+    const cursorsMap = engine.getCursors();
+    expect(cursorsMap.has('Explorer')).toBe(true);
+    expect(cursorsMap.get('Explorer')?.address).toBe(0x3000);
+  });
 });
 
 describe('CollabPanel DOM Tests', () => {
@@ -235,6 +254,47 @@ describe('CollabPanel DOM Tests', () => {
     // Verify UI updated to room connection info
     const disconnectBtn = container.querySelector('#collab-btn-disconnect');
     expect(disconnectBtn).toBeTruthy();
+  });
+
+  it('should broadcast and draw local/remote cursors on screen', () => {
+    const usernameInput = container.querySelector(
+      '#collab-username'
+    ) as HTMLInputElement;
+    const roomInput = container.querySelector(
+      '#collab-room'
+    ) as HTMLInputElement;
+    const connectBtn = container.querySelector(
+      '#collab-btn-connect'
+    ) as HTMLButtonElement;
+
+    usernameInput.value = 'LocalExplorer';
+    roomInput.value = 'test-cursor-room';
+    connectBtn.click();
+
+    // Trigger cursor move from UI
+    const cursorAddrInput = container.querySelector(
+      '#collab-cursor-addr'
+    ) as HTMLInputElement;
+    const cursorViewSelect = container.querySelector(
+      '#collab-cursor-view'
+    ) as HTMLSelectElement;
+    const sendCursorBtn = container.querySelector(
+      '#collab-btn-send-cursor'
+    ) as HTMLButtonElement;
+
+    expect(cursorAddrInput).toBeTruthy();
+    expect(cursorViewSelect).toBeTruthy();
+    expect(sendCursorBtn).toBeTruthy();
+
+    cursorAddrInput.value = '0x1234';
+    cursorViewSelect.value = 'hex';
+    sendCursorBtn.click();
+
+    // Verify cursor is drawn in UI (hex view)
+    const cursorEl = container.querySelector('#view-hex .remote-cursor');
+    expect(cursorEl).toBeTruthy();
+    expect(cursorEl?.textContent).toContain('LocalExplorer');
+    expect(cursorEl?.textContent).toContain('0x1234');
   });
 });
 

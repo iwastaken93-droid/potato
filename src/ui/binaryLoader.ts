@@ -8,7 +8,7 @@ export interface BinaryLoaderOptions {
     fileName: string,
     arrayBuffer: ArrayBuffer,
     lastModified?: number
-  ) => void;
+  ) => void | Promise<void>;
   fileInputId?: string;
   uploadBtnId?: string;
   dropzoneId?: string;
@@ -22,12 +22,181 @@ export class BinaryLoader {
     fileName: string,
     arrayBuffer: ArrayBuffer,
     lastModified?: number
-  ) => void;
+  ) => void | Promise<void>;
+
+  private loaderOverlay: HTMLDivElement | null = null;
+  private progressBar: HTMLDivElement | null = null;
+  private loaderStatus: HTMLDivElement | null = null;
 
   constructor(options: BinaryLoaderOptions) {
     this.onBinaryLoaded = options.onBinaryLoaded;
     this.cacheElements(options);
     this.setupEventListeners();
+  }
+
+  private injectLoaderStyles() {
+    if (document.getElementById('premium-loader-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'premium-loader-styles';
+    style.textContent = `
+      .premium-loader-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle at center, rgba(18, 21, 28, 0.96) 0%, rgba(10, 12, 16, 0.99) 100%);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        color: #f8fafc;
+        font-family: var(--font-sans, sans-serif);
+        opacity: 0;
+        pointer-events: none;
+      }
+      .premium-loader-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .premium-loader-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 450px;
+        width: 90%;
+        text-align: center;
+        padding: 2.5rem;
+        background: rgba(255, 255, 255, 0.01);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+      .premium-spinner {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        position: relative;
+        background: conic-gradient(from 0deg, transparent 30%, #6366f1 100%);
+        animation: premium-spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        margin-bottom: 2rem;
+        box-shadow: 0 0 40px rgba(99, 102, 241, 0.25);
+      }
+      .premium-spinner::before {
+        content: "";
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        bottom: 6px;
+        background: #0a0c10;
+        border-radius: 50%;
+      }
+      .premium-spinner::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 10px;
+        height: 10px;
+        background: #8b5cf6;
+        border-radius: 50%;
+        transform: translateX(-50%);
+        box-shadow: 0 0 20px #8b5cf6, 0 0 30px #8b5cf6;
+      }
+      @keyframes premium-spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .premium-loader-title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: 0.05em;
+      }
+      .premium-loader-status {
+        font-size: 0.9rem;
+        color: #94a3b8;
+        font-family: var(--font-mono, monospace);
+        margin-bottom: 2rem;
+        height: 1.5rem;
+        font-weight: 500;
+      }
+      .premium-progress-bg {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 9999px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        position: relative;
+      }
+      .premium-progress-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #6366f1, #8b5cf6);
+        border-radius: 9999px;
+        transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  private createLoaderOverlay() {
+    this.injectLoaderStyles();
+    this.loaderOverlay = document.createElement('div');
+    this.loaderOverlay.className = 'premium-loader-overlay';
+    this.loaderOverlay.innerHTML = `
+      <div class="premium-loader-container">
+        <div class="premium-spinner"></div>
+        <div class="premium-loader-title">Analyzing Binary</div>
+        <div class="premium-loader-status">Initializing analyzer...</div>
+        <div class="premium-progress-bg">
+          <div class="premium-progress-bar" id="premium-loader-bar"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(this.loaderOverlay);
+    this.progressBar = this.loaderOverlay.querySelector('#premium-loader-bar');
+    this.loaderStatus = this.loaderOverlay.querySelector('.premium-loader-status');
+  }
+
+  public showLoader(fileName: string) {
+    if (!this.loaderOverlay) {
+      this.createLoaderOverlay();
+    }
+    const titleEl = this.loaderOverlay!.querySelector('.premium-loader-title');
+    if (titleEl) {
+      titleEl.textContent = `Analyzing ${fileName}`;
+    }
+    this.updateProgress(0, 'Preparing binary parser...');
+    this.loaderOverlay!.classList.add('active');
+  }
+
+  public updateProgress(percent: number, status: string) {
+    if (!this.loaderOverlay) {
+      this.createLoaderOverlay();
+    }
+    if (this.progressBar) {
+      this.progressBar.style.width = `${percent}%`;
+    }
+    if (this.loaderStatus) {
+      this.loaderStatus.textContent = status;
+    }
+  }
+
+  public hideLoader() {
+    if (this.loaderOverlay) {
+      this.loaderOverlay.classList.remove('active');
+    }
   }
 
   private cacheElements(options: BinaryLoaderOptions) {
@@ -84,9 +253,21 @@ export class BinaryLoader {
 
   private handleUploadedFile(file: File) {
     const reader = new FileReader();
-    reader.onload = (event) => {
+    this.showLoader(file.name);
+
+    reader.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 15);
+        this.updateProgress(percent, `Reading file stream (${percent}%)...`);
+      }
+    };
+
+    reader.onload = async (event) => {
       if (event.target && event.target.result instanceof ArrayBuffer) {
-        this.onBinaryLoaded(file.name, event.target.result, file.lastModified);
+        this.updateProgress(15, 'File loaded. Starting parser...');
+        await this.onBinaryLoaded(file.name, event.target.result, file.lastModified);
+        this.updateProgress(100, 'Done!');
+        setTimeout(() => this.hideLoader(), 400);
       }
     };
     reader.readAsArrayBuffer(file);

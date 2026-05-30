@@ -3,8 +3,8 @@ import {
   Decompiler,
   BasicBlock,
   Instruction,
-  ASTPrinter,
 } from '../src/disassembler/decompiler.js';
+import { ASTPrinter } from '../src/disassembler/astPrinter.js';
 
 describe('Decompiler Core Analysis', () => {
   // Helper to construct basic blocks easily

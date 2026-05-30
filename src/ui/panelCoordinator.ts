@@ -35,7 +35,20 @@ import { buildCFG, BasicBlock as CoreBasicBlock } from '../disassembler/cfg.js';
 import { Decompiler, BasicBlock as DecompilerBlock } from '../disassembler/decompiler.js';
 import { DisassemblerRouter } from '../disassembler/router.js';
 
-export const PANEL_REGISTRY: Record<string, any> = (globalThis as any).PANEL_REGISTRY || ((globalThis as any).PANEL_REGISTRY = {});
+import { PANEL_REGISTRY } from './panelRegistry.js';
+import {
+  handleTabChange,
+  handleOffsetSelect,
+  handleStringNavigate,
+  handleSearchNavigate,
+  handleInstructionSelect,
+  handleBlockSelect,
+  handleNodeSelect,
+  handleCollabNavigate,
+  handleCollabRename
+} from './panelEvents.js';
+
+export { PANEL_REGISTRY };
 
 export interface CoordinatorHost {
   state: any;
@@ -117,31 +130,7 @@ export class PanelCoordinator {
   }
 
   public handleTabChange(tabName: TabName) {
-    // Trigger components updates or re-render if needed
-    if (tabName === 'hex' && this.hexViewer) {
-      // Re-trigger layout alignment inside container
-    } else if (tabName === 'assembly' && this.assemblyView) {
-      if (this.host.state.selectedSymbol) {
-        this.assemblyView.navigateToAddress(this.host.state.selectedSymbol.address);
-      }
-    } else if (tabName === 'typeSystem' && this.typeSystemPanel) {
-      this.typeSystemPanel.updateArchitecture(this.host.state.architecture);
-    } else if (tabName === 'dependencies' && this.dependencyGraph) {
-      // Re-trigger layout/resizing inside canvas container
-      setTimeout(() => {
-        if (this.dependencyGraph) {
-          const resizeEvent = new Event('resize');
-          window.dispatchEvent(resizeEvent);
-        }
-      }, 50);
-    } else if (tabName === 'plugins' && this.pluginsPanel) {
-      this.pluginsPanel.updateData(
-        this.host.state.binaryData,
-        this.host.state.sections,
-        this.host.state.symbols,
-        this.host.state.instructions
-      );
-    }
+    handleTabChange(this, tabName);
   }
 
   public updateActiveTabPanel() {

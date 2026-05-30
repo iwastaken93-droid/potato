@@ -166,10 +166,13 @@ export function extractStrings(
     return (b >= 0x20 && b <= 0x7e) || b === 0x09 || b === 0x0a || b === 0x0d;
   };
 
+  const maxStrings = 10000;
+
   // Scan ASCII/UTF-8
   if (runAscii) {
     let start = -1;
     for (let i = 0; i < bytes.length; i++) {
+      if (results.length >= maxStrings) break;
       if (isPrintableAscii(bytes[i])) {
         if (start === -1) {
           start = i;
@@ -192,7 +195,7 @@ export function extractStrings(
         }
       }
     }
-    if (start !== -1) {
+    if (start !== -1 && results.length < maxStrings) {
       const len = bytes.length - start;
       if (len >= minLength) {
         const raw = bytes.subarray(start);
@@ -209,9 +212,10 @@ export function extractStrings(
   }
 
   // Scan UTF-16LE
-  if (runUtf16Le) {
+  if (runUtf16Le && results.length < maxStrings) {
     let start = -1;
     for (let i = 0; i < bytes.length - 1; i += 2) {
+      if (results.length >= maxStrings) break;
       const b1 = bytes[i];
       const b2 = bytes[i + 1];
       const isPrint = isPrintableAscii(b1) && b2 === 0x00;
@@ -237,7 +241,7 @@ export function extractStrings(
         }
       }
     }
-    if (start !== -1) {
+    if (start !== -1 && results.length < maxStrings) {
       const len = (bytes.length - start) / 2;
       const end = start + Math.floor(len) * 2;
       if (Math.floor(len) >= minLength) {
@@ -255,9 +259,10 @@ export function extractStrings(
   }
 
   // Scan UTF-16BE
-  if (runUtf16Be) {
+  if (runUtf16Be && results.length < maxStrings) {
     let start = -1;
     for (let i = 0; i < bytes.length - 1; i += 2) {
+      if (results.length >= maxStrings) break;
       const b1 = bytes[i];
       const b2 = bytes[i + 1];
       const isPrint = isPrintableAscii(b2) && b1 === 0x00;
@@ -283,7 +288,7 @@ export function extractStrings(
         }
       }
     }
-    if (start !== -1) {
+    if (start !== -1 && results.length < maxStrings) {
       const len = (bytes.length - start) / 2;
       const end = start + Math.floor(len) * 2;
       if (Math.floor(len) >= minLength) {

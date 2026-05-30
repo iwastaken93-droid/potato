@@ -672,26 +672,26 @@ export class OnDeviceLLMManager {
     const rawTokens = this.tokenize(summary);
     let totalTokensEmitted = 0;
 
-    if (tokenCallback) {
-      for (let i = 0; i < Math.min(rawTokens.length, maxTokens); i++) {
-        if (signal?.aborted) {
-          this.updateStatus('ready');
-          throw new DOMException('Explanation aborted by the user.', 'AbortError');
-        }
-
-        const tokenStr = this.detokenize([rawTokens[i]]);
-        tokenCallback(tokenStr + ' ');
-        totalTokensEmitted++;
-
-        if (firstTokenLatencyMs === 0) {
-          firstTokenLatencyMs = performance.now() - startTime;
-        }
-
-        // Inject slight simulated latency depending on temperature
-        await new Promise((r) =>
-          setTimeout(r, Math.max(1, Math.round(temperature * 5)))
-        );
+    for (let i = 0; i < Math.min(rawTokens.length, maxTokens); i++) {
+      if (signal?.aborted) {
+        this.updateStatus('ready');
+        throw new DOMException('Explanation aborted by the user.', 'AbortError');
       }
+
+      const tokenStr = this.detokenize([rawTokens[i]]);
+      if (tokenCallback) {
+        tokenCallback(tokenStr + ' ');
+      }
+      totalTokensEmitted++;
+
+      if (firstTokenLatencyMs === 0) {
+        firstTokenLatencyMs = performance.now() - startTime;
+      }
+
+      // Inject slight simulated latency depending on temperature
+      await new Promise((r) =>
+        setTimeout(r, Math.max(1, Math.round(temperature * 5)))
+      );
     }
 
     const totalTimeMs = performance.now() - startTime;

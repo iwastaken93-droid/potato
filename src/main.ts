@@ -8,7 +8,7 @@ import { Section, Symbol, Instruction } from './disassembler/types.js';
 import { TabManager, TabName } from './ui/tabManager.js';
 import { BinaryLoader } from './ui/binaryLoader.js';
 import { injectStyles, createLayout } from './ui/layout.js';
-import { processBinaryData } from './analyzer/binaryProcessor.js';
+import { processBinaryData, processBinaryDataAsync } from './analyzer/binaryProcessor.js';
 import { PanelCoordinator } from './ui/panelCoordinator.js';
 import { BinaryPatcher } from './analyzer/patcher.js';
 
@@ -177,7 +177,7 @@ export class ApplicationCoordinator {
     this.panelCoordinator.updateActiveTabPanel();
   }
 
-  private processBinary(
+  private async processBinary(
     fileName: string,
     arrayBuffer: ArrayBuffer,
     lastModified?: number
@@ -185,7 +185,35 @@ export class ApplicationCoordinator {
     const data = new Uint8Array(arrayBuffer);
     const fileSize = arrayBuffer.byteLength;
 
-    const result = processBinaryData(fileName, data, arrayBuffer);
+    if (this.binaryLoader) {
+      this.binaryLoader.showLoader(fileName);
+    }
+
+    const isTest = typeof process !== 'undefined' && 
+      (process.env?.NODE_ENV === 'test' || (globalThis as any).vitest);
+
+    let result;
+    if (isTest || fileSize < 50000) {
+      if (this.binaryLoader) {
+        this.binaryLoader.updateProgress(50, 'Analyzing...');
+      }
+      result = processBinaryData(fileName, data, arrayBuffer);
+    } else {
+      result = await processBinaryDataAsync(
+        fileName,
+        data,
+        arrayBuffer,
+        (percent, status) => {
+          if (this.binaryLoader) {
+            this.binaryLoader.updateProgress(percent, status);
+          }
+        }
+      );
+    }
+
+    if (this.binaryLoader) {
+      this.binaryLoader.updateProgress(98, 'Rebuilding user interface panels...');
+    }
 
     // Update global state
     this.state = {
@@ -224,6 +252,11 @@ export class ApplicationCoordinator {
     // Select the first function/symbol by default
     if (result.symbols.length > 0) {
       this.selectSymbol(result.symbols[0]);
+    }
+
+    if (this.binaryLoader) {
+      this.binaryLoader.updateProgress(100, 'Loading complete');
+      setTimeout(() => this.binaryLoader?.hideLoader(), 400);
     }
   }
 

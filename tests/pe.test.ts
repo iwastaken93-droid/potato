@@ -988,4 +988,120 @@ describe('PE Parser Unit Tests', () => {
     );
     expect(truncatedTypeRes).toBeDefined();
   });
+
+  it('should successfully parse TLS directory and callbacks for 32-bit PE', () => {
+    const buffer = new ArrayBuffer(512);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d;
+    bytes[1] = 0x5a;
+    const e_lfanew = 64;
+    view.setUint32(60, e_lfanew, true);
+
+    view.setUint32(e_lfanew, 0x00004550, true);
+
+    const coffOffset = e_lfanew + 4;
+    view.setUint16(coffOffset, 0x14c, true);
+    view.setUint16(coffOffset + 2, 1, true);
+    const sizeOfOptionalHeader = 224;
+    view.setUint16(coffOffset + 16, sizeOfOptionalHeader, true);
+
+    const optionalOffset = coffOffset + 20;
+    view.setUint16(optionalOffset, 0x10b, true);
+    
+    const winOffset = optionalOffset + 28;
+    view.setUint32(winOffset, 0x400000, true);
+    
+    const stackHeapOffset = winOffset + 44;
+    const afterStackHeapOffset = stackHeapOffset + 16;
+    view.setUint32(afterStackHeapOffset + 4, 10, true);
+
+    const dirOffset = afterStackHeapOffset + 8;
+    view.setUint32(dirOffset + 9 * 8, 0x2000, true);
+    view.setUint32(dirOffset + 9 * 8 + 4, 24, true);
+
+    const sectionOffset = optionalOffset + sizeOfOptionalHeader;
+    bytes[sectionOffset] = 0x2e;
+    bytes[sectionOffset + 1] = 0x64;
+    bytes[sectionOffset + 2] = 0x61;
+    bytes[sectionOffset + 3] = 0x74;
+    bytes[sectionOffset + 4] = 0x61;
+    view.setUint32(sectionOffset + 8, 0x1000, true);
+    view.setUint32(sectionOffset + 12, 0x2000, true);
+    view.setUint32(sectionOffset + 16, 0x200, true);
+    view.setUint32(sectionOffset + 20, 0x180, true);
+    view.setUint32(sectionOffset + 36, 0xc0000040, true);
+
+    view.setUint32(0x180 + 12, 0x402050, true);
+
+    view.setUint32(0x1d0, 0x401010, true);
+    view.setUint32(0x1d4, 0x401020, true);
+    view.setUint32(0x1d8, 0, true);
+
+    const parser = new PEParser(buffer);
+    const parsed = parser.parse();
+
+    expect(parsed.tls).toBeDefined();
+    expect(parsed.tls!.rawAddressOfCallbacks).toBe(0x402050);
+    expect(parsed.tls!.callbacks).toEqual([0x1010, 0x1020]);
+  });
+
+  it('should successfully parse TLS directory and callbacks for 64-bit PE', () => {
+    const buffer = new ArrayBuffer(512);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d;
+    bytes[1] = 0x5a;
+    const e_lfanew = 64;
+    view.setUint32(60, e_lfanew, true);
+
+    view.setUint32(e_lfanew, 0x00004550, true);
+
+    const coffOffset = e_lfanew + 4;
+    view.setUint16(coffOffset, 0x8664, true);
+    view.setUint16(coffOffset + 2, 1, true);
+    const sizeOfOptionalHeader = 240;
+    view.setUint16(coffOffset + 16, sizeOfOptionalHeader, true);
+
+    const optionalOffset = coffOffset + 20;
+    view.setUint16(optionalOffset, 0x20b, true);
+    
+    const winOffset = optionalOffset + 24;
+    view.setBigUint64(winOffset, 0x140000000n, true);
+    
+    const stackHeapOffset = winOffset + 48;
+    const afterStackHeapOffset = stackHeapOffset + 32;
+    view.setUint32(afterStackHeapOffset + 4, 10, true);
+
+    const dirOffset = afterStackHeapOffset + 8;
+    view.setUint32(dirOffset + 9 * 8, 0x2000, true);
+    view.setUint32(dirOffset + 9 * 8 + 4, 40, true);
+
+    const sectionOffset = optionalOffset + sizeOfOptionalHeader;
+    bytes[sectionOffset] = 0x2e;
+    bytes[sectionOffset + 1] = 0x64;
+    bytes[sectionOffset + 2] = 0x61;
+    bytes[sectionOffset + 3] = 0x74;
+    bytes[sectionOffset + 4] = 0x61;
+    view.setUint32(sectionOffset + 8, 0x1000, true);
+    view.setUint32(sectionOffset + 12, 0x2000, true);
+    view.setUint32(sectionOffset + 16, 0x200, true);
+    view.setUint32(sectionOffset + 20, 0x180, true);
+    view.setUint32(sectionOffset + 36, 0xc0000040, true);
+
+    view.setBigUint64(0x180 + 24, 0x140002050n, true);
+
+    view.setBigUint64(0x1d0, 0x140001010n, true);
+    view.setBigUint64(0x1d8, 0x140001020n, true);
+    view.setBigUint64(0x1e0, 0n, true);
+
+    const parser = new PEParser(buffer);
+    const parsed = parser.parse();
+
+    expect(parsed.tls).toBeDefined();
+    expect(parsed.tls!.rawAddressOfCallbacks).toBe(0x140002050n);
+    expect(parsed.tls!.callbacks).toEqual([0x1010, 0x1020]);
+  });
 });

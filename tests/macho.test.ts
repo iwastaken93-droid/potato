@@ -252,4 +252,101 @@ describe('Mach-O Parser Unit Tests', () => {
       expect(arch).toBe('arm');
     });
   });
+
+  it('should successfully parse Mach-O chained fixups (LC_DYLD_CHAINED_FIXUPS)', () => {
+    // 32-bit header (32 bytes) + LC_DYLD_CHAINED_FIXUPS (16 bytes) + Chained fixups data (200 bytes)
+    const buffer = new ArrayBuffer(32 + 16 + 200);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    // Header
+    view.setUint32(0, 0xfeedfacf, true); // magic LE 64
+    view.setUint32(16, 1, true); // ncmds = 1
+    view.setUint32(20, 16, true); // sizeofcmds = 16
+
+    // LC_DYLD_CHAINED_FIXUPS (0x80000034) Command
+    const cmdOffset = 32;
+    view.setUint32(cmdOffset, 0x80000034, true); // cmd
+    view.setUint32(cmdOffset + 4, 16, true); // cmdsize: 16
+    view.setUint32(cmdOffset + 8, 48, true); // dataoff: 48
+    view.setUint32(cmdOffset + 12, 200, true); // datasize: 200
+
+    // Chained Fixups Data at offset 48
+    const dataoff = 48;
+    // Header (28 bytes)
+    view.setUint32(dataoff, 0, true); // fixupsVersion
+    view.setUint32(dataoff + 4, 120, true); // startsOffset
+    view.setUint32(dataoff + 8, 28, true); // importsOffset
+    view.setUint32(dataoff + 12, 100, true); // symbolsOffset
+    view.setUint32(dataoff + 16, 2, true); // importsCount
+    view.setUint32(dataoff + 20, 2, true); // importsFormat: 2 (DYLD_CHAINED_IMPORT_ADDEND)
+    view.setUint32(dataoff + 24, 0, true); // symbolsFormat
+
+    // Imports Table at offset 48 + 28 = 76
+    // Entry 0: libOrdinal = 1, weakImport = false, nameOffset = 0, addend = 10
+    // libOrdinal (8 bits) | weakImport (1 bit << 8) | nameOffset (23 bits << 9)
+    // 1 | 0 | 0 = 1
+    view.setUint32(76, 1, true);
+    view.setInt32(80, 10, true); // addend
+
+    // Entry 1: libOrdinal = 2, weakImport = true, nameOffset = 5, addend = -5
+    // 2 | (1 << 8) | (5 << 9) = 2 | 256 | 2560 = 2818
+    view.setUint32(84, 2818, true);
+    view.setInt32(88, -5, true); // addend
+
+    // Symbols table strings at offset 48 + 100 = 148
+    const sym1 = '_foo';
+    const sym2 = '_bar';
+    for (let i = 0; i < sym1.length; i++) {
+      bytes[148 + i] = sym1.charCodeAt(i);
+    }
+    bytes[148 + sym1.length] = 0; // null-terminated
+
+    for (let i = 0; i < sym2.length; i++) {
+      bytes[153 + i] = sym2.charCodeAt(i);
+    }
+    bytes[153 + sym2.length] = 0; // null-terminated
+
+    // Segment Starts in Image at offset 48 + 120 = 168
+    // segCount = 2
+    view.setUint32(168, 2, true);
+    view.setUint32(172, 12, true); // seg_info_offset[0] = 12 -> segment starts at 168 + 12 = 180
+    view.setUint32(176, 0, true); // seg_info_offset[1] = 0 -> no fixups
+
+    // Segment Starts at offset 180
+    view.setUint32(180, 26, true); // size
+    view.setUint16(184, 4096, true); // pageSize
+    view.setUint16(186, 6, true); // pointerFormat
+    view.setBigUint64(188, 0x1000n, true); // segmentOffset
+    view.setUint32(196, 0, true); // maxValidPointer
+    view.setUint16(200, 2, true); // pageCount
+    view.setUint16(202, 12, true); // pageStarts[0]
+    view.setUint16(204, 0xffff, true); // pageStarts[1] (NONE)
+
+    const parsed = parseMacho(buffer);
+    expect(parsed.chainedFixups).toBeDefined();
+    
+    const chained = parsed.chainedFixups!;
+    expect(chained.header.fixupsVersion).toBe(0);
+    expect(chained.header.importsCount).toBe(2);
+    expect(chained.header.importsFormat).toBe(2);
+
+    expect(chained.imports.length).toBe(2);
+    expect(chained.imports[0].name).toBe('_foo');
+    expect(chained.imports[0].libOrdinal).toBe(1);
+    expect(chained.imports[0].weakImport).toBe(false);
+    expect(chained.imports[0].addend).toBe(10);
+
+    expect(chained.imports[1].name).toBe('_bar');
+    expect(chained.imports[1].libOrdinal).toBe(2);
+    expect(chained.imports[1].weakImport).toBe(true);
+    expect(chained.imports[1].addend).toBe(-5);
+
+    expect(chained.segments.length).toBe(1);
+    expect(chained.segments[0].pageSize).toBe(4096);
+    expect(chained.segments[0].pointerFormat).toBe(6);
+    expect(chained.segments[0].segmentOffset).toBe(0x1000n);
+    expect(chained.segments[0].pageCount).toBe(2);
+    expect(chained.segments[0].pageStarts).toEqual([12, 0xffff]);
+  });
 });

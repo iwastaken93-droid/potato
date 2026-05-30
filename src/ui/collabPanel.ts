@@ -24,6 +24,10 @@ export interface CollabPanelOptions {
     newName: string,
     type: 'function' | 'variable'
   ) => void;
+  onCursorSynced?: (
+    address: number,
+    view: 'assembly' | 'hex' | 'decompiler'
+  ) => void;
 }
 
 export class CollabPanel {
@@ -51,6 +55,8 @@ export class CollabPanel {
   private actionRenameOldInput!: HTMLInputElement;
   private actionRenameNewInput!: HTMLInputElement;
   private actionRenameTypeSelect!: HTMLSelectElement;
+  private actionCursorAddrInput!: HTMLInputElement;
+  private actionCursorViewSelect!: HTMLSelectElement;
 
   private unsubscribes: (() => void)[] = [];
 
@@ -455,6 +461,23 @@ export class CollabPanel {
     `;
     actionCard.appendChild(renameGroup);
 
+    // Cursor broadcast fields
+    const cursorGroup = document.createElement('div');
+    cursorGroup.className = 'collab-input-group';
+    cursorGroup.innerHTML = `
+      <label class="collab-label">Broadcast My Cursor</label>
+      <div class="collab-form-row">
+        <input type="text" id="collab-cursor-addr" class="collab-input" placeholder="0x1000" style="width: 70px;">
+        <select id="collab-cursor-view" class="collab-input" style="flex: 1; background: rgba(15, 17, 21, 0.8);">
+          <option value="assembly">Assembly</option>
+          <option value="decompiler">Decompiler</option>
+          <option value="hex">Hex Viewer</option>
+        </select>
+        <button id="collab-btn-send-cursor" class="collab-btn collab-btn-secondary" style="padding: 0.4rem 0.6rem;">Move</button>
+      </div>
+    `;
+    actionCard.appendChild(cursorGroup);
+
     sidebar.appendChild(actionCard);
     grid.appendChild(sidebar);
 
@@ -466,7 +489,26 @@ export class CollabPanel {
         <div style="font-weight: 700; color: var(--text-primary, #ffffff); font-size: 0.95rem;">Live Workspace Activity Stream</div>
         <button id="collab-btn-simulate" class="collab-btn" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #10B981, #059669);">⚡ Simulate Peer Action</button>
       </div>
-      <div id="collab-activity-list" class="collab-activity-list"></div>
+      <div id="collab-activity-list" class="collab-activity-list" style="max-height: 250px; overflow-y: auto;"></div>
+
+      <!-- Visual Cursor Screen -->
+      <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+        <div style="font-weight: 700; color: var(--text-primary, #ffffff); font-size: 0.95rem;">Visual Workspace Cursors Screen</div>
+        <div id="collab-cursors-container" style="position: relative; height: 180px; background: rgba(10, 12, 16, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; display: flex; justify-content: space-around; align-items: center; padding: 10px;">
+           <div id="view-assembly" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; flex: 1; height: 100%; margin: 5px; background: rgba(255, 255, 255, 0.02); position: relative; display: flex; flex-direction: column; align-items: center;">
+              <div style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted, #94a3b8); margin-top: 5px; pointer-events: none;">Assembly</div>
+              <div class="cursors-area" style="position: absolute; top: 25px; left: 0; right: 0; bottom: 0; pointer-events: none; width: 100%; height: calc(100% - 25px);"></div>
+           </div>
+           <div id="view-decompiler" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; flex: 1; height: 100%; margin: 5px; background: rgba(255, 255, 255, 0.02); position: relative; display: flex; flex-direction: column; align-items: center;">
+              <div style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted, #94a3b8); margin-top: 5px; pointer-events: none;">Decompiler</div>
+              <div class="cursors-area" style="position: absolute; top: 25px; left: 0; right: 0; bottom: 0; pointer-events: none; width: 100%; height: calc(100% - 25px);"></div>
+           </div>
+           <div id="view-hex" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; flex: 1; height: 100%; margin: 5px; background: rgba(255, 255, 255, 0.02); position: relative; display: flex; flex-direction: column; align-items: center;">
+              <div style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted, #94a3b8); margin-top: 5px; pointer-events: none;">Hex Viewer</div>
+              <div class="cursors-area" style="position: absolute; top: 25px; left: 0; right: 0; bottom: 0; pointer-events: none; width: 100%; height: calc(100% - 25px);"></div>
+           </div>
+        </div>
+      </div>
     `;
     grid.appendChild(this.activityLogEl);
 
@@ -495,6 +537,12 @@ export class CollabPanel {
     this.actionRenameTypeSelect = this.rootEl.querySelector(
       '#collab-rename-type'
     ) as HTMLSelectElement;
+    this.actionCursorAddrInput = this.rootEl.querySelector(
+      '#collab-cursor-addr'
+    ) as HTMLInputElement;
+    this.actionCursorViewSelect = this.rootEl.querySelector(
+      '#collab-cursor-view'
+    ) as HTMLSelectElement;
   }
 
   private setupSubscriptions(): void {
@@ -521,6 +569,7 @@ export class CollabPanel {
     this.unsubscribes.push(
       this.engine.subscribePeers((peers) => {
         this.renderPeers(peers);
+        this.drawCursorsOnScreen();
       })
     );
 
@@ -588,6 +637,16 @@ export class CollabPanel {
             data.renamedName,
             data.type
           );
+        }
+      })
+    );
+
+    // Cursors syncing
+    this.unsubscribes.push(
+      this.engine.subscribeCursor((data) => {
+        this.drawCursorsOnScreen();
+        if (this.options.onCursorSynced) {
+          this.options.onCursorSynced(data.address, data.view);
         }
       })
     );
@@ -695,6 +754,32 @@ export class CollabPanel {
       });
     }
 
+    // Local action button: Cursor
+    const sendCursorBtn = this.rootEl.querySelector(
+      '#collab-btn-send-cursor'
+    ) as HTMLButtonElement;
+    if (sendCursorBtn) {
+      sendCursorBtn.addEventListener('click', () => {
+        if (!this.engine.isConnected()) {
+          alert('Connect to a collaboration session first.');
+          return;
+        }
+        const addrStr = this.actionCursorAddrInput.value.trim();
+        const view = this.actionCursorViewSelect.value as
+          | 'assembly'
+          | 'hex'
+          | 'decompiler';
+        if (!addrStr) return;
+        const addr = parseInt(addrStr, 16) || parseInt(addrStr, 10);
+        if (isNaN(addr)) {
+          alert('Invalid address format');
+          return;
+        }
+        this.engine.sendCursor(addr, view);
+        this.actionCursorAddrInput.value = '';
+      });
+    }
+
     // Action button: Simulate Peer Action
     const simulateBtn = this.rootEl.querySelector(
       '#collab-btn-simulate'
@@ -795,6 +880,53 @@ export class CollabPanel {
         <span class="collab-peer-status ${peer.status}">${peer.status}</span>
       `;
       this.peersListEl.appendChild(row);
+    });
+  }
+
+  private drawCursorsOnScreen(): void {
+    // Clear all cursor areas first
+    const areas = this.rootEl.querySelectorAll('.cursors-area');
+    areas.forEach((area) => (area.innerHTML = ''));
+
+    // Get cursors from the engine
+    const activeCursors = this.engine.getCursors();
+
+    activeCursors.forEach((cursor) => {
+      // Find the appropriate cursor area for the view
+      const viewId =
+        cursor.view === 'hex'
+          ? 'view-hex'
+          : cursor.view === 'decompiler'
+            ? 'view-decompiler'
+            : 'view-assembly';
+      const area = this.rootEl.querySelector(`#${viewId} .cursors-area`);
+      if (!area) return;
+
+      const cursorEl = document.createElement('div');
+      cursorEl.className = 'remote-cursor';
+      // Compute coordinates based on the address
+      const x = 10 + (cursor.address % 60);
+      const y = 10 + ((cursor.address >> 4) % 60);
+
+      cursorEl.style.cssText = `
+        position: absolute;
+        left: ${x}%;
+        top: ${y}%;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        z-index: 100;
+        pointer-events: none;
+      `;
+
+      cursorEl.innerHTML = `
+        <div style="width: 2px; height: 14px; background-color: ${cursor.color};"></div>
+        <div style="background-color: ${cursor.color}; color: white; font-size: 9px; font-weight: bold; padding: 1px 4px; border-radius: 2px; white-space: nowrap; margin-top: -2px;">
+          ${cursor.peerName} (0x${cursor.address.toString(16)})
+        </div>
+      `;
+
+      area.appendChild(cursorEl);
     });
   }
 

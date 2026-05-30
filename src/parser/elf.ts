@@ -43,10 +43,49 @@ export interface ElfProgramHeader {
   align: bigint | number;
 }
 
+export interface ElfSymbol {
+  name: string;
+  nameOffset: number;
+  value: bigint | number;
+  size: bigint | number;
+  info: number;
+  other: number;
+  shndx: number;
+  bind: string;
+  type: string;
+}
+
+export interface ElfRelocation {
+  offset: bigint | number;
+  info: bigint | number;
+  addend?: bigint | number;
+  symbolIndex: number;
+  symbolName: string;
+  type: number;
+  typeName: string;
+}
+
+export interface GotEntry {
+  address: bigint | number;
+  symbolName: string;
+  relocationType: string;
+  addend?: bigint | number;
+}
+
+export interface PltEntry {
+  address: bigint | number;
+  symbolName: string;
+  gotAddress?: bigint | number;
+}
+
 export interface ParsedElf {
   header: ElfHeader;
   programHeaders: ElfProgramHeader[];
   sectionHeaders: ElfSectionHeader[];
+  symbols: ElfSymbol[];
+  relocations: ElfRelocation[];
+  gotEntries: GotEntry[];
+  pltEntries: PltEntry[];
 }
 
 // ELF Constants and Mappings
@@ -139,6 +178,108 @@ const PT_TYPE: Record<number, string> = {
   0x6474e551: 'PT_GNU_STACK',
   0x6474e552: 'PT_GNU_RELRO',
 };
+
+const SHT_SYMTAB = 2;
+const SHT_STRTAB = 3;
+const SHT_RELA = 4;
+const SHT_REL = 9;
+const SHT_DYNSYM = 11;
+
+const STB_NAMES: Record<number, string> = {
+  0: 'LOCAL',
+  1: 'GLOBAL',
+  2: 'WEAK',
+  10: 'LOOS',
+  12: 'HIOS',
+  13: 'LOPROC',
+  15: 'HIPROC',
+};
+
+const STT_NAMES: Record<number, string> = {
+  0: 'NOTYPE',
+  1: 'OBJECT',
+  2: 'FUNC',
+  3: 'SECTION',
+  4: 'FILE',
+  5: 'COMMON',
+  6: 'TLS',
+  10: 'LOOS',
+  12: 'HIOS',
+  13: 'LOPROC',
+  15: 'HIPROC',
+};
+
+const REL_TYPES_X86_64: Record<number, string> = {
+  0: 'R_X86_64_NONE',
+  1: 'R_X86_64_64',
+  2: 'R_X86_64_PC32',
+  3: 'R_X86_64_GOT32',
+  4: 'R_X86_64_PLT32',
+  5: 'R_X86_64_COPY',
+  6: 'R_X86_64_GLOB_DAT',
+  7: 'R_X86_64_JUMP_SLOT',
+  8: 'R_X86_64_RELATIVE',
+  9: 'R_X86_64_GOTPCREL',
+  10: 'R_X86_64_32',
+  11: 'R_X86_64_32S',
+  12: 'R_X86_64_16',
+  13: 'R_X86_64_PC16',
+  14: 'R_X86_64_8',
+  15: 'R_X86_64_PC8',
+  16: 'R_X86_64_DTPMOD64',
+  17: 'R_X86_64_DTPOFF64',
+  18: 'R_X86_64_TPOFF64',
+};
+
+const REL_TYPES_I386: Record<number, string> = {
+  0: 'R_386_NONE',
+  1: 'R_386_32',
+  2: 'R_386_PC32',
+  3: 'R_386_GOT32',
+  4: 'R_386_PLT32',
+  5: 'R_386_COPY',
+  6: 'R_386_GLOB_DAT',
+  7: 'R_386_JMP_SLOT',
+  8: 'R_386_RELATIVE',
+  9: 'R_386_GOTOFF',
+  10: 'R_386_GOTPC',
+};
+
+const REL_TYPES_AARCH64: Record<number, string> = {
+  0: 'R_AARCH64_NONE',
+  257: 'R_AARCH64_ABS64',
+  258: 'R_AARCH64_ABS32',
+  1024: 'R_AARCH64_COPY',
+  1025: 'R_AARCH64_GLOB_DAT',
+  1026: 'R_AARCH64_JUMP_SLOT',
+  1027: 'R_AARCH64_RELATIVE',
+};
+
+const REL_TYPES_ARM: Record<number, string> = {
+  0: 'R_ARM_NONE',
+  2: 'R_ARM_PC24',
+  17: 'R_ARM_RELATIVE',
+  21: 'R_ARM_GLOB_DAT',
+  22: 'R_ARM_JUMP_SLOT',
+  23: 'R_ARM_RELATIVE',
+};
+
+function getRelocationTypeName(machine: string, type: number): string {
+  const m = machine.toLowerCase();
+  if (m.includes('amd64') || m.includes('x86-64') || m.includes('62')) {
+    return REL_TYPES_X86_64[type] || `R_X86_64_UNKNOWN (${type})`;
+  }
+  if (m.includes('x86') || m.includes('386') || m.includes('3')) {
+    return REL_TYPES_I386[type] || `R_386_UNKNOWN (${type})`;
+  }
+  if (m.includes('aarch64') || m.includes('arm 64') || m.includes('183')) {
+    return REL_TYPES_AARCH64[type] || `R_AARCH64_UNKNOWN (${type})`;
+  }
+  if (m.includes('arm') || m.includes('40')) {
+    return REL_TYPES_ARM[type] || `R_ARM_UNKNOWN (${type})`;
+  }
+  return `R_UNKNOWN (${type})`;
+}
 
 export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
   const view = new DataView(arrayBuffer);
@@ -361,9 +502,279 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
     }
   }
 
+  const symbols: ElfSymbol[] = [];
+  const symbolTables: Record<number, ElfSymbol[]> = {};
+
+  // Parse symbols from SHT_SYMTAB and SHT_DYNSYM sections
+  for (let sIdx = 0; sIdx < sectionHeaders.length; sIdx++) {
+    const sec = sectionHeaders[sIdx];
+    if (sec.type === SHT_SYMTAB || sec.type === SHT_DYNSYM) {
+      const secOffset = Number(sec.offset);
+      const secSize = Number(sec.size);
+      const entSize = Number(sec.entsize) || (is64 ? 24 : 16);
+
+      if (secOffset + secSize <= arrayBuffer.byteLength) {
+        // Link points to corresponding string table section
+        let strTabOffset = 0;
+        let strTabSize = 0;
+        if (sec.link >= 0 && sec.link < sectionHeaders.length) {
+          const strSec = sectionHeaders[sec.link];
+          strTabOffset = Number(strSec.offset);
+          strTabSize = Number(strSec.size);
+        }
+
+        const secSymbols: ElfSymbol[] = [];
+        for (let off = 0; off + entSize <= secSize; off += entSize) {
+          const symAddr = secOffset + off;
+          let nameOffset = 0;
+          let value: bigint | number = 0;
+          let size: bigint | number = 0;
+          let info = 0;
+          let other = 0;
+          let shndx = 0;
+
+          if (is64) {
+            nameOffset = view.getUint32(symAddr, littleEndian);
+            info = view.getUint8(symAddr + 4);
+            other = view.getUint8(symAddr + 5);
+            shndx = view.getUint16(symAddr + 6, littleEndian);
+            value = view.getBigUint64(symAddr + 8, littleEndian);
+            size = view.getBigUint64(symAddr + 16, littleEndian);
+          } else {
+            nameOffset = view.getUint32(symAddr, littleEndian);
+            value = view.getUint32(symAddr + 4, littleEndian);
+            size = view.getUint32(symAddr + 8, littleEndian);
+            info = view.getUint8(symAddr + 12);
+            other = view.getUint8(symAddr + 13);
+            shndx = view.getUint16(symAddr + 14, littleEndian);
+          }
+
+          // Extract name from linked string table
+          let symName = '';
+          if (strTabOffset > 0 && strTabOffset + strTabSize <= arrayBuffer.byteLength) {
+            const start = strTabOffset + nameOffset;
+            if (start < strTabOffset + strTabSize) {
+              for (let j = start; j < strTabOffset + strTabSize; j++) {
+                if (bytes[j] === 0) break;
+                symName += String.fromCharCode(bytes[j]);
+              }
+            }
+          }
+
+          const bindVal = info >> 4;
+          const typeVal = info & 0xf;
+          const bind = STB_NAMES[bindVal] || `UNKNOWN_BIND (${bindVal})`;
+          const type = STT_NAMES[typeVal] || `UNKNOWN_TYPE (${typeVal})`;
+
+          const parsedSym: ElfSymbol = {
+            name: symName,
+            nameOffset,
+            value,
+            size,
+            info,
+            other,
+            shndx,
+            bind,
+            type,
+          };
+          secSymbols.push(parsedSym);
+          symbols.push(parsedSym);
+        }
+        symbolTables[sIdx] = secSymbols;
+      }
+    }
+  }
+
+  const relocations: ElfRelocation[] = [];
+  const gotEntries: GotEntry[] = [];
+  const pltRelocs: ElfRelocation[] = [];
+
+  // Parse relocation sections (SHT_REL and SHT_RELA)
+  for (let sIdx = 0; sIdx < sectionHeaders.length; sIdx++) {
+    const sec = sectionHeaders[sIdx];
+    if (sec.type === SHT_REL || sec.type === SHT_RELA) {
+      const secOffset = Number(sec.offset);
+      const secSize = Number(sec.size);
+      const isRela = sec.type === SHT_RELA;
+      
+      let entSize = Number(sec.entsize);
+      if (!entSize) {
+        if (is64) {
+          entSize = isRela ? 24 : 16;
+        } else {
+          entSize = isRela ? 12 : 8;
+        }
+      }
+
+      if (secOffset + secSize <= arrayBuffer.byteLength) {
+        // Find linked symbol table
+        const linkedSymTableIdx = sec.link;
+        const symTable = symbolTables[linkedSymTableIdx] || [];
+
+        for (let off = 0; off + entSize <= secSize; off += entSize) {
+          const relAddr = secOffset + off;
+          let offset: bigint | number = 0;
+          let info: bigint | number = 0;
+          let addend: bigint | number | undefined = undefined;
+
+          if (is64) {
+            offset = view.getBigUint64(relAddr, littleEndian);
+            info = view.getBigUint64(relAddr + 8, littleEndian);
+            if (isRela) {
+              addend = view.getBigInt64(relAddr + 16, littleEndian);
+            }
+          } else {
+            offset = view.getUint32(relAddr, littleEndian);
+            info = view.getUint32(relAddr + 4, littleEndian);
+            if (isRela) {
+              addend = view.getInt32(relAddr + 8, littleEndian);
+            }
+          }
+
+          // Unpack info
+          let symbolIndex = 0;
+          let relocType = 0;
+          if (is64) {
+            const infoBig = BigInt(info);
+            symbolIndex = Number(infoBig >> 32n);
+            relocType = Number(infoBig & 0xffffffffn);
+          } else {
+            const infoNum = Number(info);
+            symbolIndex = infoNum >> 8;
+            relocType = infoNum & 0xff;
+          }
+
+          const sym = symTable[symbolIndex];
+          const symbolName = sym ? sym.name : '';
+
+          const typeName = getRelocationTypeName(header.machine, relocType);
+
+          const relocation: ElfRelocation = {
+            offset,
+            info,
+            addend,
+            symbolIndex,
+            symbolName,
+            type: relocType,
+            typeName,
+          };
+          relocations.push(relocation);
+
+          // Identify GOT Relocations
+          // Usually relocations of type GLOB_DAT, JUMP_SLOT / JMP_SLOT, etc.
+          // or target offset falls into a section starting with `.got`
+          let isGot = false;
+          if (
+            typeName.includes('GLOB_DAT') ||
+            typeName.includes('JUMP_SLOT') ||
+            typeName.includes('JMP_SLOT') ||
+            typeName.includes('RELATIVE')
+          ) {
+            isGot = true;
+          } else {
+            // Find if relocation offset falls within a .got section
+            for (const s of sectionHeaders) {
+              if (s.name.startsWith('.got')) {
+                const sAddr = BigInt(s.addr);
+                const sSize = BigInt(s.size);
+                const offVal = BigInt(offset);
+                if (offVal >= sAddr && offVal < sAddr + sSize) {
+                  isGot = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (isGot && symbolName) {
+            gotEntries.push({
+              address: offset,
+              symbolName,
+              relocationType: typeName,
+              addend,
+            });
+          }
+
+          if (typeName.includes('JUMP_SLOT') || typeName.includes('JMP_SLOT')) {
+            pltRelocs.push(relocation);
+          }
+        }
+      }
+    }
+  }
+
+  const pltEntries: PltEntry[] = [];
+
+  // PLT Resolution
+  // Look for .plt or .plt.sec or .plt.got sections
+  for (const pltSec of sectionHeaders) {
+    if (pltSec.name === '.plt' || pltSec.name === '.plt.sec' || pltSec.name === '.plt.got') {
+      const secOffset = Number(pltSec.offset);
+      const secSize = Number(pltSec.size);
+      const secAddr = BigInt(pltSec.addr);
+
+      if (secOffset + secSize <= arrayBuffer.byteLength) {
+        let instructionResolvedCount = 0;
+
+        // Try x86-64 Instruction decoding: search for jmp *disp(%rip) -> ff 25 displacement_32
+        const isX86_64 = header.machine.toLowerCase().includes('amd64') || header.machine.toLowerCase().includes('x86-64') || header.machine.toLowerCase().includes('62');
+        if (isX86_64) {
+          for (let i = 0; i <= secSize - 6; i++) {
+            if (bytes[secOffset + i] === 0xff && bytes[secOffset + i + 1] === 0x25) {
+              const displacement = view.getInt32(secOffset + i + 2, littleEndian);
+              const pltEntryAddr = secAddr + BigInt(i);
+              const gotAddr = pltEntryAddr + 6n + BigInt(displacement);
+
+              const gotEntry = gotEntries.find(g => BigInt(g.address) === gotAddr) ||
+                               relocations.find(r => BigInt(r.offset) === gotAddr);
+              if (gotEntry && gotEntry.symbolName) {
+                pltEntries.push({
+                  address: pltEntryAddr,
+                  symbolName: gotEntry.symbolName,
+                  gotAddress: gotAddr,
+                });
+                instructionResolvedCount++;
+              }
+            }
+          }
+        }
+
+        // Fallback: 1-to-1 sequential layout mapping
+        if (instructionResolvedCount === 0 && pltRelocs.length > 0 && pltSec.name === '.plt') {
+          let headerSize = 16;
+          let entrySize = 16;
+          const machineLower = header.machine.toLowerCase();
+          if (machineLower.includes('aarch64') || machineLower.includes('183')) {
+            headerSize = 32;
+            entrySize = 16;
+          } else if (machineLower.includes('arm') || machineLower.includes('40')) {
+            headerSize = 32;
+            entrySize = 16;
+          }
+
+          for (let idx = 0; idx < pltRelocs.length; idx++) {
+            const rel = pltRelocs[idx];
+            const pltEntryAddr = secAddr + BigInt(headerSize + idx * entrySize);
+            if (headerSize + idx * entrySize + entrySize <= secSize) {
+              pltEntries.push({
+                address: pltEntryAddr,
+                symbolName: rel.symbolName,
+                gotAddress: rel.offset,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   return {
     header,
     programHeaders,
     sectionHeaders,
+    symbols,
+    relocations,
+    gotEntries,
+    pltEntries,
   };
 }

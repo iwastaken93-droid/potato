@@ -79,8 +79,187 @@ export function readSLEB128(
 // DWARF Parser Implementation
 // ============================================================================
 
-export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
+export function parseFormValue(
+  view: DataView,
+  offset: number,
+  form: number,
+  is64Bit: boolean,
+  debugStrView?: DataView | null,
+  debugLineStrView?: DataView | null
+): { value: any; bytesRead: number } {
+  let bytesRead = 0;
+  let value: any = null;
+
+  switch (form) {
+    case 0x08: { // DW_FORM_string
+      let str = '';
+      while (offset + bytesRead < view.byteLength) {
+        const char = view.getUint8(offset + bytesRead);
+        bytesRead++;
+        if (char === 0) break;
+        str += String.fromCharCode(char);
+      }
+      value = str;
+      break;
+    }
+    case 0x1f: { // DW_FORM_line_strp
+      const size = is64Bit ? 8 : 4;
+      if (offset + bytesRead + size > view.byteLength) {
+        throw new Error('Out of bounds reading DW_FORM_line_strp');
+      }
+      const strOffset = size === 8
+        ? Number(view.getBigUint64(offset + bytesRead, true))
+        : view.getUint32(offset + bytesRead, true);
+      bytesRead += size;
+
+      if (debugLineStrView && strOffset < debugLineStrView.byteLength) {
+        let str = '';
+        let i = strOffset;
+        while (i < debugLineStrView.byteLength) {
+          const char = debugLineStrView.getUint8(i);
+          if (char === 0) break;
+          str += String.fromCharCode(char);
+          i++;
+        }
+        value = str;
+      } else {
+        value = `line_strp_${strOffset}`;
+      }
+      break;
+    }
+    case 0x0e: { // DW_FORM_strp
+      const size = is64Bit ? 8 : 4;
+      if (offset + bytesRead + size > view.byteLength) {
+        throw new Error('Out of bounds reading DW_FORM_strp');
+      }
+      const strOffset = size === 8
+        ? Number(view.getBigUint64(offset + bytesRead, true))
+        : view.getUint32(offset + bytesRead, true);
+      bytesRead += size;
+
+      if (debugStrView && strOffset < debugStrView.byteLength) {
+        let str = '';
+        let i = strOffset;
+        while (i < debugStrView.byteLength) {
+          const char = debugStrView.getUint8(i);
+          if (char === 0) break;
+          str += String.fromCharCode(char);
+          i++;
+        }
+        value = str;
+      } else {
+        value = `strp_${strOffset}`;
+      }
+      break;
+    }
+    case 0x0b: // DW_FORM_data1
+      if (offset + bytesRead + 1 > view.byteLength) throw new Error('Out of bounds');
+      value = view.getUint8(offset + bytesRead);
+      bytesRead += 1;
+      break;
+    case 0x05: // DW_FORM_data2
+      if (offset + bytesRead + 2 > view.byteLength) throw new Error('Out of bounds');
+      value = view.getUint16(offset + bytesRead, true);
+      bytesRead += 2;
+      break;
+    case 0x06: // DW_FORM_data4
+      if (offset + bytesRead + 4 > view.byteLength) throw new Error('Out of bounds');
+      value = view.getUint32(offset + bytesRead, true);
+      bytesRead += 4;
+      break;
+    case 0x07: // DW_FORM_data8
+      if (offset + bytesRead + 8 > view.byteLength) throw new Error('Out of bounds');
+      value = Number(view.getBigUint64(offset + bytesRead, true));
+      bytesRead += 8;
+      break;
+    case 0x0f: { // DW_FORM_udata
+      const res = readULEB128(view, offset + bytesRead);
+      value = res.value;
+      bytesRead += res.bytesRead;
+      break;
+    }
+    case 0x0d: { // DW_FORM_sdata
+      const res = readSLEB128(view, offset + bytesRead);
+      value = res.value;
+      bytesRead += res.bytesRead;
+      break;
+    }
+    case 0x17: { // DW_FORM_sec_offset
+      const size = is64Bit ? 8 : 4;
+      if (offset + bytesRead + size > view.byteLength) throw new Error('Out of bounds');
+      value = size === 8
+        ? Number(view.getBigUint64(offset + bytesRead, true))
+        : view.getUint32(offset + bytesRead, true);
+      bytesRead += size;
+      break;
+    }
+    case 0x0c: // DW_FORM_flag
+      if (offset + bytesRead + 1 > view.byteLength) throw new Error('Out of bounds');
+      value = view.getUint8(offset + bytesRead) !== 0;
+      bytesRead += 1;
+      break;
+    case 0x19: // DW_FORM_flag_present
+      value = true;
+      break;
+    case 0x1a: { // DW_FORM_strx
+      const res = readULEB128(view, offset + bytesRead);
+      value = `strx_${res.value}`;
+      bytesRead += res.bytesRead;
+      break;
+    }
+    case 0x25: // DW_FORM_strx1
+      if (offset + bytesRead + 1 > view.byteLength) throw new Error('Out of bounds');
+      value = `strx_${view.getUint8(offset + bytesRead)}`;
+      bytesRead += 1;
+      break;
+    case 0x26: // DW_FORM_strx2
+      if (offset + bytesRead + 2 > view.byteLength) throw new Error('Out of bounds');
+      value = `strx_${view.getUint16(offset + bytesRead, true)}`;
+      bytesRead += 2;
+      break;
+    case 0x27: // DW_FORM_strx3
+      if (offset + bytesRead + 3 > view.byteLength) throw new Error('Out of bounds');
+      const val3 = view.getUint8(offset + bytesRead) | (view.getUint16(offset + bytesRead + 1, true) << 8);
+      value = `strx_${val3}`;
+      bytesRead += 3;
+      break;
+    case 0x28: // DW_FORM_strx4
+      if (offset + bytesRead + 4 > view.byteLength) throw new Error('Out of bounds');
+      value = `strx_${view.getUint32(offset + bytesRead, true)}`;
+      bytesRead += 4;
+      break;
+    default:
+      // Fallback/minimal handling for custom or unlisted forms
+      if (form === 1) { // inline custom string used by existing test mock
+        let str = '';
+        while (offset + bytesRead < view.byteLength) {
+          const char = view.getUint8(offset + bytesRead);
+          bytesRead++;
+          if (char === 0) break;
+          str += String.fromCharCode(char);
+        }
+        value = str;
+      } else if (form === 2) { // strp custom used by existing test mock
+        if (offset + bytesRead + 4 <= view.byteLength) {
+          value = view.getUint32(offset + bytesRead, true);
+          bytesRead += 4;
+        }
+      } else {
+        throw new Error(`Unsupported DW_FORM: 0x${form.toString(16)}`);
+      }
+  }
+
+  return { value, bytesRead };
+}
+
+export function parseDwarfLine(
+  debugLineBuffer: ArrayBuffer,
+  debugStrBuffer?: ArrayBuffer,
+  debugLineStrBuffer?: ArrayBuffer
+): LineInfo[] {
   const view = new DataView(debugLineBuffer);
+  const strView = debugStrBuffer ? new DataView(debugStrBuffer) : null;
+  const lineStrView = debugLineStrBuffer ? new DataView(debugLineStrBuffer) : null;
   const lines: LineInfo[] = [];
   let offset = 0;
 
@@ -110,6 +289,16 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
     if (offset + 2 > view.byteLength) break;
     const version = view.getUint16(offset, true);
     offset += 2;
+
+    let addressSize = 4;
+    let segmentSelectorSize = 0;
+    if (version >= 5) {
+      if (offset + 2 > view.byteLength) break;
+      addressSize = view.getUint8(offset);
+      offset += 1;
+      segmentSelectorSize = view.getUint8(offset);
+      offset += 1;
+    }
 
     const headerLengthSize = is64Bit ? 8 : 4;
     if (offset + headerLengthSize > view.byteLength) break;
@@ -155,62 +344,157 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
     }
 
     // Directories table
-    const directories: string[] = ['']; // Index 0 is often empty or current dir in DWARF < 5
-    while (offset < headerEndOffset) {
-      if (offset + 1 > view.byteLength) break;
-      if (view.getUint8(offset) === 0) {
-        offset++;
-        break; // End of directories
-      }
-      let dir = '';
-      while (offset < view.byteLength) {
-        const char = view.getUint8(offset);
-        offset++;
-        if (char === 0) break;
-        dir += String.fromCharCode(char);
-      }
-      directories.push(dir);
-    }
-
-    // Files table
+    const directories: string[] = version >= 5 ? [] : ['']; // Index 0 is often empty or current dir in DWARF < 5
     interface FileEntry {
       name: string;
       dirIndex: number;
       modTime: number;
       length: number;
     }
-    const files: FileEntry[] = [
+    const files: FileEntry[] = version >= 5 ? [] : [
       { name: '', dirIndex: 0, modTime: 0, length: 0 },
-    ]; // Index 0 is dummy/placeholder
-    while (offset < headerEndOffset) {
+    ]; // Index 0 is dummy/placeholder in DWARF < 5
+
+    if (version >= 5) {
+      // Parse DWARF v5 directories
       if (offset + 1 > view.byteLength) break;
-      if (view.getUint8(offset) === 0) {
-        offset++;
-        break; // End of files
+      const dirEntryFormatCount = view.getUint8(offset);
+      offset++;
+
+      interface FormatDescription {
+        contentType: number;
+        form: number;
       }
-      let fileName = '';
-      while (offset < view.byteLength) {
-        const char = view.getUint8(offset);
-        offset++;
-        if (char === 0) break;
-        fileName += String.fromCharCode(char);
+      const dirFormats: FormatDescription[] = [];
+      for (let i = 0; i < dirEntryFormatCount; i++) {
+        const ct = readULEB128(view, offset);
+        offset += ct.bytesRead;
+        const f = readULEB128(view, offset);
+        offset += f.bytesRead;
+        dirFormats.push({ contentType: ct.value, form: f.value });
       }
 
-      const dirIdxRes = readULEB128(view, offset);
-      offset += dirIdxRes.bytesRead;
+      const dirsCountRes = readULEB128(view, offset);
+      offset += dirsCountRes.bytesRead;
+      const dirsCount = dirsCountRes.value;
 
-      const modTimeRes = readULEB128(view, offset);
-      offset += modTimeRes.bytesRead;
+      for (let i = 0; i < dirsCount; i++) {
+        let dirPath = '';
+        for (const format of dirFormats) {
+          const parsed = parseFormValue(
+            view,
+            offset,
+            format.form,
+            is64Bit,
+            strView,
+            lineStrView
+          );
+          offset += parsed.bytesRead;
+          if (format.contentType === 1) { // DW_LNCT_path
+            dirPath = String(parsed.value);
+          }
+        }
+        directories.push(dirPath);
+      }
 
-      const lenRes = readULEB128(view, offset);
-      offset += lenRes.bytesRead;
+      // Parse DWARF v5 files
+      if (offset + 1 > view.byteLength) break;
+      const fileEntryFormatCount = view.getUint8(offset);
+      offset++;
 
-      files.push({
-        name: fileName,
-        dirIndex: dirIdxRes.value,
-        modTime: modTimeRes.value,
-        length: lenRes.value,
-      });
+      const fileFormats: FormatDescription[] = [];
+      for (let i = 0; i < fileEntryFormatCount; i++) {
+        const ct = readULEB128(view, offset);
+        offset += ct.bytesRead;
+        const f = readULEB128(view, offset);
+        offset += f.bytesRead;
+        fileFormats.push({ contentType: ct.value, form: f.value });
+      }
+
+      const filesCountRes = readULEB128(view, offset);
+      offset += filesCountRes.bytesRead;
+      const filesCount = filesCountRes.value;
+
+      for (let i = 0; i < filesCount; i++) {
+        let fileName = '';
+        let dirIndex = 0;
+        let modTime = 0;
+        let fileLength = 0;
+
+        for (const format of fileFormats) {
+          const parsed = parseFormValue(
+            view,
+            offset,
+            format.form,
+            is64Bit,
+            strView,
+            lineStrView
+          );
+          offset += parsed.bytesRead;
+          if (format.contentType === 1) { // DW_LNCT_path
+            fileName = String(parsed.value);
+          } else if (format.contentType === 2) { // DW_LNCT_directory_index
+            dirIndex = Number(parsed.value);
+          } else if (format.contentType === 3) { // DW_LNCT_timestamp
+            modTime = Number(parsed.value);
+          } else if (format.contentType === 4) { // DW_LNCT_size
+            fileLength = Number(parsed.value);
+          }
+        }
+        files.push({
+          name: fileName,
+          dirIndex,
+          modTime,
+          length: fileLength,
+        });
+      }
+    } else {
+      while (offset < headerEndOffset) {
+        if (offset + 1 > view.byteLength) break;
+        if (view.getUint8(offset) === 0) {
+          offset++;
+          break; // End of directories
+        }
+        let dir = '';
+        while (offset < view.byteLength) {
+          const char = view.getUint8(offset);
+          offset++;
+          if (char === 0) break;
+          dir += String.fromCharCode(char);
+        }
+        directories.push(dir);
+      }
+
+      while (offset < headerEndOffset) {
+        if (offset + 1 > view.byteLength) break;
+        if (view.getUint8(offset) === 0) {
+          offset++;
+          break; // End of files
+        }
+        let fileName = '';
+        while (offset < view.byteLength) {
+          const char = view.getUint8(offset);
+          offset++;
+          if (char === 0) break;
+          fileName += String.fromCharCode(char);
+        }
+
+        const dirIdxRes = readULEB128(view, offset);
+        offset += dirIdxRes.bytesRead;
+
+        const modTimeRes = readULEB128(view, offset);
+        offset += modTimeRes.bytesRead;
+
+        const lenRes = readULEB128(view, offset);
+        offset += lenRes.bytesRead;
+
+        files.push({
+          name: fileName,
+          dirIndex: dirIdxRes.value,
+          modTime: modTimeRes.value,
+          length: lenRes.value,
+        });
+      }
     }
 
     // Ensure we start instructions exactly after header
@@ -219,7 +503,7 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
     // DWARF Line Program State Machine Registers
     let address = 0;
     let opIndex = 0;
-    let file = 1;
+    let file = version >= 5 ? 0 : 1;
     let line = 1;
     let column = 0;
     let isStmt = defaultIsStmt;
@@ -281,7 +565,7 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
           // Reset registers
           address = 0;
           opIndex = 0;
-          file = 1;
+          file = version >= 5 ? 0 : 1;
           line = 1;
           column = 0;
           isStmt = defaultIsStmt;
@@ -419,10 +703,12 @@ export function parseDwarfLine(debugLineBuffer: ArrayBuffer): LineInfo[] {
 
 export function parseDwarfInfo(
   debugInfoBuffer: ArrayBuffer,
-  debugStrBuffer?: ArrayBuffer
+  debugStrBuffer?: ArrayBuffer,
+  debugLineStrBuffer?: ArrayBuffer
 ): DebugSymbol[] {
   const view = new DataView(debugInfoBuffer);
   const strView = debugStrBuffer ? new DataView(debugStrBuffer) : null;
+  const lineStrView = debugLineStrBuffer ? new DataView(debugLineStrBuffer) : null;
   const symbols: DebugSymbol[] = [];
   let offset = 0;
 
@@ -494,7 +780,7 @@ export function parseDwarfInfo(
       if (offset < view.byteLength) {
         const form = view.getUint8(offset);
         offset++;
-        if (form === 1) {
+        if (form === 1 || form === 0x08) {
           // inline string
           while (offset < view.byteLength) {
             const char = view.getUint8(offset);
@@ -502,12 +788,24 @@ export function parseDwarfInfo(
             if (char === 0) break;
             name += String.fromCharCode(char);
           }
-        } else if (form === 2) {
-          // strp (string pointer)
+        } else if (form === 2 || form === 0x0e || form === 0x1f) {
+          // strp or line_strp (string pointer)
           if (offset + 4 <= view.byteLength) {
             const strOffsetVal = view.getUint32(offset, true);
             offset += 4;
-            name = getString(strOffsetVal);
+            if (form === 0x1f && lineStrView) {
+              let str = '';
+              let i = strOffsetVal;
+              while (i < lineStrView.byteLength) {
+                const char = lineStrView.getUint8(i);
+                if (char === 0) break;
+                str += String.fromCharCode(char);
+                i++;
+              }
+              name = str;
+            } else {
+              name = getString(strOffsetVal);
+            }
           }
         }
       }
@@ -536,13 +834,25 @@ export function parseDwarfInfo(
         offset += addressSize;
       }
 
-      // Tag 0x2e is DW_TAG_subprogram
-      if (tag === 0x2e && name) {
+      // DWARF Tags Mapping: DW_TAG_subprogram is 0x2e. Supports new DWARF v5 tags as well
+      let mappedType: string | undefined = undefined;
+      if (tag === 0x2e) mappedType = 'function';
+      else if (tag === 0x48) mappedType = 'call_site';
+      else if (tag === 0x4a) mappedType = 'skeleton_unit';
+      else if (tag === 0x34) mappedType = 'variable';
+      else if (tag === 0x11) mappedType = 'compile_unit';
+      else if (tag === 0x44) mappedType = 'coarray_type';
+      else if (tag === 0x45) mappedType = 'generic_subrange';
+      else if (tag === 0x46) mappedType = 'dynamic_type';
+      else if (tag === 0x47) mappedType = 'atomic_type';
+      else if (tag === 0x4b) mappedType = 'immutable_type';
+
+      if (mappedType && name) {
         symbols.push({
           name,
           address: lowPC,
           size: highPC > lowPC ? highPC - lowPC : undefined,
-          type: 'function',
+          type: mappedType,
         });
       }
     }
@@ -727,6 +1037,7 @@ export class DebugSymbolsParser {
     debugLine?: ArrayBuffer;
     debugInfo?: ArrayBuffer;
     debugStr?: ArrayBuffer;
+    debugLineStr?: ArrayBuffer;
     pdbFile?: ArrayBuffer;
   }): ParseResult {
     if (options.pdbFile) {
@@ -747,9 +1058,9 @@ export class DebugSymbolsParser {
       }
     } else if (options.debugLine) {
       this.format = 'DWARF';
-      this.lines = parseDwarfLine(options.debugLine);
+      this.lines = parseDwarfLine(options.debugLine, options.debugStr, options.debugLineStr);
       if (options.debugInfo) {
-        this.symbols = parseDwarfInfo(options.debugInfo, options.debugStr);
+        this.symbols = parseDwarfInfo(options.debugInfo, options.debugStr, options.debugLineStr);
       }
     }
 

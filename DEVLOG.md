@@ -1666,3 +1666,107 @@ Test Files   3 failed | 28 passed (31)
   - [vulnPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/vulnPanel.ts)
 - Cleaned up unused `devDependencies` in [package.json](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/package.json): `jest`, `ts-jest`, and `@types/jest`.
 - Ran `pnpm install` and verified all tests pass successfully via `pnpm test`.
+
+## [2026-05-30T19:52:00+10:00] - Dangling Import Verification
+- Verified no remaining references to deleted files: searchView.ts, dependencyGraphView.ts, memoryMapView.ts, vulnPanel.ts.
+- Ran pnpm build successfully, confirming no breakage.
+
+## [2026-05-30 19:53:00] - Fix aiOnDevice totalTokens test
+- Fixed token generation loop in [src/analyzer/aiOnDevice.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/aiOnDevice.ts) to populate totalTokens when tokenCallback is not provided.
+- Verified all tests in [tests/aiOnDevice.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/aiOnDevice.test.ts) pass successfully.
+
+## [2026-05-30T19:54:00+10:00] - Fix WASM and Mach-O Parser Types and Bounds Checking
+- Safe-casted `buffer.buffer as ArrayBuffer` to avoid type errors with `SharedArrayBuffer` when constructing a `DataView`.
+- Refactored `WasmReader` and `MachoParser` constructors to support both `ArrayBuffer` and `Uint8Array` payloads seamlessly.
+- Added strict bounds checking when parsing WASM sections, name sub-sections, endOffset limits, and reading floats.
+- Added strict bounds checking when parsing Mach-O headers, segments, fat slices, load commands, symbols, and null-padded strings.
+- Verified that all 15 parser unit tests in `wasm.test.ts` and `macho.test.ts` pass successfully.
+
+## [2026-05-30T19:55:50+10:00] - Split router.ts into Architecture Decoders
+- Extracted x86 decoder logic to [x86.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/x86.ts)
+- Extracted ARM decoder logic to [arm.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/arm.ts)
+- Extracted WASM decoder logic to [wasm.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/wasm.ts)
+- Extracted Dalvik/DEX decoder logic to [dalvik.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/dalvik.ts)
+- Extracted helper sign-extension utilities to [helpers.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/helpers.ts)
+- Refactored [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts) to delegate to individual modules
+- Verified all 399 unit tests pass successfully
+
+
+## [2026-05-30T19:55:00+10:00] - Session 15: Fix IR and Register Allocation Bugs
+- Fixed BigInt fallback coercion `inst.args[0].value ?? 0` causing mixing in constantFolding and ssaConstantFolding.
+- Fixed Division semantics so that both BigInt and number division truncate toward zero (replaced Math.floor with Math.trunc for numbers).
+- Excluded PHI instructions from blockUses in RegisterAllocator liveness calculation.
+- Implemented RegisterAllocator with spill loads and stores that resolve spilled variables into temporary scratch registers, satisfying x86 constraints.
+- Added new test case in ir.test.ts for RegisterAllocator and spill load/store rewriting.
+- Verified all 18 IR unit tests pass successfully.
+
+## [2026-05-30T19:58:00+10:00] - Split typeSystemPanel.ts into Renderers and Editors
+- Extracted HTML layout and map visualizer to [typeRenderers.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/typeRenderers.ts).
+- Extracted struct creation, deletion, member edits, and C-source parser to [typeEditors.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/typeEditors.ts).
+- Updated [typeSystemPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/typeSystemPanel.ts) to delegate to split helper files.
+- Confirmed unit tests pass in [typeSystem.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/typeSystem.test.ts).
+
+## [2026-05-30T19:59:00+10:00] - Extract Panel Registration and Event Handling
+- Extracted PANEL_REGISTRY to [panelRegistry.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/panelRegistry.ts).
+- Extracted event handling to [panelEvents.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/panelEvents.ts).
+- Integrated helper functions back into [panelCoordinator.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/panelCoordinator.ts).
+- Verified all unit tests continue to pass.
+
+## [2026-05-30T19:59:45+10:00] - High-Fidelity Instruction Decoders
+- Implemented real instruction decoding for x86_64, ARM64, and MIPS inside [capstoneWasm.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/capstoneWasm.ts).
+- Implemented operand parsing (registers, immediates, memory operands) for x86_64, ARM64, and MIPS architectures.
+- Added comprehensive unit tests for MIPS instruction disassembly and operand verification in [capstoneWasm.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/capstoneWasm.test.ts).
+- Fixed a test import bug for `ASTPrinter` in [decompiler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/decompiler.test.ts).
+- Verified all 658 tests in the workspace pass successfully.
+
+
+## [2026-05-30T20:00:20+10:00] AST extraction and refactor
+- Extracted AST node types to [src/disassembler/ast.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ast.ts)
+- Extracted ASTPrinter visitor to [src/disassembler/astPrinter.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/astPrinter.ts)
+- Integrated imports in [src/disassembler/decompiler.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/decompiler.ts)
+- Updated imports in [tests/decompiler.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/decompiler.test.ts)
+- Verified all 658 tests pass successfully.
+
+
+## [2026-05-30T20:02:00+10:00]
+- Added RISC-V instruction decoding support to the disassembler instruction router.
+- Implemented decoder logic for ADDI, SUB, LUI, AUIPC, JAL, JALR, BEQ, BNE, LW, SW standard RISC-V instructions.
+- Added unit tests in tests/router.test.ts to verify correct decoding and architecture routing.
+
+
+## [2026-05-30 20:03] ELF Parser PLT/GOT Resolution
+- Expanded ELF parser in [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts) with PLT and GOT resolution logic.
+- Added comprehensive tests in [elf.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/elf.test.ts) to verify correct parsing of symbols, relocations, GOT entries, and PLT stub resolution.
+- All tests passing successfully.
+
+## [2026-05-30T20:05:00+10:00] - MIPS Instruction Decoding Support
+- Implemented MIPS instruction decoding logic in [mips.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/mips.ts) with support for standard instructions (ADD, ADDU, SUB, SUBU, AND, OR, XOR, NOR, SLT, LW, SW, BEQ, BNE, J, JAL).
+- Integrated MIPS/MIPSEL architecture detection and routing in [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts).
+- Added comprehensive unit tests in [router.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/router.test.ts) to verify architecture auto-detection, instruction decoding, and big/little endian support.
+- Verified all 662 tests pass successfully.
+
+## [2026-05-30 20:03] PE TLS Callback Parsing
+- Added TLS parsing support to [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts).
+- Resolves TLS callback array virtual addresses to relative virtual addresses (RVAs).
+- Added unit tests verifying parsing of TLS structures for both PE32 and PE32+ binaries in [pe.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/pe.test.ts).
+
+
+## [2026-05-30T10:03:00Z] Refactored IR Optimizer & Register Allocator
+- Split [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts) by extracting optimization passes.
+- Created [optimizer.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/optimizer.ts) for \IROptimizer\.
+- Created [registerAllocator.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/registerAllocator.ts) for \RegisterAllocator\.
+- Re-exported classes from [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts).
+- All unit tests in [ir.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/ir.test.ts) pass successfully.
+
+## [2026-05-30 20:04] Mach-O Chained Fixups Parsing Support
+- Added LC_DYLD_CHAINED_FIXUPS (0x80000034) load command parsing to [macho.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/macho.ts).
+- Parsed chained fixups header, imports list, and segment/page starts.
+- Added comprehensive unit tests in [macho.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/macho.test.ts).
+- Verified all tests pass.
+
+## [2026-05-30T20:06:20+10:00] - Subagent Cursor Sync Implement
+- Add SyncCursor interface to [src/network/collab.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/network/collab.ts).
+- Add cursor broadcast protocol and simulation.
+- Draw remote peer cursors dynamically inside [src/ui/collabPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/collabPanel.ts).
+- Add unit tests verifying cursor sync and DOM layout render in [tests/collab.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/collab.test.ts).
+- Run and pass all collab tests.

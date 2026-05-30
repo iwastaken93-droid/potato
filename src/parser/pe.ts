@@ -111,6 +111,11 @@ export interface ParsedResource {
   data: Uint8Array;
 }
 
+export interface ParsedTLS {
+  callbacks: number[];
+  rawAddressOfCallbacks: bigint | number;
+}
+
 export interface ParsedPE {
   is32Bit: boolean;
   dosHeader: DosHeader;
@@ -125,6 +130,7 @@ export interface ParsedPE {
     icons: { type: number | string; size: number; offset: number }[];
     all: ParsedResource[];
   };
+  tls?: ParsedTLS;
 }
 
 export class PEParser {
@@ -772,6 +778,65 @@ export class PEParser {
       }
     }
 
+    // 9. Parse TLS (Directory 9)
+    let tls: ParsedTLS | undefined;
+    if (dataDirectories.length > 9 && dataDirectories[9].virtualAddress !== 0) {
+      const tlsDirRva = dataDirectories[9].virtualAddress;
+      const tlsDirOffset = rvaToOffset(tlsDirRva);
+
+      if (
+        tlsDirOffset !== 0 &&
+        tlsDirOffset + (is32Bit ? 24 : 40) <= this.view.byteLength
+      ) {
+        let rawAddressOfCallbacks: bigint | number;
+        if (is32Bit) {
+          rawAddressOfCallbacks = this.view.getUint32(tlsDirOffset + 12, true);
+        } else {
+          rawAddressOfCallbacks = this.view.getBigUint64(tlsDirOffset + 24, true);
+        }
+
+        const callbacks: number[] = [];
+        if (rawAddressOfCallbacks !== 0 && rawAddressOfCallbacks !== 0n) {
+          const callbacksRva =
+            typeof imageBase === 'bigint'
+              ? Number(BigInt(rawAddressOfCallbacks) - imageBase)
+              : Number(rawAddressOfCallbacks) - (imageBase as number);
+
+          let thunkOffset = rvaToOffset(callbacksRva);
+          if (thunkOffset !== 0) {
+            if (is32Bit) {
+              while (thunkOffset + 4 <= this.view.byteLength) {
+                const val = this.view.getUint32(thunkOffset, true);
+                if (val === 0) break;
+                const callbackRva =
+                  typeof imageBase === 'bigint'
+                    ? Number(BigInt(val) - imageBase)
+                    : Number(val) - (imageBase as number);
+                callbacks.push(callbackRva);
+                thunkOffset += 4;
+              }
+            } else {
+              while (thunkOffset + 8 <= this.view.byteLength) {
+                const val = this.view.getBigUint64(thunkOffset, true);
+                if (val === 0n) break;
+                const callbackRva =
+                  typeof imageBase === 'bigint'
+                    ? Number(val - imageBase)
+                    : Number(val) - (imageBase as number);
+                callbacks.push(callbackRva);
+                thunkOffset += 8;
+              }
+            }
+          }
+        }
+
+        tls = {
+          callbacks,
+          rawAddressOfCallbacks,
+        };
+      }
+    }
+
     return {
       is32Bit,
       dosHeader,
@@ -781,6 +846,7 @@ export class PEParser {
       imports,
       exports,
       resources,
+      tls,
     };
   }
 }

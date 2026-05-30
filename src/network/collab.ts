@@ -7,11 +7,21 @@
  * Supports configurable simulated latency and multi-client synchronization.
  */
 
+export interface SyncCursor {
+  peerId: string;
+  peerName: string;
+  color: string;
+  address: number;
+  view: 'assembly' | 'hex' | 'decompiler';
+  timestamp: number;
+}
+
 export interface Peer {
   id: string;
   name: string;
   color: string;
   status: 'connected' | 'idle' | 'disconnected';
+  cursor?: SyncCursor;
 }
 
 export interface SyncComment {
@@ -41,6 +51,7 @@ type PeerCallback = (peers: Peer[]) => void;
 type CommentCallback = (data: SyncComment) => void;
 type HighlightCallback = (data: SyncHighlight) => void;
 type RenameCallback = (data: SyncRename) => void;
+type CursorCallback = (data: SyncCursor) => void;
 
 // Simple diff utility to identify edits between two strings
 export function computeStringDiff(
@@ -261,6 +272,7 @@ export class CollabEngine {
   > = new Map();
   private renames: Map<string, SyncRename & { clock: number; client: string }> =
     new Map();
+  private cursors: Map<string, SyncCursor> = new Map();
 
   private lamportClock: number = 0;
   private latencyMs: number = 0;
@@ -278,6 +290,7 @@ export class CollabEngine {
   private onCommentCallbacks: Set<CommentCallback> = new Set();
   private onHighlightCallbacks: Set<HighlightCallback> = new Set();
   private onRenameCallbacks: Set<RenameCallback> = new Set();
+  private onCursorCallbacks: Set<CursorCallback> = new Set();
 
   private simulationInterval: any = null;
 
@@ -351,6 +364,10 @@ export class CollabEngine {
     return result;
   }
 
+  public getCursors(): Map<string, SyncCursor> {
+    return new Map(this.cursors);
+  }
+
   // Event subscription
   public subscribeConnectionState(cb: ConnectionStateCallback): () => void {
     this.onConnectionStateCallbacks.add(cb);
@@ -377,6 +394,11 @@ export class CollabEngine {
     return () => this.onRenameCallbacks.delete(cb);
   }
 
+  public subscribeCursor(cb: CursorCallback): () => void {
+    this.onCursorCallbacks.add(cb);
+    return () => this.onCursorCallbacks.delete(cb);
+  }
+
   /**
    * Get full serialized state of all CRDT structures.
    */
@@ -387,10 +409,12 @@ export class CollabEngine {
     }
     const serializedHighlights = Array.from(this.highlights.entries());
     const serializedRenames = Array.from(this.renames.entries());
+    const serializedCursors = Array.from(this.cursors.entries());
     return {
       comments: serializedComments,
       highlights: serializedHighlights,
       renames: serializedRenames,
+      cursors: serializedCursors,
       lamportClock: this.lamportClock,
     };
   }
@@ -402,6 +426,16 @@ export class CollabEngine {
     if (!state) return;
     if (state.lamportClock && state.lamportClock > this.lamportClock) {
       this.lamportClock = state.lamportClock;
+    }
+    if (state.cursors) {
+      for (const [peerId, stateData] of state.cursors) {
+        this.cursors.set(peerId, stateData);
+        const peer = this.peers.find((p) => p.id === peerId);
+        if (peer) {
+          peer.cursor = stateData;
+        }
+        this.notifyCursor(stateData);
+      }
     }
     if (state.comments) {
       for (const entry of state.comments) {
@@ -797,6 +831,46 @@ export class CollabEngine {
     }
   }
 
+  public sendCursor(
+    address: number,
+    view: 'assembly' | 'hex' | 'decompiler'
+  ): void {
+    if (!this.connected) return;
+
+    const state: SyncCursor = {
+      peerId: this.username,
+      peerName: this.username,
+      color: '#8B5CF6',
+      address,
+      view,
+      timestamp: Date.now(),
+    };
+
+    this.cursors.set(this.username, state);
+    this.notifyCursor(state);
+
+    const message = {
+      type: 'cursor_op',
+      state,
+    };
+
+    if (this.ws) {
+      this.sendWebSocketMessage(message);
+    } else {
+      MockNetworkBroker.broadcast(this.roomName, this, message, this.latencyMs);
+    }
+  }
+
+  private notifyCursor(data: SyncCursor): void {
+    for (const cb of this.onCursorCallbacks) {
+      try {
+        cb(data);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+
   /**
    * Receive and process a message from another peer.
    */
@@ -813,6 +887,7 @@ export class CollabEngine {
       }
       case 'peer_leave': {
         this.peers = this.peers.filter((p) => p.id !== msg.peerId);
+        this.cursors.delete(msg.peerId);
         this.notifyPeers();
         break;
       }
@@ -876,6 +951,16 @@ export class CollabEngine {
         }
         break;
       }
+      case 'cursor_op': {
+        const { state } = msg;
+        this.cursors.set(state.peerId, state);
+        const peer = this.peers.find((p) => p.id === state.peerId);
+        if (peer) {
+          peer.cursor = state;
+        }
+        this.notifyCursor(state);
+        break;
+      }
     }
   }
 
@@ -891,6 +976,7 @@ export class CollabEngine {
       'rename',
       'peer_join',
       'peer_leave',
+      'cursor',
     ];
     const action = actions[Math.floor(Math.random() * actions.length)];
     const mockPeers = this.peers.filter((p) => p.status === 'connected');
@@ -990,6 +1076,29 @@ export class CollabEngine {
             timestamp: Date.now(),
             clock: this.lamportClock,
             client: randomPeer.name,
+          },
+        });
+        break;
+      }
+      case 'cursor': {
+        const addresses = [0x1000, 0x1020, 0x1044, 0x2010, 0x3000];
+        const address = addresses[Math.floor(Math.random() * addresses.length)];
+        const views: Array<'assembly' | 'hex' | 'decompiler'> = [
+          'assembly',
+          'decompiler',
+          'hex',
+        ];
+        const view = views[Math.floor(Math.random() * views.length)];
+
+        this.receiveMessage({
+          type: 'cursor_op',
+          state: {
+            peerId: randomPeer.id,
+            peerName: randomPeer.name,
+            color: randomPeer.color,
+            address,
+            view,
+            timestamp: Date.now(),
           },
         });
         break;

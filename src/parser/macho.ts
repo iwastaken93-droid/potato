@@ -91,6 +91,7 @@ const LC_NAMES: Record<number, string> = {
   0x30: 'LC_VERSION_MIN_WATCHOS',
   0x31: 'LC_NOTE',
   0x32: 'LC_BUILD_VERSION',
+  [0x34 | 0x80000000]: 'LC_DYLD_CHAINED_FIXUPS',
 };
 
 export interface MachoHeader {
@@ -163,6 +164,40 @@ export interface FatArch {
   align: number;
 }
 
+export interface MachoChainedFixupsHeader {
+  fixupsVersion: number;
+  startsOffset: number;
+  importsOffset: number;
+  symbolsOffset: number;
+  importsCount: number;
+  importsFormat: number;
+  symbolsFormat: number;
+}
+
+export interface MachoChainedImport {
+  libOrdinal: number;
+  weakImport: boolean;
+  nameOffset: number;
+  name: string;
+  addend?: bigint | number;
+}
+
+export interface MachoChainedStartsInSegment {
+  size: number;
+  pageSize: number;
+  pointerFormat: number;
+  segmentOffset: bigint | number;
+  maxValidPointer: number;
+  pageCount: number;
+  pageStarts: number[];
+}
+
+export interface MachoChainedFixups {
+  header: MachoChainedFixupsHeader;
+  imports: MachoChainedImport[];
+  segments: MachoChainedStartsInSegment[];
+}
+
 export interface ParsedMacho {
   is64Bit: boolean;
   isLittleEndian: boolean;
@@ -172,6 +207,7 @@ export interface ParsedMacho {
   sections: MachoSection[];
   symbols: MachoSymbol[];
   fatArches?: FatArch[];
+  chainedFixups?: MachoChainedFixups;
 }
 
 export interface MachoParserOptions {
@@ -183,10 +219,20 @@ export class MachoParser {
   private view: DataView;
   private bytes: Uint8Array;
 
-  constructor(buffer: ArrayBuffer) {
-    this.buffer = buffer;
-    this.view = new DataView(buffer);
-    this.bytes = new Uint8Array(buffer);
+  constructor(buffer: ArrayBuffer | Uint8Array) {
+    if (buffer instanceof Uint8Array) {
+      this.buffer = buffer.buffer as ArrayBuffer;
+      this.view = new DataView(
+        buffer.buffer as ArrayBuffer,
+        buffer.byteOffset,
+        buffer.byteLength
+      );
+      this.bytes = buffer;
+    } else {
+      this.buffer = buffer;
+      this.view = new DataView(buffer);
+      this.bytes = new Uint8Array(buffer);
+    }
   }
 
   public parse(options: MachoParserOptions = {}): ParsedMacho {
@@ -210,6 +256,13 @@ export class MachoParser {
       }
 
       const arch = fatArches[sliceIndex];
+      if (
+        arch.offset < 0 ||
+        arch.size < 0 ||
+        arch.offset + arch.size > this.buffer.byteLength
+      ) {
+        throw new Error('Fat architecture offset/size out of bounds');
+      }
       const slicedBuffer = this.buffer.slice(
         arch.offset,
         arch.offset + arch.size
@@ -246,6 +299,7 @@ export class MachoParser {
     const segments: MachoSegment[] = [];
     const sections: MachoSection[] = [];
     let symbols: MachoSymbol[] = [];
+    let chainedFixups: MachoChainedFixups | undefined = undefined;
 
     // Parse Load Commands
     let offset = is64Bit ? 32 : 28;
@@ -257,11 +311,11 @@ export class MachoParser {
       const cmd = this.view.getUint32(offset, isLittleEndian);
       const cmdsize = this.view.getUint32(offset + 4, isLittleEndian);
 
-      if (offset + cmdsize > this.buffer.byteLength) {
+      if (cmdsize < 8 || offset + cmdsize > this.buffer.byteLength) {
         break;
       }
 
-      const cmdName = LC_NAMES[cmd] || `LC_UNKNOWN_0x${cmd.toString(16)}`;
+      const cmdName = LC_NAMES[cmd] || LC_NAMES[cmd | 0] || `LC_UNKNOWN_0x${cmd.toString(16)}`;
       const payload: any = {};
 
       if (cmd === 0x1 || cmd === 0x19) {
@@ -291,6 +345,19 @@ export class MachoParser {
           isLittleEndian,
           sections
         );
+      } else if (cmd === 0x80000034) {
+        // LC_DYLD_CHAINED_FIXUPS
+        payload.dataoff = this.view.getUint32(offset + 8, isLittleEndian);
+        payload.datasize = this.view.getUint32(offset + 12, isLittleEndian);
+        try {
+          chainedFixups = this.parseChainedFixups(
+            payload.dataoff,
+            payload.datasize,
+            isLittleEndian
+          );
+        } catch (e) {
+          // ignore or handle gracefully
+        }
       }
 
       loadCommands.push({
@@ -311,10 +378,178 @@ export class MachoParser {
       segments,
       sections,
       symbols,
+      ...(chainedFixups !== undefined ? { chainedFixups } : {}),
+    };
+  }
+
+  private parseChainedFixups(
+    dataoff: number,
+    datasize: number,
+    isLittleEndian: boolean
+  ): MachoChainedFixups {
+    if (dataoff <= 0 || dataoff + datasize > this.buffer.byteLength) {
+      throw new Error('Chained fixups offset/size out of bounds');
+    }
+
+    if (datasize < 28) {
+      throw new Error('Chained fixups data too small for header');
+    }
+
+    const fixupsVersion = this.view.getUint32(dataoff, isLittleEndian);
+    const startsOffset = this.view.getUint32(dataoff + 4, isLittleEndian);
+    const importsOffset = this.view.getUint32(dataoff + 8, isLittleEndian);
+    const symbolsOffset = this.view.getUint32(dataoff + 12, isLittleEndian);
+    const importsCount = this.view.getUint32(dataoff + 16, isLittleEndian);
+    const importsFormat = this.view.getUint32(dataoff + 20, isLittleEndian);
+    const symbolsFormat = this.view.getUint32(dataoff + 24, isLittleEndian);
+
+    const header: MachoChainedFixupsHeader = {
+      fixupsVersion,
+      startsOffset,
+      importsOffset,
+      symbolsOffset,
+      importsCount,
+      importsFormat,
+      symbolsFormat,
+    };
+
+    const imports: MachoChainedImport[] = [];
+    if (importsCount > 0 && importsOffset > 0) {
+      let currentOffset = dataoff + importsOffset;
+      for (let i = 0; i < importsCount; i++) {
+        let libOrdinal = 0;
+        let weakImport = false;
+        let nameOffset = 0;
+        let addend: bigint | number | undefined = undefined;
+
+        if (importsFormat === 1) {
+          if (currentOffset + 4 > dataoff + datasize) break;
+          const val = this.view.getUint32(currentOffset, isLittleEndian);
+          libOrdinal = val & 0xff;
+          weakImport = ((val >> 8) & 1) === 1;
+          nameOffset = (val >> 9) & 0x7fffff;
+          currentOffset += 4;
+        } else if (importsFormat === 2) {
+          if (currentOffset + 8 > dataoff + datasize) break;
+          const val = this.view.getUint32(currentOffset, isLittleEndian);
+          libOrdinal = val & 0xff;
+          weakImport = ((val >> 8) & 1) === 1;
+          nameOffset = (val >> 9) & 0x7fffff;
+          addend = this.view.getInt32(currentOffset + 4, isLittleEndian);
+          currentOffset += 8;
+        } else if (importsFormat === 3) {
+          if (currentOffset + 16 > dataoff + datasize) break;
+          const valLow = this.view.getUint32(currentOffset, isLittleEndian);
+          const valHigh = this.view.getUint32(currentOffset + 4, isLittleEndian);
+          libOrdinal = valLow & 0xffff;
+          weakImport = ((valLow >> 16) & 1) === 1;
+          nameOffset = valHigh;
+          addend = this.view.getBigInt64(currentOffset + 8, isLittleEndian);
+          currentOffset += 16;
+        } else {
+          break;
+        }
+
+        let name = '';
+        if (symbolsOffset > 0 && nameOffset >= 0) {
+          const symNameOffset = dataoff + symbolsOffset + nameOffset;
+          if (symNameOffset < this.buffer.byteLength) {
+            for (let j = symNameOffset; j < this.buffer.byteLength; j++) {
+              if (this.bytes[j] === 0) {
+                break;
+              }
+              name += String.fromCharCode(this.bytes[j]);
+            }
+          }
+        }
+
+        imports.push({
+          libOrdinal,
+          weakImport,
+          nameOffset,
+          name,
+          ...(addend !== undefined ? { addend } : {}),
+        });
+      }
+    }
+
+    const segments: MachoChainedStartsInSegment[] = [];
+    if (startsOffset > 0) {
+      const startsInImageOffset = dataoff + startsOffset;
+      if (startsInImageOffset + 4 <= dataoff + datasize) {
+        const segCount = this.view.getUint32(startsInImageOffset, isLittleEndian);
+        if (startsInImageOffset + 4 + segCount * 4 <= dataoff + datasize) {
+          for (let i = 0; i < segCount; i++) {
+            const segInfoOffset = this.view.getUint32(
+              startsInImageOffset + 4 + i * 4,
+              isLittleEndian
+            );
+            if (segInfoOffset === 0) {
+              continue;
+            }
+
+            const segmentStartsOffset = startsInImageOffset + segInfoOffset;
+            if (segmentStartsOffset + 22 <= dataoff + datasize) {
+              const size = this.view.getUint32(segmentStartsOffset, isLittleEndian);
+              const pageSize = this.view.getUint16(
+                segmentStartsOffset + 4,
+                isLittleEndian
+              );
+              const pointerFormat = this.view.getUint16(
+                segmentStartsOffset + 6,
+                isLittleEndian
+              );
+              const segmentOffset = this.view.getBigUint64(
+                segmentStartsOffset + 8,
+                isLittleEndian
+              );
+              const maxValidPointer = this.view.getUint32(
+                segmentStartsOffset + 16,
+                isLittleEndian
+              );
+              const pageCount = this.view.getUint16(
+                segmentStartsOffset + 20,
+                isLittleEndian
+              );
+
+              const pageStarts: number[] = [];
+              if (segmentStartsOffset + 22 + pageCount * 2 <= dataoff + datasize) {
+                for (let p = 0; p < pageCount; p++) {
+                  pageStarts.push(
+                    this.view.getUint16(
+                      segmentStartsOffset + 22 + p * 2,
+                      isLittleEndian
+                    )
+                  );
+                }
+              }
+
+              segments.push({
+                size,
+                pageSize,
+                pointerFormat,
+                segmentOffset,
+                maxValidPointer,
+                pageCount,
+                pageStarts,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      header,
+      imports,
+      segments,
     };
   }
 
   private parseFatHeader(isLittleEndian: boolean): FatArch[] {
+    if (this.buffer.byteLength < 8) {
+      throw new Error('File too small to contain Fat header');
+    }
     const nfat_arch = this.view.getUint32(4, isLittleEndian);
     const arches: FatArch[] = [];
     let offset = 8;
@@ -346,6 +581,10 @@ export class MachoParser {
   }
 
   private parseHeader(is64Bit: boolean, isLittleEndian: boolean): MachoHeader {
+    const minHeaderSize = is64Bit ? 32 : 28;
+    if (this.buffer.byteLength < minHeaderSize) {
+      throw new Error('File too small to contain Mach-O header');
+    }
     const magic = this.view.getUint32(0, isLittleEndian);
     const cputype = this.view.getInt32(4, isLittleEndian);
     const cpusubtype = this.view.getInt32(8, isLittleEndian);
@@ -384,6 +623,10 @@ export class MachoParser {
     isLittleEndian: boolean
   ): MachoSegment {
     const cmdName = cmd === 0x19 ? 'LC_SEGMENT_64' : 'LC_SEGMENT';
+    const minHeaderSize = cmd === 0x19 ? 72 : 56;
+    if (cmdsize < minHeaderSize || offset + minHeaderSize > this.buffer.byteLength) {
+      throw new Error(`Malformed segment command size: ${cmdsize}`);
+    }
     const segname = this.readNullPaddedString(offset + 8, 16);
 
     let vmaddr: bigint | number;
@@ -511,6 +754,13 @@ export class MachoParser {
     const symbols: MachoSymbol[] = [];
     const entrySize = is64Bit ? 16 : 12;
 
+    if (symoff < 0 || symoff > this.buffer.byteLength) {
+      return [];
+    }
+    if (stroff < 0 || stroff > this.buffer.byteLength) {
+      return [];
+    }
+
     for (let i = 0; i < nsyms; i++) {
       const offset = symoff + i * entrySize;
       if (offset + entrySize > this.buffer.byteLength) {
@@ -594,6 +844,9 @@ export class MachoParser {
   private readNullPaddedString(offset: number, maxLength: number): string {
     let result = '';
     for (let i = 0; i < maxLength; i++) {
+      if (offset + i >= this.buffer.byteLength) {
+        break;
+      }
       const charCode = this.view.getUint8(offset + i);
       if (charCode === 0) {
         break;
@@ -605,7 +858,7 @@ export class MachoParser {
 }
 
 export function parseMacho(
-  buffer: ArrayBuffer,
+  buffer: ArrayBuffer | Uint8Array,
   options?: MachoParserOptions
 ): ParsedMacho {
   const parser = new MachoParser(buffer);

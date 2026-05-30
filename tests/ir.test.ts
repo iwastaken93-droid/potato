@@ -6,6 +6,7 @@ import {
   SSABuilder,
   IROptimizer,
   IROp,
+  RegisterAllocator,
 } from '../src/disassembler/ir.js';
 
 describe('IR/SSA Framework Unit Tests', () => {
@@ -1235,6 +1236,79 @@ describe('IR/SSA Framework Unit Tests', () => {
 
     expect(allocB1.instructions[0].dest?.type).toBe('reg');
     expect(allocB1.instructions[0].dest?.name).toBe(mapping.get('x_0'));
+  });
+
+  it('should allocate registers and rewrite spilled variables with spill loads/stores satisfying x86 constraints', () => {
+    const translator = new IRTranslator();
+    const allocator = new RegisterAllocator();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        instructions: [
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1005,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // x_0 = 10
+    b1.instructions[0].op = IROp.MOV;
+    b1.instructions[0].dest = { type: 'var', name: 'x', version: 0 };
+    b1.instructions[0].args = [{ type: 'imm', value: 10 }];
+
+    // y_0 = x_0 + 5 (both x_0 and y_0 will be spilled if we allocate with 0 available registers)
+    b1.instructions[1].op = IROp.ADD;
+    b1.instructions[1].dest = { type: 'var', name: 'y', version: 0 };
+    b1.instructions[1].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'imm', value: 5 },
+    ];
+
+    // Allocate with 0 registers to force everything to spill
+    const allocation = allocator.allocate(irCfg, []);
+    expect(allocation.get('x_0')?.startsWith('[rsp+')).toBe(true);
+    expect(allocation.get('y_0')?.startsWith('[rsp+')).toBe(true);
+
+    const rewrittenCfg = allocator.rewrite(irCfg, allocation);
+    const rewrittenB1 = rewrittenCfg.blocks.get('block_1')!;
+
+    // Check that we inserted LOAD and STORE instructions and didn't generate invalid memory-memory operands
+    // Instruction 0 (MOV) dest was x_0 (spilled). It should write to a scratch register and then STORE to memory.
+    // Instruction 1 (ADD) args had x_0 (spilled) and dest was y_0 (spilled).
+    // It should: LOAD x_0 into scratch, ADD, then STORE result to y_0 memory.
+    const ops = rewrittenB1.instructions.map(inst => inst.op);
+    expect(ops).toContain(IROp.LOAD);
+    expect(ops).toContain(IROp.STORE);
+
+    // Verify each instruction has at most one memory operand (x86 constraint)
+    for (const inst of rewrittenB1.instructions) {
+      let memCount = 0;
+      if (inst.dest?.type === 'mem') memCount++;
+      for (const arg of inst.args) {
+        if (arg.type === 'mem') memCount++;
+      }
+      expect(memCount).toBeLessThanOrEqual(1);
+    }
   });
 });
 

@@ -821,4 +821,205 @@ describe('DisassemblerRouter Unit Tests', () => {
       expect(insts[0].opStr).toBe('0x26, 0x01, 0x05');
     });
   });
+
+  describe('MIPS Routing and Decoding', () => {
+    it('should detect MIPS big-endian and little-endian format by ELF e_machine and endian field', () => {
+      const dataBE = new Uint8Array(64);
+      dataBE[0] = 0x7f;
+      dataBE[1] = 0x45;
+      dataBE[2] = 0x4c;
+      dataBE[3] = 0x46; // ELF magic
+      dataBE[4] = 1;    // 32-bit
+      dataBE[5] = 2;    // Big Endian
+      dataBE[18] = 8;   // EM_MIPS
+      dataBE[19] = 0;
+
+      const archBE = DisassemblerRouter.detectArchitecture(dataBE);
+      expect(archBE).toBe('mips');
+
+      const dataLE = new Uint8Array(64);
+      dataLE[0] = 0x7f;
+      dataLE[1] = 0x45;
+      dataLE[2] = 0x4c;
+      dataLE[3] = 0x46; // ELF magic
+      dataLE[4] = 1;    // 32-bit
+      dataLE[5] = 1;    // Little Endian
+      dataLE[18] = 8;   // EM_MIPS
+      dataLE[19] = 0;
+
+      const archLE = DisassemblerRouter.detectArchitecture(dataLE);
+      expect(archLE).toBe('mipsel');
+    });
+
+    it('should decode standard MIPS instructions correctly', () => {
+      const router = new DisassemblerRouter();
+      const data = new Uint8Array([
+        // add $s0, $s1, $s2
+        0x02, 0x32, 0x80, 0x20,
+        // subu $t0, $t1, $t2
+        0x01, 0x2a, 0x40, 0x23,
+        // and $t3, $t4, $t5
+        0x01, 0x8d, 0x58, 0x24,
+        // or $t6, $t7, $s0
+        0x01, 0xf0, 0x70, 0x25,
+        // xor $s1, $t8, $t9
+        0x03, 0x19, 0x88, 0x26,
+        // nor $s2, $s3, $s4
+        0x02, 0x74, 0x90, 0x27,
+        // slt $s5, $s6, $s7
+        0x02, 0xd7, 0xa8, 0x2a,
+        // lw $t0, 4($s0)
+        0x8e, 0x08, 0x00, 0x04,
+        // sw $t1, -8($sp)
+        0xaf, 0xa9, 0xff, 0xf8,
+        // beq $s0, $s1, -4 (PC = 0x24, next PC = 0x28, target = 0x28 - 16 = 0x18)
+        0x12, 0x11, 0xff, 0xfc,
+        // bne $s2, $s3, 8 (PC = 0x28, next PC = 0x2c, target = 0x2c + 32 = 0x4c)
+        0x16, 0x53, 0x00, 0x08,
+        // j 0x0012345 (PC = 0x2c, next PC = 0x30, target = (0x30 & 0xf0000000) | (0x0012345 << 2) = 0x00048d14)
+        0x08, 0x00, 0x48, 0xd1,
+        // jal 0x0012345
+        0x0c, 0x00, 0x48, 0xd1
+      ]);
+
+      const insts = router.disassemble(data, { arch: 'mips', baseAddress: 0 });
+
+      expect(insts.length).toBe(13);
+
+      expect(insts[0].mnemonic).toBe('add');
+      expect(insts[0].opStr).toBe('$s0, $s1, $s2');
+      expect(insts[0].operands[0]).toEqual({ type: 'reg', reg: '$s0', access: 'w' });
+
+      expect(insts[1].mnemonic).toBe('subu');
+      expect(insts[1].opStr).toBe('$t0, $t1, $t2');
+
+      expect(insts[2].mnemonic).toBe('and');
+      expect(insts[2].opStr).toBe('$t3, $t4, $t5');
+
+      expect(insts[3].mnemonic).toBe('or');
+      expect(insts[3].opStr).toBe('$t6, $t7, $s0');
+
+      expect(insts[4].mnemonic).toBe('xor');
+      expect(insts[4].opStr).toBe('$s1, $t8, $t9');
+
+      expect(insts[5].mnemonic).toBe('nor');
+      expect(insts[5].opStr).toBe('$s2, $s3, $s4');
+
+      expect(insts[6].mnemonic).toBe('slt');
+      expect(insts[6].opStr).toBe('$s5, $s6, $s7');
+
+      expect(insts[7].mnemonic).toBe('lw');
+      expect(insts[7].opStr).toBe('$t0, 4($s0)');
+      expect(insts[7].operands[1].mem).toEqual({ base: '$s0', disp: 4 });
+
+      expect(insts[8].mnemonic).toBe('sw');
+      expect(insts[8].opStr).toBe('$t1, -8($sp)');
+      expect(insts[8].operands[1].mem).toEqual({ base: '$sp', disp: -8 });
+
+      // beq: PC = 0x24. target = 0x28 + (-4 * 4) = 0x18
+      expect(insts[9].mnemonic).toBe('beq');
+      expect(insts[9].opStr).toBe('$s0, $s1, 0x18');
+      expect(insts[9].operands[2].imm).toBe(0x18);
+
+      // bne: PC = 0x28. target = 0x2c + (8 * 4) = 0x4c
+      expect(insts[10].mnemonic).toBe('bne');
+      expect(insts[10].opStr).toBe('$s2, $s3, 0x4c');
+
+      // j: PC = 0x2c. Target address = 0x12344
+      expect(insts[11].mnemonic).toBe('j');
+      expect(insts[11].opStr).toBe('0x12344');
+
+      // jal: PC = 0x30. Target address = 0x12344
+      expect(insts[12].mnemonic).toBe('jal');
+      expect(insts[12].opStr).toBe('0x12344');
+    });
+
+    it('should decode MIPS instructions in little-endian correctly', () => {
+      const router = new DisassemblerRouter();
+      // add $s0, $s1, $s2 in little endian:
+      // Big-endian: 0x02328020 -> Bytes: 0x20, 0x80, 0x32, 0x02
+      const data = new Uint8Array([0x20, 0x80, 0x32, 0x02]);
+      const insts = router.disassemble(data, { arch: 'mipsel', baseAddress: 0x1000 });
+      expect(insts.length).toBe(1);
+      expect(insts[0].mnemonic).toBe('add');
+      expect(insts[0].opStr).toBe('$s0, $s1, $s2');
+      expect(insts[0].address).toBe(0x1000);
+    });
+  });
+
+  describe('PPC Routing and Decoding', () => {
+    it('should detect PPC format by ELF e_machine', () => {
+      const data = new Uint8Array(64);
+      data[0] = 0x7f;
+      data[1] = 0x45;
+      data[2] = 0x4c;
+      data[3] = 0x46; // ELF magic
+      data[4] = 1;
+      data[5] = 2;
+      data[18] = 20;  // EM_PPC
+      data[19] = 0;
+
+      const arch = DisassemblerRouter.detectArchitecture(data);
+      expect(arch).toBe('ppc');
+    });
+
+    it('should decode standard PPC instructions correctly', () => {
+      const router = new DisassemblerRouter();
+      const data = new Uint8Array([
+        // add r3, r4, r5
+        0x7c, 0x64, 0x2a, 0x14,
+        // addi r3, r4, 10
+        0x38, 0x64, 0x00, 0x0a,
+        // subf r3, r4, r5
+        0x7c, 0x64, 0x28, 0x50,
+        // lwz r3, 16(r4)
+        0x80, 0x64, 0x00, 0x10,
+        // stw r3, 20(r4)
+        0x90, 0x64, 0x00, 0x14,
+        // b 0x10 (offset 16 from PC=20)
+        0x48, 0x00, 0x00, 0x10,
+        // bc 12, 2, 0x10 (at PC=24, offset -4)
+        0x41, 0x82, 0xff, 0xfc,
+        // cmpw r3, r4
+        0x7c, 0x03, 0x20, 0x00
+      ]);
+
+      const insts = router.disassemble(data, { arch: 'ppc', baseAddress: 0 });
+
+      expect(insts.length).toBe(8);
+
+      expect(insts[0].mnemonic).toBe('add');
+      expect(insts[0].opStr).toBe('r3, r4, r5');
+      expect(insts[0].operands[0]).toEqual({ type: 'reg', reg: 'r3' });
+      expect(insts[0].operands[1]).toEqual({ type: 'reg', reg: 'r4' });
+      expect(insts[0].operands[2]).toEqual({ type: 'reg', reg: 'r5' });
+
+      expect(insts[1].mnemonic).toBe('addi');
+      expect(insts[1].opStr).toBe('r3, r4, 10');
+      expect(insts[1].operands[2]).toEqual({ type: 'imm', imm: 10 });
+
+      expect(insts[2].mnemonic).toBe('subf');
+      expect(insts[2].opStr).toBe('r3, r4, r5');
+
+      expect(insts[3].mnemonic).toBe('lwz');
+      expect(insts[3].opStr).toBe('r3, 16(r4)');
+      expect(insts[3].operands[1].mem).toEqual({ base: 'r4', disp: 16 });
+
+      expect(insts[4].mnemonic).toBe('stw');
+      expect(insts[4].opStr).toBe('r3, 20(r4)');
+      expect(insts[4].operands[1].mem).toEqual({ base: 'r4', disp: 20 });
+
+      expect(insts[5].mnemonic).toBe('b');
+      expect(insts[5].opStr).toBe('0x24');
+      expect(insts[5].operands[0]).toEqual({ type: 'imm', imm: 36 });
+
+      // PC at instruction 6 is 24. Offset is -4. Target is 20.
+      expect(insts[6].mnemonic).toBe('bc');
+      expect(insts[6].opStr).toBe('12, 2, 0x14');
+      expect(insts[6].operands[2]).toEqual({ type: 'imm', imm: 20 });
+
+      expect(insts[7].mnemonic).toBe('cmpw');
+      expect(insts[7].opStr).toBe('r3, r4');
+    });
+  });
 });

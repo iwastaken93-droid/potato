@@ -111,12 +111,75 @@ describe('CapstoneWasmEngine Unit Tests', () => {
     expect(insts[2].size).toBe(4);
   });
 
-  it('should fallback for other architectures', () => {
+  it('should disassemble mips instructions correctly when loaded', () => {
     const engine = new CapstoneWasmEngine('mips', '32');
     engine.loadSync();
 
-    const data = new Uint8Array([0x12, 0x34]);
+    // MIPS Big-Endian instructions:
+    // 0x00000000 -> nop
+    // 0x012a4020 -> add t0, s1, t2
+    // 0x21290005 -> addiu t1, t1, 5
+    // 0x8d080004 -> lw t0, 4(t0)
+    // 0x03e00008 -> jr ra
+    const data = new Uint8Array([
+      0x00, 0x00, 0x00, 0x00,
+      0x02, 0x2a, 0x40, 0x20,
+      0x21, 0x29, 0x00, 0x05,
+      0x8d, 0x08, 0x00, 0x04,
+      0x03, 0xe0, 0x00, 0x08,
+    ]);
+
     const insts = engine.disassemble(data, 0x3000);
+    expect(insts.length).toBe(5);
+
+    expect(insts[0].address).toBe(0x3000);
+    expect(insts[0].mnemonic).toBe('nop');
+    expect(insts[0].size).toBe(4);
+
+    expect(insts[1].address).toBe(0x3004);
+    expect(insts[1].mnemonic).toBe('add');
+    expect(insts[1].opStr).toBe('t0, s1, t2');
+    expect(insts[1].operands).toEqual([
+      { type: 'reg', reg: 't0' },
+      { type: 'reg', reg: 's1' },
+      { type: 'reg', reg: 't2' },
+    ]);
+    expect(insts[1].size).toBe(4);
+
+    expect(insts[2].address).toBe(0x3008);
+    expect(insts[2].mnemonic).toBe('addi');
+    expect(insts[2].opStr).toBe('t1, t1, 5');
+    expect(insts[2].operands).toEqual([
+      { type: 'reg', reg: 't1' },
+      { type: 'reg', reg: 't1' },
+      { type: 'imm', imm: 5 },
+    ]);
+    expect(insts[2].size).toBe(4);
+
+    expect(insts[3].address).toBe(0x300c);
+    expect(insts[3].mnemonic).toBe('lw');
+    expect(insts[3].opStr).toBe('t0, 4(t0)');
+    expect(insts[3].operands).toEqual([
+      { type: 'reg', reg: 't0' },
+      { type: 'mem', mem: { base: 't0', disp: 4 } },
+    ]);
+    expect(insts[3].size).toBe(4);
+
+    expect(insts[4].address).toBe(0x3010);
+    expect(insts[4].mnemonic).toBe('jr');
+    expect(insts[4].opStr).toBe('ra');
+    expect(insts[4].operands).toEqual([
+      { type: 'reg', reg: 'ra' },
+    ]);
+    expect(insts[4].size).toBe(4);
+  });
+
+  it('should fallback for other architectures', () => {
+    const engine = new CapstoneWasmEngine('riscv', '32');
+    engine.loadSync();
+
+    const data = new Uint8Array([0x12, 0x34]);
+    const insts = engine.disassemble(data, 0x4000);
 
     expect(insts.length).toBe(2);
     expect(insts[0].mnemonic).toBe('db');

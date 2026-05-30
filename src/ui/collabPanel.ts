@@ -916,7 +916,8 @@ export class CollabPanel {
         flex-direction: column;
         align-items: flex-start;
         z-index: 100;
-        pointer-events: none;
+        cursor: pointer;
+        pointer-events: auto;
       `;
 
       cursorEl.innerHTML = `
@@ -926,8 +927,22 @@ export class CollabPanel {
         </div>
       `;
 
+      cursorEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.options.onNavigate(cursor.view, cursor.address);
+      });
+
       area.appendChild(cursorEl);
     });
+  }
+
+  /**
+   * Updates the local peer's cursor and broadcasts it to all other peers.
+   */
+  public updateLocalCursor(address: number, view: 'assembly' | 'hex' | 'decompiler'): void {
+    if (this.engine && this.engine.isConnected()) {
+      this.engine.sendCursor(address, view);
+    }
   }
 
   private appendActivity(

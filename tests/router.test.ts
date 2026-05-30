@@ -1022,4 +1022,76 @@ describe('DisassemblerRouter Unit Tests', () => {
       expect(insts[7].opStr).toBe('r3, r4');
     });
   });
+
+  describe('SPARC Routing and Decoding', () => {
+    it('should detect SPARC format by ELF e_machine', () => {
+      const data = new Uint8Array(64);
+      data[0] = 0x7f;
+      data[1] = 0x45;
+      data[2] = 0x4c;
+      data[3] = 0x46; // ELF magic
+      data[4] = 1;
+      data[5] = 2; // Big Endian
+      data[18] = 2;  // EM_SPARC
+      data[19] = 0;
+
+      const arch = DisassemblerRouter.detectArchitecture(data);
+      expect(arch).toBe('sparc');
+    });
+
+    it('should decode standard SPARC instructions correctly', () => {
+      const router = new DisassemblerRouter();
+      const data = new Uint8Array([
+        // call 0x1000 (at PC=0, offset 0x400 words)
+        0x40, 0x00, 0x04, 0x00,
+        // sethi 0x10000, %g1 (imm22 = 0x40, rd = 1)
+        0x03, 0x00, 0x00, 0x40,
+        // be 0x10 (at PC=8, offset 2 words -> target 16 = 0x10)
+        0x02, 0x80, 0x00, 0x02,
+        // add %g1, %g2, %g3
+        0x86, 0x00, 0x40, 0x02,
+        // add %g1, 10, %g3
+        0x86, 0x00, 0x60, 0x0a,
+        // ld [%g1 + %g2], %g3
+        0xc6, 0x00, 0x40, 0x02,
+        // st %g3, [%g1 + 16]
+        0xc6, 0x20, 0x60, 0x10
+      ]);
+
+      const insts = router.disassemble(data, { arch: 'sparc', baseAddress: 0 });
+
+      expect(insts.length).toBe(7);
+
+      expect(insts[0].mnemonic).toBe('call');
+      expect(insts[0].opStr).toBe('0x1000');
+      expect(insts[0].operands[0]).toEqual({ type: 'imm', imm: 0x1000 });
+
+      expect(insts[1].mnemonic).toBe('sethi');
+      expect(insts[1].opStr).toBe('0x10000, %g1');
+      expect(insts[1].operands[0]).toEqual({ type: 'imm', imm: 0x10000 });
+      expect(insts[1].operands[1]).toEqual({ type: 'reg', reg: '%g1' });
+
+      expect(insts[2].mnemonic).toBe('be');
+      expect(insts[2].opStr).toBe('0x10');
+      expect(insts[2].operands[0]).toEqual({ type: 'imm', imm: 16 });
+
+      expect(insts[3].mnemonic).toBe('add');
+      expect(insts[3].opStr).toBe('%g1, %g2, %g3');
+      expect(insts[3].operands[0]).toEqual({ type: 'reg', reg: '%g1' });
+      expect(insts[3].operands[1]).toEqual({ type: 'reg', reg: '%g2' });
+      expect(insts[3].operands[2]).toEqual({ type: 'reg', reg: '%g3' });
+
+      expect(insts[4].mnemonic).toBe('add');
+      expect(insts[4].opStr).toBe('%g1, 0xa, %g3');
+      expect(insts[4].operands[1]).toEqual({ type: 'imm', imm: 10 });
+
+      expect(insts[5].mnemonic).toBe('ld');
+      expect(insts[5].opStr).toBe('[%g1 + %g2], %g3');
+      expect(insts[5].operands[0].mem).toEqual({ base: '%g1', index: '%g2', disp: undefined });
+
+      expect(insts[6].mnemonic).toBe('st');
+      expect(insts[6].opStr).toBe('%g3, [%g1 + 0x10]');
+      expect(insts[6].operands[1].mem).toEqual({ base: '%g1', index: undefined, disp: 16 });
+    });
+  });
 });

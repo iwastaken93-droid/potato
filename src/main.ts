@@ -179,36 +179,65 @@ export class ApplicationCoordinator {
 
   private async processBinary(
     fileName: string,
-    arrayBuffer: ArrayBuffer,
+    arrayBufferOrBlob: ArrayBuffer | Blob,
     lastModified?: number
   ) {
-    const data = new Uint8Array(arrayBuffer);
-    const fileSize = arrayBuffer.byteLength;
+    const isBlob = arrayBufferOrBlob instanceof Blob;
+    const blob = isBlob ? arrayBufferOrBlob : new Blob([arrayBufferOrBlob]);
+    const fileSize = blob.size;
 
+    let data: Uint8Array;
+    if (isBlob) {
+      const buf = await blob.arrayBuffer();
+      data = new Uint8Array(buf);
+    } else {
+      data = new Uint8Array(arrayBufferOrBlob as ArrayBuffer);
+    }
+
+    let isCancelled = false;
     if (this.binaryLoader) {
       this.binaryLoader.showLoader(fileName);
+      this.binaryLoader.onCancel(() => {
+        isCancelled = true;
+      });
     }
 
     const isTest = typeof process !== 'undefined' && 
       (process.env?.NODE_ENV === 'test' || (globalThis as any).vitest);
 
     let result;
-    if (isTest || fileSize < 50000) {
-      if (this.binaryLoader) {
-        this.binaryLoader.updateProgress(50, 'Analyzing...');
-      }
-      result = processBinaryData(fileName, data, arrayBuffer);
-    } else {
-      result = await processBinaryDataAsync(
-        fileName,
-        data,
-        arrayBuffer,
-        (percent, status) => {
-          if (this.binaryLoader) {
-            this.binaryLoader.updateProgress(percent, status);
-          }
+    try {
+      if (isTest || fileSize < 50000) {
+        if (this.binaryLoader) {
+          this.binaryLoader.updateProgress(50, 'Analyzing...');
         }
-      );
+        result = processBinaryData(fileName, data, isBlob ? (data.buffer as ArrayBuffer) : (arrayBufferOrBlob as ArrayBuffer));
+      } else {
+        result = await processBinaryDataAsync(
+          fileName,
+          data,
+          blob,
+          (percent, status) => {
+            if (isCancelled) {
+              throw new Error('Loading cancelled by user');
+            }
+            if (this.binaryLoader) {
+              this.binaryLoader.updateProgress(percent, status);
+            }
+          }
+        );
+      }
+
+
+      if (isCancelled) {
+        return;
+      }
+    } catch (err) {
+      console.warn('Binary processing failed or was cancelled:', err);
+      if (this.binaryLoader) {
+        this.binaryLoader.hideLoader();
+      }
+      return;
     }
 
     if (this.binaryLoader) {

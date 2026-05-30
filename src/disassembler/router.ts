@@ -7,6 +7,7 @@ import { disassembleDalvik } from './dalvik.js';
 import { disassembleRiscv } from './riscv.js';
 import { disassembleMips } from './mips.js';
 import { disassemblePpc } from './ppc.js';
+import { disassembleSparc } from './sparc.js';
 
 /**
  * Supported architectures.
@@ -19,7 +20,8 @@ export type Architecture =
   | 'riscv'
   | 'mips'
   | 'mipsel'
-  | 'ppc';
+  | 'ppc'
+  | 'sparc';
 
 /**
  * Metadata configuration for disassembly.
@@ -149,6 +151,7 @@ export class DisassemblerRouter {
         return data[5] === 1 ? 'mipsel' : 'mips';
       }
       if (eMachine === 20 || eMachine === 21) return 'ppc'; // EM_PPC or EM_PPC64
+      if (eMachine === 2 || eMachine === 43) return 'sparc'; // EM_SPARC or EM_SPARCV9
     }
 
     // Detect PE Architecture
@@ -286,6 +289,8 @@ export class DisassemblerRouter {
         return disassembleMips(data, baseAddress, true);
       case 'ppc':
         return disassemblePpc(data, baseAddress);
+      case 'sparc':
+        return disassembleSparc(data, baseAddress);
       case 'x86_64':
       default:
         return disassembleX86(data, baseAddress);

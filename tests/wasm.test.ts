@@ -490,4 +490,77 @@ describe('WASM Parser Unit Tests', () => {
     ]);
     expect(module.metadata?.sourceMappingURL).toBe('http://example.com/map');
   });
+
+  it('should parse Wasm component model binaries with imports, exports, and nested core modules', () => {
+    const importPayload = [
+      ...encodeVarUint(1), // count = 1
+      0x00, // tag = 0x00 (simple string)
+      ...encodeString('hello_import'),
+      0x01, // descTag = 0x01
+      ...encodeVarUint(5), // descVal = 5
+    ];
+
+    const exportPayload = [
+      ...encodeVarUint(1), // count = 1
+      0x01, // tag = 0x01 (two strings)
+      ...encodeString('pkg'),
+      ...encodeString('hello_export'),
+      0x00, // sort = 0x00 (func)
+      ...encodeVarUint(2), // index = 2
+    ];
+
+    const customPayload = [
+      ...encodeString('custom_comp'),
+      0xaa,
+      0xbb,
+    ];
+
+    const embeddedWasm = [
+      0x00, 0x61, 0x73, 0x6d, // magic
+      0x01, 0x00, 0x00, 0x00, // version = 1
+    ];
+
+    const wasmBytes = new Uint8Array([
+      0x00, 0x61, 0x73, 0x6d, // magic
+      0x0d, 0x00, 0x01, 0x00, // version = 13, layer = 1 (component)
+
+      10, // Section 10: Import
+      ...encodeVarUint(importPayload.length),
+      ...importPayload,
+
+      11, // Section 11: Export
+      ...encodeVarUint(exportPayload.length),
+      ...exportPayload,
+
+      1, // Section 1: Core Module
+      ...encodeVarUint(embeddedWasm.length),
+      ...embeddedWasm,
+
+      0, // Section 0: Custom
+      ...encodeVarUint(customPayload.length),
+      ...customPayload,
+    ]);
+
+    const module = parseWasm(wasmBytes);
+    expect(module.isComponent).toBe(true);
+    expect(module.version).toBe(13);
+    expect(module.layer).toBe(1);
+
+    expect(module.imports).toHaveLength(1);
+    expect(module.imports[0].field).toBe('hello_import');
+
+    expect(module.exports).toHaveLength(1);
+    expect(module.exports[0].name).toBe('pkg:hello_export');
+
+    expect(module.componentSections).toHaveLength(4);
+    const coreModSection = module.componentSections?.find(s => s.id === 1);
+    expect(coreModSection).toBeDefined();
+    expect(coreModSection?.modules).toHaveLength(1);
+    expect(coreModSection?.modules?.[0].version).toBe(1);
+
+    const customSection = module.customSections.find(s => s.name === 'custom_comp');
+    expect(customSection).toBeDefined();
+    expect(customSection?.size).toBe(2);
+  });
 });
+

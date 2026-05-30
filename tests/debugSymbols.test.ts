@@ -191,6 +191,123 @@ describe('Debug Symbols Parser Framework Tests', () => {
       expect(lines[1].file).toBe('/usr/src/app/main.cpp');
       expect(lines[1].line).toBe(6);
     });
+
+    it('should parse a mock DWARF v5 line number program with MD5 and directories', () => {
+      const bytes: number[] = [];
+
+      // 1. unit_length (4 bytes) - populated later
+      bytes.push(0, 0, 0, 0);
+      const startOfUnit = bytes.length;
+
+      // 2. version (2 bytes) = 5
+      bytes.push(5, 0);
+
+      // 3. address_size (1 byte) = 8
+      bytes.push(8);
+
+      // 4. segment_selector_size (1 byte) = 0
+      bytes.push(0);
+
+      // 5. header_length (4 bytes) - populated later
+      bytes.push(0, 0, 0, 0);
+      const startOfHeader = bytes.length;
+
+      // 6. min_instruction_length (1)
+      bytes.push(1);
+      // 7. max_ops_per_instruction (1)
+      bytes.push(1);
+      // 8. default_is_stmt (1)
+      bytes.push(1);
+      // 9. line_base (1) - signed -5
+      bytes.push(-5 & 0xff);
+      // 10. line_range (1)
+      bytes.push(14);
+      // 11. opcode_base (1)
+      bytes.push(13);
+
+      // 12. standard_opcode_lengths
+      bytes.push(0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1);
+
+      // 13. DWARF v5 Directory Entry Format Count
+      bytes.push(1);
+      // Format 0: content_type = 1 (DW_LNCT_path), form = 0x08 (DW_FORM_string)
+      bytes.push(...writeULEB128(1));
+      bytes.push(...writeULEB128(0x08));
+
+      // Directories count (ULEB128)
+      bytes.push(...writeULEB128(1));
+      // Directory 0: path = "/usr/src/app"
+      const dir1 = '/usr/src/app';
+      for (let i = 0; i < dir1.length; i++) bytes.push(dir1.charCodeAt(i));
+      bytes.push(0);
+
+      // 14. DWARF v5 File Entry Format Count
+      bytes.push(3);
+      // Format 0: content_type = 1 (DW_LNCT_path), form = 0x08 (DW_FORM_string)
+      bytes.push(...writeULEB128(1));
+      bytes.push(...writeULEB128(0x08));
+      // Format 1: content_type = 2 (DW_LNCT_directory_index), form = 0x0f (DW_FORM_udata)
+      bytes.push(...writeULEB128(2));
+      bytes.push(...writeULEB128(0x0f));
+      // Format 2: content_type = 5 (DW_LNCT_MD5), form = 0x1e (DW_FORM_data16)
+      bytes.push(...writeULEB128(5));
+      bytes.push(...writeULEB128(0x1e));
+
+      // Files count (ULEB128)
+      bytes.push(...writeULEB128(1));
+      // File 0: name = "main.cpp", dir_idx = 0, MD5 = 16 bytes
+      const file1 = 'main.cpp';
+      for (let i = 0; i < file1.length; i++) bytes.push(file1.charCodeAt(i));
+      bytes.push(0);
+      bytes.push(...writeULEB128(0)); // dir index 0
+      // 16 bytes MD5: 0102030405060708090a0b0c0d0e0f10
+      for (let i = 1; i <= 16; i++) bytes.push(i);
+
+      const endOfHeader = bytes.length;
+      const headerLength = endOfHeader - startOfHeader;
+
+      // Fill in header length
+      bytes[startOfUnit + 4] = headerLength & 0xff;
+      bytes[startOfUnit + 5] = (headerLength >> 8) & 0xff;
+      bytes[startOfUnit + 6] = (headerLength >> 16) & 0xff;
+      bytes[startOfUnit + 7] = (headerLength >> 24) & 0xff;
+
+      // Line Program Instructions
+      // - DW_LNE_set_address (Extended subopcode 2, size 8)
+      bytes.push(0); // Extended prefix
+      bytes.push(...writeULEB128(9)); // length: 1 (subopcode) + 8 (addr)
+      bytes.push(2); // DW_LNE_set_address
+      bytes.push(0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+
+      // - DW_LNS_advance_line (signed advance by 4)
+      bytes.push(3);
+      bytes.push(...writeSLEB128(4)); // line = 1 + 4 = 5
+
+      // - DW_LNS_copy (append row)
+      bytes.push(1);
+
+      // - DW_LNE_end_sequence (Extended subopcode 1, size 1)
+      bytes.push(0);
+      bytes.push(...writeULEB128(1));
+      bytes.push(1); // end_sequence
+
+      const endOfUnit = bytes.length;
+      const unitLength = endOfUnit - startOfUnit;
+
+      // Fill in unit length
+      bytes[0] = unitLength & 0xff;
+      bytes[1] = (unitLength >> 8) & 0xff;
+      bytes[2] = (unitLength >> 16) & 0xff;
+      bytes[3] = (unitLength >> 24) & 0xff;
+
+      const buffer = new Uint8Array(bytes).buffer;
+      const lines = parseDwarfLine(buffer);
+
+      expect(lines.length).toBe(2);
+      expect(lines[0].address).toBe(0x1000);
+      expect(lines[0].file).toBe('/usr/src/app/main.cpp');
+      expect(lines[0].line).toBe(5);
+    });
   });
 
   describe('DWARF Info Parser Tests', () => {

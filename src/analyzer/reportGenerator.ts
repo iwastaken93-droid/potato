@@ -350,7 +350,7 @@ export class ReportGenerator {
         const pe = peParser.parse();
         if (pe.resources && pe.resources.all && pe.resources.all.length > 0) {
           const r = pe.resources;
-          let resourceRows = r.all.map(res => `
+          const resourceRows = r.all.map(res => `
             <tr>
               <td><code>${res.typeName}</code></td>
               <td>${res.name}</td>
@@ -917,7 +917,7 @@ export class ReportGenerator {
             text += `Type                 Size       File Offset\n`;
             text += `--------------------------------------------------------------------------------\n`;
             for (const i of r.icons) {
-              const typePad = i.type.padEnd(20);
+              const typePad = String(i.type).padEnd(20);
               const sizePad = `${i.size} B`.padEnd(10);
               const offPad = `0x${i.offset.toString(16).toUpperCase()}`;
               text += `${typePad} ${sizePad} ${offPad}\n`;

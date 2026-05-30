@@ -5,22 +5,22 @@
 
 import { HexViewer } from './hexViewer.js';
 import { AssemblyView } from './assemblyView.js';
-import { CFGVisualizer } from './cfgVisualizer.js';
-import { DependencyGraph } from './dependencyGraph.js';
-import { MemoryMapOverlay } from './memoryMap.js';
+import type { CFGVisualizer } from './cfgVisualizer.js';
+import type { DependencyGraph } from './dependencyGraph.js';
+import type { MemoryMapOverlay } from './memoryMap.js';
 import { StringsView } from './stringsView.js';
 import type { SearchPanel } from './searchPanel.js';
-import { SignaturePanel } from './signaturePanel.js';
+import type { SignaturePanel } from './signaturePanel.js';
 import type { EmulatorPanel } from './emulatorPanel.js';
 import type { GDBPanel } from './gdbPanel.js';
 import type { ReportPanel } from './reportPanel.js';
-import { XRefsPanel } from './xrefsPanel.js';
-import { ImportsExportsPanel } from './importsExportsPanel.js';
+import type { XRefsPanel } from './xrefsPanel.js';
+import type { ImportsExportsPanel } from './importsExportsPanel.js';
 import type { AIPanel } from './aiPanel.js';
 import { BinaryPatcher, PatchRecord } from '../analyzer/patcher.js';
-import { PatcherPanel } from './patcherPanel.js';
+import type { PatcherPanel } from './patcherPanel.js';
 import { buildFCG } from '../analyzer/fcg.js';
-import { FCGVisualizer } from './fcgVisualizer.js';
+import type { FCGVisualizer } from './fcgVisualizer.js';
 import type { CollabPanel } from './collabPanel.js';
 import type { YaraPanel } from './yaraPanel.js';
 import type { TypeSystemPanel } from './typeSystemPanel.js';
@@ -95,8 +95,19 @@ export class PanelCoordinator {
   public metadataNeedsUpdate = true;
   public typeSystemNeedsUpdate = true;
   public diffNeedsUpdate = true;
+  public signatureNeedsUpdate = true;
+  public dependencyNeedsUpdate = true;
+  public gdbNeedsUpdate = true;
+  public xrefsNeedsUpdate = true;
+  public importsExportsNeedsUpdate = true;
+  public patcherNeedsUpdate = true;
+  public fcgNeedsUpdate = true;
+  public demanglerNeedsUpdate = true;
+  public machoObjcNeedsUpdate = true;
 
-  constructor(private host: CoordinatorHost) {}
+  private currentPatcher: BinaryPatcher | null = null;
+
+  constructor(public host: CoordinatorHost) {}
 
   public onBinaryLoaded(patcher: BinaryPatcher | null) {
     this.cfgNeedsUpdate = true;
@@ -109,19 +120,21 @@ export class PanelCoordinator {
     this.metadataNeedsUpdate = true;
     this.typeSystemNeedsUpdate = true;
     this.diffNeedsUpdate = true;
+    this.signatureNeedsUpdate = true;
+    this.dependencyNeedsUpdate = true;
+    this.gdbNeedsUpdate = true;
+    this.xrefsNeedsUpdate = true;
+    this.importsExportsNeedsUpdate = true;
+    this.patcherNeedsUpdate = true;
+    this.fcgNeedsUpdate = true;
+    this.demanglerNeedsUpdate = true;
+    this.machoObjcNeedsUpdate = true;
+
+    this.currentPatcher = patcher;
 
     this.initHexViewer();
     this.initAssemblyViewer();
     this.initStringsViewer();
-    this.initSignaturePanel();
-    this.initDependencyGraph();
-    this.initGDBPanel();
-    this.initXRefsPanel();
-    this.initImportsExportsPanel();
-    this.initPatcherPanel(patcher);
-    this.initFCGViewer();
-    this.initDemanglerPanel();
-    this.initMachoObjcPanel();
     this.updateActiveTabPanel();
     this.updateDecompiler();
 
@@ -166,6 +179,33 @@ export class PanelCoordinator {
     } else if (tabName === 'diff' && this.diffNeedsUpdate) {
       this.initDiffPanel();
       this.diffNeedsUpdate = false;
+    } else if (tabName === 'signatures' && this.signatureNeedsUpdate) {
+      this.initSignaturePanel();
+      this.signatureNeedsUpdate = false;
+    } else if (tabName === 'dependencies' && this.dependencyNeedsUpdate) {
+      this.initDependencyGraph();
+      this.dependencyNeedsUpdate = false;
+    } else if (tabName === 'gdb' && this.gdbNeedsUpdate) {
+      this.initGDBPanel();
+      this.gdbNeedsUpdate = false;
+    } else if (tabName === 'xrefs' && this.xrefsNeedsUpdate) {
+      this.initXRefsPanel();
+      this.xrefsNeedsUpdate = false;
+    } else if (tabName === 'importsExports' && this.importsExportsNeedsUpdate) {
+      this.initImportsExportsPanel();
+      this.importsExportsNeedsUpdate = false;
+    } else if (tabName === 'patcher' && this.patcherNeedsUpdate) {
+      this.initPatcherPanel(this.currentPatcher);
+      this.patcherNeedsUpdate = false;
+    } else if (tabName === 'fcg' && this.fcgNeedsUpdate) {
+      this.initFCGViewer();
+      this.fcgNeedsUpdate = false;
+    } else if (tabName === 'demangler' && this.demanglerNeedsUpdate) {
+      this.initDemanglerPanel();
+      this.demanglerNeedsUpdate = false;
+    } else if (tabName === 'machoObjc' && this.machoObjcNeedsUpdate) {
+      this.initMachoObjcPanel();
+      this.machoObjcNeedsUpdate = false;
     }
   }
 
@@ -290,8 +330,11 @@ export class PanelCoordinator {
         this.host.state.binaryData,
         this.host.state.sections
       );
-    } else {
-      this.signaturePanel = new SignaturePanel(container, {
+      return;
+    }
+    const SignaturePanelClass = PANEL_REGISTRY['SignaturePanel'];
+    const init = (Clazz: any) => {
+      this.signaturePanel = new Clazz(container, {
         onNavigate: (
           targetView: 'assembly' | 'hex' | 'decompiler',
           address: number
@@ -337,10 +380,16 @@ export class PanelCoordinator {
           }
         },
       });
-      this.signaturePanel.updateData(
+      this.signaturePanel?.updateData(
         this.host.state.binaryData,
         this.host.state.sections
       );
+    };
+
+    if (SignaturePanelClass) {
+      init(SignaturePanelClass);
+    } else {
+      import('./signaturePanel.js').then((m) => init(m.SignaturePanel));
     }
   }
 
@@ -377,18 +426,26 @@ export class PanelCoordinator {
     const container = document.getElementById('cfg-viewer-container')!;
     container.innerHTML = '';
 
-    // Create visualization with state blocks
-    this.cfgVisualizer = new CFGVisualizer(container, this.host.state.cfgBlocks, {
-      layout: 'layered',
-      onBlockSelect: (blockId: string | null) => {
-        if (blockId) {
-          const block = this.host.state.cfgBlocks.find((b: CoreBasicBlock) => b.id === blockId);
-          if (block && this.assemblyView) {
-            this.assemblyView.navigateToAddress(block.startAddress);
+    const CFGVisualizerClass = PANEL_REGISTRY['CFGVisualizer'];
+    const init = (Clazz: any) => {
+      this.cfgVisualizer = new Clazz(container, this.host.state.cfgBlocks, {
+        layout: 'layered',
+        onBlockSelect: (blockId: string | null) => {
+          if (blockId) {
+            const block = this.host.state.cfgBlocks.find((b: CoreBasicBlock) => b.id === blockId);
+            if (block && this.assemblyView) {
+              this.assemblyView.navigateToAddress(block.startAddress);
+            }
           }
-        }
-      },
-    });
+        },
+      });
+    };
+
+    if (CFGVisualizerClass) {
+      init(CFGVisualizerClass);
+    } else {
+      import('./cfgVisualizer.js').then((m) => init(m.CFGVisualizer));
+    }
   }
 
   public initDependencyGraph() {
@@ -398,17 +455,26 @@ export class PanelCoordinator {
     }
 
     if (this.host.state.dependencies) {
-      this.dependencyGraph = new DependencyGraph(
-        container,
-        this.host.state.dependencies,
-        {
-          onNodeSelect: (node) => {
-            if (node && node.address && this.assemblyView) {
-              this.assemblyView.navigateToAddress(node.address);
-            }
-          },
-        }
-      );
+      const DependencyGraphClass = PANEL_REGISTRY['DependencyGraph'];
+      const init = (Clazz: any) => {
+        this.dependencyGraph = new Clazz(
+          container,
+          this.host.state.dependencies,
+          {
+            onNodeSelect: (node: any) => {
+              if (node && node.address && this.assemblyView) {
+                this.assemblyView.navigateToAddress(node.address);
+              }
+            },
+          }
+        );
+      };
+
+      if (DependencyGraphClass) {
+        init(DependencyGraphClass);
+      } else {
+        import('./dependencyGraph.js').then((m) => init(m.DependencyGraph));
+      }
     }
   }
 
@@ -527,8 +593,11 @@ export class PanelCoordinator {
         this.host.state.instructions,
         this.host.state.extractedStrings
       );
-    } else {
-      this.xrefsPanel = new XRefsPanel(container, {
+      return;
+    }
+    const XRefsPanelClass = PANEL_REGISTRY['XRefsPanel'];
+    const init = (Clazz: any) => {
+      this.xrefsPanel = new Clazz(container, {
         onNavigate: (
           targetView: 'assembly' | 'hex' | 'decompiler',
           address: number
@@ -574,13 +643,19 @@ export class PanelCoordinator {
           }
         },
       });
-      this.xrefsPanel.updateData(
+      this.xrefsPanel?.updateData(
         this.host.state.binaryData,
         this.host.state.sections,
         this.host.state.symbols,
         this.host.state.instructions,
         this.host.state.extractedStrings
       );
+    };
+
+    if (XRefsPanelClass) {
+      init(XRefsPanelClass);
+    } else {
+      import('./xrefsPanel.js').then((m) => init(m.XRefsPanel));
     }
   }
 
@@ -588,8 +663,11 @@ export class PanelCoordinator {
     const container = document.getElementById('imports-exports-container')!;
     if (this.importsExportsPanel) {
       this.importsExportsPanel.updateData(this.host.state.dependencies);
-    } else {
-      this.importsExportsPanel = new ImportsExportsPanel(
+      return;
+    }
+    const ImportsExportsPanelClass = PANEL_REGISTRY['ImportsExportsPanel'];
+    const init = (Clazz: any) => {
+      this.importsExportsPanel = new Clazz(
         container,
         this.host.state.dependencies,
         {
@@ -612,6 +690,12 @@ export class PanelCoordinator {
           },
         }
       );
+    };
+
+    if (ImportsExportsPanelClass) {
+      init(ImportsExportsPanelClass);
+    } else {
+      import('./importsExportsPanel.js').then((m) => init(m.ImportsExportsPanel));
     }
   }
 
@@ -623,62 +707,73 @@ export class PanelCoordinator {
         this.host.state.fileName,
         this.host.state.architecture
       );
-    } else if (patcher) {
-      this.patcherPanel = new PatcherPanel(container, patcher, {
-        onPatchApplied: (patchedBinary: Uint8Array, patches: PatchRecord[]) => {
-          // 1. Update binary data in state
-          this.host.state.binaryData = patchedBinary;
+      return;
+    }
+    if (patcher) {
+      const PatcherPanelClass = PANEL_REGISTRY['PatcherPanel'];
+      const init = (Clazz: any) => {
+        this.patcherPanel = new Clazz(container, patcher, {
+          onPatchApplied: (patchedBinary: Uint8Array, patches: PatchRecord[]) => {
+            // 1. Update binary data in state
+            this.host.state.binaryData = patchedBinary;
 
-          // 2. Re-disassemble the binary to get new instructions!
-          const router = new DisassemblerRouter();
-          const instructions = router.disassemble(patchedBinary, {
-            arch: this.host.state.architecture,
-            baseAddress:
-              this.host.state.sections.find((s: any) => s.flags.execute)
-                ?.virtualAddress || 0x1000,
-            entryPoint: this.host.state.entryPoint,
-          });
+            // 2. Re-disassemble the binary to get new instructions!
+            const router = new DisassemblerRouter();
+            const instructions = router.disassemble(patchedBinary, {
+              arch: this.host.state.architecture,
+              baseAddress:
+                this.host.state.sections.find((s: any) => s.flags.execute)
+                  ?.virtualAddress || 0x1000,
+              entryPoint: this.host.state.entryPoint,
+            });
 
-          this.host.state.instructions = instructions;
+            this.host.state.instructions = instructions;
 
-          // 3. Re-build CFG blocks
-          const cfgBlocks = buildCFG(instructions);
-          this.host.state.cfgBlocks = cfgBlocks;
+            // 3. Re-build CFG blocks
+            const cfgBlocks = buildCFG(instructions);
+            this.host.state.cfgBlocks = cfgBlocks;
 
-          // 4. Update the active/relevant viewer datasets
-          if (this.hexViewer) {
-            this.hexViewer.setData(patchedBinary);
-          }
-          if (this.assemblyView) {
-            this.assemblyView.setInstructions(instructions);
-          }
-          if (this.cfgVisualizer) {
-            this.initCFGViewer();
-          }
-          if (this.emulatorPanel) {
-            this.emulatorPanel.updateData(
-              patchedBinary,
-              this.host.state.sections,
-              this.host.state.entryPoint,
-              instructions
-            );
-          }
-          if (this.gdbPanel) {
-            this.gdbPanel.updateData(
-              patchedBinary,
-              this.host.state.sections,
-              this.host.state.entryPoint,
-              instructions
-            );
-          }
-          if (this.yaraPanel) {
-            this.yaraPanel.updateData(patchedBinary, this.host.state.sections);
-          }
-          if (this.fcgVisualizer) {
-            this.initFCGViewer();
-          }
-        },
-      });
+            // 4. Update the active/relevant viewer datasets
+            if (this.hexViewer) {
+              this.hexViewer.setData(patchedBinary);
+            }
+            if (this.assemblyView) {
+              this.assemblyView.setInstructions(instructions);
+            }
+            if (this.cfgVisualizer) {
+              this.initCFGViewer();
+            }
+            if (this.emulatorPanel) {
+              this.emulatorPanel.updateData(
+                patchedBinary,
+                this.host.state.sections,
+                this.host.state.entryPoint,
+                instructions
+              );
+            }
+            if (this.gdbPanel) {
+              this.gdbPanel.updateData(
+                patchedBinary,
+                this.host.state.sections,
+                this.host.state.entryPoint,
+                instructions
+              );
+            }
+            if (this.yaraPanel) {
+              this.yaraPanel.updateData(patchedBinary, this.host.state.sections);
+            }
+            if (this.fcgVisualizer) {
+              this.initFCGViewer();
+            }
+          },
+        });
+      };
+
+      if (PatcherPanelClass) {
+        init(PatcherPanelClass);
+      } else {
+        import('./patcherPanel.js').then((m) => init(m.PatcherPanel));
+      }
     }
   }
 
@@ -793,14 +888,23 @@ export class PanelCoordinator {
     const container = document.getElementById('fcg-viewer-container')!;
     container.innerHTML = '';
     const fcgGraph = buildFCG(this.host.state.symbols, this.host.state.instructions);
-    this.fcgVisualizer = new FCGVisualizer(container, fcgGraph, {
-      onNodeSelect: (address: number) => {
-        if (this.assemblyView) {
-          this.assemblyView.navigateToAddress(address);
-        }
-        this.host.switchTab('assembly');
-      },
-    });
+    const FCGVisualizerClass = PANEL_REGISTRY['FCGVisualizer'];
+    const init = (Clazz: any) => {
+      this.fcgVisualizer = new Clazz(container, fcgGraph, {
+        onNodeSelect: (address: number) => {
+          if (this.assemblyView) {
+            this.assemblyView.navigateToAddress(address);
+          }
+          this.host.switchTab('assembly');
+        },
+      });
+    };
+
+    if (FCGVisualizerClass) {
+      init(FCGVisualizerClass);
+    } else {
+      import('./fcgVisualizer.js').then((m) => init(m.FCGVisualizer));
+    }
   }
 
   public async initCollabPanel() {
@@ -1157,28 +1261,40 @@ export class PanelCoordinator {
 
   public showMemoryMap() {
     if (!this.memoryMapOverlay) {
-      this.memoryMapOverlay = new MemoryMapOverlay(
-        this.host.state.binaryData,
-        this.host.state.sections,
-        {
-          onNavigate: (offset: number, address: number) => {
-            if (this.hexViewer) {
-              this.hexViewer.setSelectedOffset(offset);
-            }
-            if (this.assemblyView) {
-              this.assemblyView.navigateToAddress(address);
-            }
-            // Switch to assembly tab if currently in another tab
-            if (
-              this.host.state.activeTab !== 'hex' &&
-              this.host.state.activeTab !== 'assembly'
-            ) {
-              this.host.switchTab('assembly');
-            }
-          },
-        }
-      );
+      const MemoryMapOverlayClass = PANEL_REGISTRY['MemoryMapOverlay'];
+      const init = (Clazz: any) => {
+        const overlay = new Clazz(
+          this.host.state.binaryData,
+          this.host.state.sections,
+          {
+            onNavigate: (offset: number, address: number) => {
+              if (this.hexViewer) {
+                this.hexViewer.setSelectedOffset(offset);
+              }
+              if (this.assemblyView) {
+                this.assemblyView.navigateToAddress(address);
+              }
+              // Switch to assembly tab if currently in another tab
+              if (
+                this.host.state.activeTab !== 'hex' &&
+                this.host.state.activeTab !== 'assembly'
+              ) {
+                this.host.switchTab('assembly');
+              }
+            },
+          }
+        );
+        this.memoryMapOverlay = overlay;
+        overlay.show();
+      };
+
+      if (MemoryMapOverlayClass) {
+        init(MemoryMapOverlayClass);
+      } else {
+        import('./memoryMap.js').then((m) => init(m.MemoryMapOverlay));
+      }
+    } else {
+      this.memoryMapOverlay.show();
     }
-    this.memoryMapOverlay.show();
   }
 }

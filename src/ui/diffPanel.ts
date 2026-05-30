@@ -18,6 +18,13 @@ import { parseWasm } from '../parser/wasm.js';
 import { parseMacho } from '../parser/macho.js';
 import { parseDex } from '../parser/dex.js';
 import { DisassemblerRouter } from '../disassembler/router.js';
+import { Emulator } from '../emulator/emulator.js';
+import {
+  captureEmulatorTrace,
+  diffTraces,
+  findFirstDivergence,
+  TraceDiffEntry,
+} from '../analyzer/traceDiff.js';
 
 export class DiffPanel {
   private container: HTMLElement;
@@ -27,15 +34,17 @@ export class DiffPanel {
   private sections1: Section[] = [];
   private instructions1: Instruction[] = [];
   private fileName1: string = 'Primary Binary';
+  private entryPoint1: number = 0;
 
   // Binary 2 Data (Loaded in diff panel)
   private binaryData2: Uint8Array | null = null;
   private sections2: Section[] = [];
   private instructions2: Instruction[] = [];
   private fileName2: string = '';
+  private entryPoint2: number = 0;
 
   // Mode state
-  private mode: 'byte' | 'instruction' = 'byte';
+  private mode: 'byte' | 'instruction' | 'trace' = 'byte';
 
   // DOM Elements
   private rootEl!: HTMLDivElement;
@@ -61,12 +70,14 @@ export class DiffPanel {
     binaryData: Uint8Array,
     sections: Section[],
     instructions: Instruction[],
-    fileName: string = 'Primary Binary'
+    fileName: string = 'Primary Binary',
+    entryPoint: number = 0
   ) {
     this.binaryData1 = binaryData;
     this.sections1 = sections;
     this.instructions1 = instructions;
     this.fileName1 = fileName;
+    this.entryPoint1 = entryPoint;
     this.render();
   }
 
@@ -395,16 +406,22 @@ export class DiffPanel {
 
     const btnByte = document.createElement('button');
     btnByte.className = 'btn-mode-toggle active';
-    btnByte.innerText = 'Byte Diff';
+    btnByte.textContent = 'Byte Diff';
     btnByte.onclick = () => this.switchMode('byte');
 
     const btnInst = document.createElement('button');
     btnInst.className = 'btn-mode-toggle';
-    btnInst.innerText = 'Instruction Diff';
+    btnInst.textContent = 'Instruction Diff';
     btnInst.onclick = () => this.switchMode('instruction');
+
+    const btnTrace = document.createElement('button');
+    btnTrace.className = 'btn-mode-toggle';
+    btnTrace.textContent = 'Trace Diff';
+    btnTrace.onclick = () => this.switchMode('trace');
 
     toggleGroup.appendChild(btnByte);
     toggleGroup.appendChild(btnInst);
+    toggleGroup.appendChild(btnTrace);
     actions.appendChild(toggleGroup);
     headerBar.appendChild(actions);
 
@@ -463,14 +480,15 @@ export class DiffPanel {
     this.container.appendChild(this.rootEl);
   }
 
-  private switchMode(mode: 'byte' | 'instruction') {
+  private switchMode(mode: 'byte' | 'instruction' | 'trace') {
     this.mode = mode;
     const buttons =
       this.modeSelectorContainer.querySelectorAll('.btn-mode-toggle');
     buttons.forEach((btn, idx) => {
       if (
         (mode === 'byte' && idx === 0) ||
-        (mode === 'instruction' && idx === 1)
+        (mode === 'instruction' && idx === 1) ||
+        (mode === 'trace' && idx === 2)
       ) {
         btn.classList.add('active');
       } else {
@@ -801,7 +819,7 @@ export class DiffPanel {
         contentLeft.appendChild(rowL);
         contentRight.appendChild(rowR);
       }
-    } else {
+    } else if (this.mode === 'instruction') {
       // Instruction Diff Mode
       const diffs = diffInstructions(this.instructions1, this.instructions2);
 
@@ -855,6 +873,110 @@ export class DiffPanel {
               <span class="diff-inst-bytes">${bytes}</span>
               <span class="diff-inst-mnemonic">${item.inst2.mnemonic}</span>
               <span class="diff-inst-ops">${item.inst2.opStr}</span>
+            </div>
+          `;
+        } else {
+          rowR.innerHTML = `<div class="diff-offset" style="width: 80px; color: transparent;">-</div><div class="diff-inst-col"><span style="color: rgba(255,255,255,0.15)">--</span></div>`;
+        }
+
+        contentLeft.appendChild(rowL);
+        contentRight.appendChild(rowR);
+      });
+    } else {
+      // Trace Diff Mode
+      const emu1 = new Emulator();
+      emu1.loadInstructions(this.instructions1);
+      emu1.reset(this.entryPoint1);
+      emu1.memory.loadSections(this.binaryData1, this.sections1);
+
+      const emu2 = new Emulator();
+      emu2.loadInstructions(this.instructions2);
+      emu2.reset(this.entryPoint2);
+      emu2.memory.loadSections(this.binaryData2!, this.sections2);
+
+      const trace1 = captureEmulatorTrace(emu1, 1000);
+      const trace2 = captureEmulatorTrace(emu2, 1000);
+
+      const diffs = diffTraces(trace1, trace2);
+      const firstDivIdx = findFirstDivergence(diffs);
+
+      diffs.forEach((d) => {
+        if (d.type === 'equal' && d.registerDiffs.length > 0) {
+          stats['replace']++;
+        } else {
+          stats[d.type]++;
+        }
+      });
+
+      diffs.forEach((item, idx) => {
+        const rowL = document.createElement('div');
+        rowL.className = 'diff-row';
+        const rowR = document.createElement('div');
+        rowR.className = 'diff-row';
+
+        let rowClass = '';
+        if (item.type === 'delete') rowClass = 'type-delete';
+        else if (item.type === 'insert') rowClass = 'type-insert';
+        else if (item.type === 'replace') rowClass = 'type-replace';
+        else if (item.registerDiffs.length > 0) rowClass = 'type-replace';
+
+        if (rowClass) {
+          rowL.classList.add(rowClass);
+          rowR.classList.add(rowClass);
+        }
+
+        // Highlight first divergence
+        if (idx === firstDivIdx) {
+          rowL.style.borderLeft = '3px solid var(--error)';
+          rowR.style.borderLeft = '3px solid var(--error)';
+          rowL.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+          rowR.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+        }
+
+        // Left Pane Trace Step
+        if (item.stepA) {
+          const stepIdx = item.stepA.stepIndex.toString();
+          const rip = item.stepA.rip.toString(16).toUpperCase();
+          const mnemonic = item.stepA.instruction.mnemonic;
+          const opStr = item.stepA.instruction.opStr;
+
+          let regText = '';
+          if (item.registerDiffs.length > 0) {
+            regText = `<span class="reg-mismatch-badge" title="${item.registerDiffs.map((rd) => `${rd.register}: 0x${rd.valueA?.toString(16)} vs 0x${rd.valueB?.toString(16)}`).join(', ')}" style="color: var(--warning); margin-left: auto; font-size: 0.75rem; background: rgba(245,158,11,0.1); padding: 2px 6px; border-radius: 4px; border: 1px dashed var(--warning); cursor: pointer;">mismatch</span>`;
+          }
+
+          rowL.innerHTML = `
+            <div class="diff-offset" style="width: 80px;">Step ${stepIdx}</div>
+            <div class="diff-inst-col">
+              <span class="diff-inst-bytes" style="width: 80px; color: var(--text-muted);">0x${rip}</span>
+              <span class="diff-inst-mnemonic">${mnemonic}</span>
+              <span class="diff-inst-ops">${opStr}</span>
+              ${regText}
+            </div>
+          `;
+        } else {
+          rowL.innerHTML = `<div class="diff-offset" style="width: 80px; color: transparent;">-</div><div class="diff-inst-col"><span style="color: rgba(255,255,255,0.15)">--</span></div>`;
+        }
+
+        // Right Pane Trace Step
+        if (item.stepB) {
+          const stepIdx = item.stepB.stepIndex.toString();
+          const rip = item.stepB.rip.toString(16).toUpperCase();
+          const mnemonic = item.stepB.instruction.mnemonic;
+          const opStr = item.stepB.instruction.opStr;
+
+          let regText = '';
+          if (item.registerDiffs.length > 0) {
+            regText = `<span class="reg-mismatch-badge" title="${item.registerDiffs.map((rd) => `${rd.register}: 0x${rd.valueA?.toString(16)} vs 0x${rd.valueB?.toString(16)}`).join(', ')}" style="color: var(--warning); margin-left: auto; font-size: 0.75rem; background: rgba(245,158,11,0.1); padding: 2px 6px; border-radius: 4px; border: 1px dashed var(--warning); cursor: pointer;">mismatch</span>`;
+          }
+
+          rowR.innerHTML = `
+            <div class="diff-offset" style="width: 80px;">Step ${stepIdx}</div>
+            <div class="diff-inst-col">
+              <span class="diff-inst-bytes" style="width: 80px; color: var(--text-muted);">0x${rip}</span>
+              <span class="diff-inst-mnemonic">${mnemonic}</span>
+              <span class="diff-inst-ops">${opStr}</span>
+              ${regText}
             </div>
           `;
         } else {

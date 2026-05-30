@@ -35,6 +35,9 @@ export function handleOffsetSelect(coordinator: PanelCoordinator, offset: number
       (coordinator.host.state.sections.find((s: any) => s.flags.execute)
         ?.virtualAddress || 0x1000) + offset;
     coordinator.assemblyView.navigateToAddress(address, false);
+    if (coordinator.collabPanel) {
+      coordinator.collabPanel.updateLocalCursor(address, 'hex');
+    }
   }
 }
 
@@ -46,6 +49,9 @@ export function handleStringNavigate(coordinator: PanelCoordinator, offset: numb
     coordinator.assemblyView.navigateToAddress(address);
   }
   coordinator.host.switchTab('assembly');
+  if (coordinator.collabPanel) {
+    coordinator.collabPanel.updateLocalCursor(address, 'assembly');
+  }
 }
 
 export function handleSearchNavigate(
@@ -91,6 +97,9 @@ export function handleSearchNavigate(
     }
     coordinator.host.switchTab('decompiler');
   }
+  if (coordinator.collabPanel) {
+    coordinator.collabPanel.updateLocalCursor(address, targetView);
+  }
 }
 
 export function handleInstructionSelect(coordinator: PanelCoordinator, inst: Instruction) {
@@ -110,6 +119,9 @@ export function handleInstructionSelect(coordinator: PanelCoordinator, inst: Ins
   if (coordinator.xrefsPanel) {
     coordinator.xrefsPanel.selectAddress(inst.address);
   }
+  if (coordinator.collabPanel) {
+    coordinator.collabPanel.updateLocalCursor(inst.address, 'assembly');
+  }
 }
 
 export function handleBlockSelect(coordinator: PanelCoordinator, blockId: string | null) {
@@ -117,6 +129,9 @@ export function handleBlockSelect(coordinator: PanelCoordinator, blockId: string
     const block = coordinator.host.state.cfgBlocks.find((b: any) => b.id === blockId);
     if (block && coordinator.assemblyView) {
       coordinator.assemblyView.navigateToAddress(block.startAddress);
+      if (coordinator.collabPanel) {
+        coordinator.collabPanel.updateLocalCursor(block.startAddress, 'assembly');
+      }
     }
   }
 }
@@ -126,6 +141,9 @@ export function handleNodeSelect(coordinator: PanelCoordinator, address: number)
     coordinator.assemblyView.navigateToAddress(address);
   }
   coordinator.host.switchTab('assembly');
+  if (coordinator.collabPanel) {
+    coordinator.collabPanel.updateLocalCursor(address, 'assembly');
+  }
 }
 
 export function handleCollabNavigate(

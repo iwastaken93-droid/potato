@@ -535,7 +535,9 @@ export class CollabEngine {
     if (this.ws) {
       try {
         this.ws.close();
-      } catch (e) {}
+      } catch (e) {
+        // ignore close failure
+      }
     }
 
     const url = `${this.wsUrl}?room=${encodeURIComponent(this.roomName)}&username=${encodeURIComponent(this.username)}`;
@@ -643,7 +645,9 @@ export class CollabEngine {
           peerId: this.username,
         }));
         this.ws.close();
-      } catch (e) {}
+      } catch (e) {
+        // ignore close/send failure
+      }
       this.ws = null;
     } else {
       // Broadcast leave via mock broker

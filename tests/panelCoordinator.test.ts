@@ -17,6 +17,13 @@ import { CollabPanel } from '../src/ui/collabPanel.js';
 import { PluginsPanel } from '../src/ui/pluginsPanel.js';
 import { DemanglerPanel } from '../src/ui/demanglerPanel.js';
 import { AIPanel } from '../src/ui/aiPanel.js';
+import { SignaturePanel } from '../src/ui/signaturePanel.js';
+import { CFGVisualizer } from '../src/ui/cfgVisualizer.js';
+import { DependencyGraph } from '../src/ui/dependencyGraph.js';
+import { ImportsExportsPanel } from '../src/ui/importsExportsPanel.js';
+import { PatcherPanel } from '../src/ui/patcherPanel.js';
+import { FCGVisualizer } from '../src/ui/fcgVisualizer.js';
+import { MemoryMapOverlay } from '../src/ui/memoryMap.js';
 
 const PANEL_REGISTRY = (globalThis as any).PANEL_REGISTRY || ((globalThis as any).PANEL_REGISTRY = {});
 PANEL_REGISTRY['GDBPanel'] = GDBPanel;
@@ -32,6 +39,13 @@ PANEL_REGISTRY['CollabPanel'] = CollabPanel;
 PANEL_REGISTRY['PluginsPanel'] = PluginsPanel;
 PANEL_REGISTRY['DemanglerPanel'] = DemanglerPanel;
 PANEL_REGISTRY['AIPanel'] = AIPanel;
+PANEL_REGISTRY['SignaturePanel'] = SignaturePanel;
+PANEL_REGISTRY['CFGVisualizer'] = CFGVisualizer;
+PANEL_REGISTRY['DependencyGraph'] = DependencyGraph;
+PANEL_REGISTRY['ImportsExportsPanel'] = ImportsExportsPanel;
+PANEL_REGISTRY['PatcherPanel'] = PatcherPanel;
+PANEL_REGISTRY['FCGVisualizer'] = FCGVisualizer;
+PANEL_REGISTRY['MemoryMapOverlay'] = MemoryMapOverlay;
 
 // Setup required JSDOM mocks
 if (typeof global.ResizeObserver === 'undefined') {
@@ -160,10 +174,14 @@ describe('PanelCoordinator Unit Tests', () => {
     // Trigger onBinaryLoaded
     coordinator.onBinaryLoaded(null);
 
-    // Verify sub-views are initialized
+    // Verify primary views are initialized and secondary views are lazy-loaded (null)
     expect(coordinator.hexViewer).not.toBeNull();
     expect(coordinator.assemblyView).not.toBeNull();
     expect(coordinator.stringsView).not.toBeNull();
+    expect(coordinator.signaturePanel).toBeNull();
+
+    // Initialize signaturePanel on demand
+    coordinator.initSignaturePanel();
     expect(coordinator.signaturePanel).not.toBeNull();
   });
 

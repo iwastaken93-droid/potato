@@ -93,6 +93,7 @@ export interface GenerationOptions {
   maxTokens?: number;
   stopSequences?: string[];
   onToken?: (token: string) => void;
+  signal?: AbortSignal;
 }
 
 export interface InferenceProfile {

@@ -14,6 +14,14 @@ export interface PatchRecord {
   active: boolean;
 }
 
+export interface Transaction {
+  id: string;
+  type: 'apply' | 'toggle' | 'remove' | 'clear' | 'undo' | 'redo';
+  description: string;
+  timestamp: number;
+  patchId?: string;
+}
+
 export class BinaryPatcher {
   private originalBinary: Uint8Array;
   private patchedBinary: Uint8Array;
@@ -22,6 +30,29 @@ export class BinaryPatcher {
     patchedBinary: Uint8Array,
     history: PatchRecord[]
   ) => void)[] = [];
+  private transactionLog: Transaction[] = [];
+  private undoStack: PatchRecord[][] = [];
+  private redoStack: PatchRecord[][] = [];
+
+  private cloneHistory(history: PatchRecord[]): PatchRecord[] {
+    return history.map(patch => ({
+      ...patch,
+      originalBytes: new Uint8Array(patch.originalBytes),
+      patchedBytes: new Uint8Array(patch.patchedBytes),
+    }));
+  }
+
+  private saveState(type: 'apply' | 'toggle' | 'remove' | 'clear', description: string, patchId?: string): void {
+    this.undoStack.push(this.cloneHistory(this.history));
+    this.redoStack = [];
+    this.transactionLog.push({
+      id: 'tx_' + Math.random().toString(36).substring(2, 11),
+      type,
+      description,
+      timestamp: Date.now(),
+      patchId,
+    });
+  }
 
   constructor(originalBinary: Uint8Array) {
     this.originalBinary = new Uint8Array(originalBinary);
@@ -74,6 +105,7 @@ export class BinaryPatcher {
       active: true,
     };
 
+    this.saveState('apply', `Applied patch at address 0x${address.toString(16)}`, record.id);
     this.history.push(record);
     this.reapplyAll();
     return record;
@@ -86,6 +118,7 @@ export class BinaryPatcher {
     const record = this.history.find((p) => p.id === id);
     if (!record) return false;
 
+    this.saveState('toggle', `Toggled patch ${id} (${record.active ? 'deactivated' : 'activated'})`, id);
     record.active = !record.active;
     this.reapplyAll();
     return true;
@@ -98,6 +131,8 @@ export class BinaryPatcher {
     const index = this.history.findIndex((p) => p.id === id);
     if (index === -1) return false;
 
+    const record = this.history[index];
+    this.saveState('remove', `Removed patch ${id} at address 0x${record.address.toString(16)}`, id);
     this.history.splice(index, 1);
     this.reapplyAll();
     return true;
@@ -107,8 +142,57 @@ export class BinaryPatcher {
    * Clears all patches.
    */
   public clearAll(): void {
+    this.saveState('clear', 'Cleared all patches');
     this.history = [];
     this.reapplyAll();
+  }
+
+  public getTransactionLog(): Transaction[] {
+    return this.transactionLog;
+  }
+
+  public canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  public canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  public undo(): boolean {
+    if (!this.canUndo()) return false;
+
+    const previous = this.undoStack.pop()!;
+    this.redoStack.push(this.cloneHistory(this.history));
+    this.history = previous;
+
+    this.transactionLog.push({
+      id: 'tx_' + Math.random().toString(36).substring(2, 11),
+      type: 'undo',
+      description: 'Undo last operation',
+      timestamp: Date.now(),
+    });
+
+    this.reapplyAll();
+    return true;
+  }
+
+  public redo(): boolean {
+    if (!this.canRedo()) return false;
+
+    const next = this.redoStack.pop()!;
+    this.undoStack.push(this.cloneHistory(this.history));
+    this.history = next;
+
+    this.transactionLog.push({
+      id: 'tx_' + Math.random().toString(36).substring(2, 11),
+      type: 'redo',
+      description: 'Redo last undone operation',
+      timestamp: Date.now(),
+    });
+
+    this.reapplyAll();
+    return true;
   }
 
   /**

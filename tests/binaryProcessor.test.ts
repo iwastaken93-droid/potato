@@ -86,4 +86,27 @@ describe('binaryProcessor Unit Tests', () => {
     expect(result).toBeDefined();
     expect(result.architecture).toBe('wasm');
   });
+
+  it('should process streaming chunked loading correctly and yield identical structures', async () => {
+    const { processBinaryFileChunked } = await import('../src/analyzer/binaryProcessor.js');
+    const rawData = new Uint8Array(200000);
+    // Write mock ELF magic
+    rawData[0] = 0x7f; rawData[1] = 0x45; rawData[2] = 0x4c; rawData[3] = 0x46;
+    rawData[4] = 2; // ELFCLASS64
+    rawData[5] = 1; // ELFDATA2LSB
+    rawData[16] = 2; // ET_EXEC
+    rawData[18] = 0x3e; // EM_X86_64
+    
+    // Add standard ascii text
+    const textEncoder = new TextEncoder();
+    const secret = textEncoder.encode('ChunkedLoadedSuperSecret');
+    rawData.set(secret, 50000); // place in second chunk
+
+    const blob = new Blob([rawData]);
+    const result = await processBinaryFileChunked(blob, 'chunked_test.bin');
+
+    expect(result).toBeDefined();
+    expect(result.architecture).toBe('x86_64');
+    expect(result.extractedStrings.some(s => s.value === 'ChunkedLoadedSuperSecret')).toBe(true);
+  });
 });

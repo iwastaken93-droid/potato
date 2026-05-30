@@ -107,9 +107,20 @@ export interface WasmNames {
   data?: Record<number, string>;
 }
 
+export interface ComponentSection {
+  id: number;
+  name: string;
+  size: number;
+  payload: Uint8Array;
+  modules?: WasmModule[];
+}
+
 export interface WasmModule {
   magic: number[];
   version: number;
+  layer?: number;
+  isComponent?: boolean;
+  componentSections?: ComponentSection[];
   types: FuncType[];
   imports: ImportEntry[];
   functions: number[]; // indices into types
@@ -119,6 +130,7 @@ export interface WasmModule {
   names?: WasmNames;
   metadata?: Record<string, any>;
 }
+
 
 export class WasmReader {
   private view: DataView;
@@ -547,8 +559,50 @@ export function parseInstructions(
   return instructions;
 }
 
+export function getComponentSectionName(id: number): string {
+  switch (id) {
+    case 0: return 'custom';
+    case 1: return 'core-module';
+    case 2: return 'core-instance';
+    case 3: return 'core-type';
+    case 4: return 'component';
+    case 5: return 'instance';
+    case 6: return 'alias';
+    case 7: return 'type';
+    case 8: return 'canon';
+    case 9: return 'start';
+    case 10: return 'import';
+    case 11: return 'export';
+    case 12: return 'value';
+    default: return `unknown_0x${id.toString(16)}`;
+  }
+}
+
+export function readComponentExternName(reader: WasmReader): string {
+  const tag = reader.readByte();
+  if (tag === 0x00) {
+    return reader.readString();
+  } else if (tag === 0x01) {
+    const s1 = reader.readString();
+    const s2 = reader.readString();
+    return `${s1}:${s2}`;
+  } else if (tag === 0x02) {
+    const s1 = reader.readString();
+    const s2 = reader.readString();
+    return `${s1}/${s2}`;
+  } else {
+    reader.pos--;
+    try {
+      return reader.readString();
+    } catch {
+      reader.pos++;
+      return `unknown_tag_0x${tag.toString(16)}`;
+    }
+  }
+}
+
 /**
- * Parses a complete WebAssembly binary module.
+ * Parses a complete WebAssembly binary module or component.
  */
 export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
   const reader = new WasmReader(binary);
@@ -572,12 +626,141 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
     );
   }
 
-  // Version verification
-  const version =
+  // Version/layer verification
+  const versionVal =
     reader.readByte() |
     (reader.readByte() << 8) |
     (reader.readByte() << 16) |
     (reader.readByte() << 24);
+
+  const isComponent = (versionVal >>> 16) === 1;
+  const version = isComponent ? (versionVal & 0xffff) : versionVal;
+  const layer = isComponent ? (versionVal >>> 16) : undefined;
+
+  if (isComponent) {
+    const componentSections: ComponentSection[] = [];
+    const customSections: { name: string; size: number; payload?: Uint8Array }[] = [];
+    const imports: ImportEntry[] = [];
+    const exports: ExportEntry[] = [];
+    const code: FunctionBody[] = [];
+    let names: WasmNames | undefined = undefined;
+
+    while (reader.remaining > 0) {
+      const sectionId = reader.readByte();
+      const sectionSize = reader.readVarUint();
+      const sectionEnd = reader.pos + sectionSize;
+
+      if (sectionEnd > reader.bytes.length) {
+        throw new Error(`Component Section size ${sectionSize} extends beyond EOF`);
+      }
+
+      const payload = reader.bytes.subarray(reader.pos, sectionEnd);
+
+      const section: ComponentSection = {
+        id: sectionId,
+        name: getComponentSectionName(sectionId),
+        size: sectionSize,
+        payload,
+      };
+
+      if (sectionId === 0) {
+        const subReader = new WasmReader(payload);
+        try {
+          const name = subReader.readString();
+          const customPayloadSize = subReader.remaining;
+          const customPayload = subReader.readBytes(customPayloadSize);
+          customSections.push({
+            name,
+            size: customPayloadSize,
+            payload: customPayload,
+          });
+        } catch (e) {
+          // ignore
+        }
+      } else if (sectionId === 1) {
+        section.modules = [];
+        try {
+          if (
+            payload[0] === 0x00 &&
+            payload[1] === 0x61 &&
+            payload[2] === 0x73 &&
+            payload[3] === 0x6d
+          ) {
+            const parsedModule = parseWasm(payload);
+            section.modules.push(parsedModule);
+
+            imports.push(...parsedModule.imports);
+            exports.push(...parsedModule.exports);
+            code.push(...parsedModule.code);
+            customSections.push(...parsedModule.customSections);
+            if (parsedModule.names) {
+              if (!names) names = {};
+              names.functions = { ...names.functions, ...parsedModule.names.functions };
+              names.locals = { ...names.locals, ...parsedModule.names.locals };
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      } else if (sectionId === 10) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          for (let i = 0; i < count; i++) {
+            const name = readComponentExternName(subReader);
+            const descTag = subReader.readByte();
+            let descVal: any = undefined;
+            if (descTag <= 0x05) {
+              descVal = subReader.readVarUint();
+            }
+            imports.push({
+              module: 'component',
+              field: name,
+              kind: ExportKind.Func,
+              typeIndexOrDesc: { descTag, descVal },
+            });
+          }
+        } catch (e) {
+          // ignore
+        }
+      } else if (sectionId === 11) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          for (let i = 0; i < count; i++) {
+            const name = readComponentExternName(subReader);
+            const sort = subReader.readByte();
+            const index = subReader.readVarUint();
+            exports.push({
+              name,
+              kind: sort === 0x00 ? ExportKind.Func : sort as any,
+              index,
+            });
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      componentSections.push(section);
+      reader.pos = sectionEnd;
+    }
+
+    return {
+      magic,
+      version,
+      layer,
+      isComponent: true,
+      componentSections,
+      types: [],
+      imports,
+      functions: [],
+      exports,
+      code,
+      customSections,
+      names,
+    };
+  }
 
   if (version !== 1) {
     // WASM specification standard version is 1

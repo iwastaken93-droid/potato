@@ -177,6 +177,46 @@ describe('BinaryPatcher Unit Tests', () => {
     expect(clickSpy).toHaveBeenCalled();
     expect(revokeObjectURLMock).toHaveBeenCalled();
   });
+
+  it('should support undo and redo operations and transaction log tracking', () => {
+    expect(patcher.canUndo()).toBe(false);
+    expect(patcher.canRedo()).toBe(false);
+    expect(patcher.getTransactionLog()).toEqual([]);
+
+    const record1 = patcher.applyPatch(1, new Uint8Array([0x99]), 0x1001, 'p1');
+    expect(patcher.canUndo()).toBe(true);
+    expect(patcher.canRedo()).toBe(false);
+    expect(patcher.getTransactionLog().length).toBe(1);
+    expect(patcher.getTransactionLog()[0].type).toBe('apply');
+    expect(patcher.getTransactionLog()[0].patchId).toBe(record1.id);
+    expect(patcher.getPatchedBinary()).toEqual(new Uint8Array([0x10, 0x99, 0x30, 0x40, 0x50]));
+
+    patcher.togglePatch(record1.id);
+    expect(patcher.getPatchedBinary()).toEqual(originalBinary);
+    expect(patcher.getTransactionLog().length).toBe(2);
+    expect(patcher.getTransactionLog()[1].type).toBe('toggle');
+
+    expect(patcher.undo()).toBe(true);
+    expect(patcher.getPatchedBinary()).toEqual(new Uint8Array([0x10, 0x99, 0x30, 0x40, 0x50]));
+    expect(patcher.canRedo()).toBe(true);
+
+    expect(patcher.redo()).toBe(true);
+    expect(patcher.getPatchedBinary()).toEqual(originalBinary);
+
+    expect(patcher.undo()).toBe(true);
+    expect(patcher.undo()).toBe(true);
+    expect(patcher.getPatchedBinary()).toEqual(originalBinary);
+    expect(patcher.canUndo()).toBe(false);
+
+    expect(patcher.redo()).toBe(true);
+    expect(patcher.redo()).toBe(true);
+    expect(patcher.getPatchedBinary()).toEqual(originalBinary);
+
+    expect(patcher.undo()).toBe(true);
+    expect(patcher.canRedo()).toBe(true);
+    patcher.applyPatch(3, new Uint8Array([0x88]), 0x1003, 'p2');
+    expect(patcher.canRedo()).toBe(false);
+  });
 });
 
 describe('PatcherPanel Unit Tests', () => {

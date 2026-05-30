@@ -90,7 +90,7 @@ describe('ReportPanel Unit Tests', () => {
     expect(container.querySelector('.json-preview-container')).not.toBeNull();
   });
 
-  it('should trigger download when downloadJSON and downloadMarkdown are called', () => {
+  it('should trigger download when downloadJSON, downloadMarkdown, downloadHTML, and downloadPlaintext are called', () => {
     const binaryData = new Uint8Array([0x90, 0x90]);
     panel.updateData('test.bin', 2, binaryData, 'x86_64', 0x1000, [], [], []);
 
@@ -99,12 +99,22 @@ describe('ReportPanel Unit Tests', () => {
       .mockImplementation(() => {});
 
     panel.downloadJSON();
-    expect(clickSpy).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
 
     clickSpy.mockClear();
 
     panel.downloadMarkdown();
-    expect(clickSpy).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    clickSpy.mockClear();
+
+    panel.downloadHTML();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    clickSpy.mockClear();
+
+    panel.downloadPlaintext();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
   it('should copy to clipboard when copyToClipboard is called', async () => {

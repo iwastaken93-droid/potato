@@ -185,6 +185,15 @@ export class MockYText {
   public getItems() {
     return [...this.items];
   }
+
+  public merge(otherItems: Array<{ id: string; char: string; origin: string | null; deleted: boolean }>): void {
+    for (const item of otherItems) {
+      this.applyInsert(item.id, item.char, item.origin);
+      if (item.deleted) {
+        this.applyDelete(item.id);
+      }
+    }
+  }
 }
 
 // Global network broker simulating message passing between CollabEngines with latency
@@ -255,6 +264,13 @@ export class CollabEngine {
 
   private lamportClock: number = 0;
   private latencyMs: number = 0;
+
+  // WebSocket fields
+  private ws: any = null;
+  private wsUrl: string = '';
+  private reconnectTimeout: any = null;
+  private messageQueue: any[] = [];
+  private reconnectAttempts: number = 0;
 
   // Callbacks
   private onConnectionStateCallbacks: Set<ConnectionStateCallback> = new Set();
@@ -362,9 +378,80 @@ export class CollabEngine {
   }
 
   /**
-   * Connect to collaborative room.
+   * Get full serialized state of all CRDT structures.
    */
-  public connect(room: string, username: string): void {
+  public getFullState() {
+    const serializedComments: Array<{ address: number; items: any[] }> = [];
+    for (const [address, ytext] of this.commentTexts.entries()) {
+      serializedComments.push({ address, items: ytext.getItems() });
+    }
+    const serializedHighlights = Array.from(this.highlights.entries());
+    const serializedRenames = Array.from(this.renames.entries());
+    return {
+      comments: serializedComments,
+      highlights: serializedHighlights,
+      renames: serializedRenames,
+      lamportClock: this.lamportClock,
+    };
+  }
+
+  /**
+   * Merge external full CRDT state structure.
+   */
+  public mergeState(state: any): void {
+    if (!state) return;
+    if (state.lamportClock && state.lamportClock > this.lamportClock) {
+      this.lamportClock = state.lamportClock;
+    }
+    if (state.comments) {
+      for (const entry of state.comments) {
+        if (!this.commentTexts.has(entry.address)) {
+          this.commentTexts.set(entry.address, new MockYText());
+        }
+        const ytext = this.commentTexts.get(entry.address)!;
+        ytext.merge(entry.items);
+        this.notifyComment({
+          address: entry.address,
+          comment: ytext.toString(),
+          peerName: 'System Sync',
+          timestamp: Date.now(),
+        });
+      }
+    }
+    if (state.highlights) {
+      for (const [address, stateData] of state.highlights) {
+        const current = this.highlights.get(address);
+        const isNewer =
+          !current ||
+          stateData.clock > current.clock ||
+          (stateData.clock === current.clock && stateData.client > current.client);
+
+        if (isNewer) {
+          this.highlights.set(address, stateData);
+          this.notifyHighlight(stateData);
+        }
+      }
+    }
+    if (state.renames) {
+      for (const [originalName, stateData] of state.renames) {
+        const current = this.renames.get(originalName);
+        const isNewer =
+          !current ||
+          stateData.clock > current.clock ||
+          (stateData.clock === current.clock && stateData.client > current.client);
+
+        if (isNewer) {
+          this.renames.set(originalName, stateData);
+          this.notifyRename(stateData);
+        }
+      }
+    }
+  }
+
+  /**
+   * Connect to collaborative room (optionally using real WebSocket).
+   */
+  public connect(room: string, username: string, wsUrl?: string): void {
     if (this.connected) return;
 
     this.roomName = room;
@@ -383,23 +470,128 @@ export class CollabEngine {
     this.notifyConnectionState();
     this.notifyPeers();
 
-    // Broadcast join to other active clients
-    MockNetworkBroker.broadcast(
-      this.roomName,
-      this,
-      {
-        type: 'peer_join',
-        peer: {
-          id: this.username,
-          name: this.username,
-          color: '#8B5CF6',
-          status: 'connected',
+    const actualWsUrl = wsUrl || (typeof window !== 'undefined' && (window as any).collabWebSocketUrl);
+
+    if (actualWsUrl && typeof WebSocket !== 'undefined') {
+      this.wsUrl = actualWsUrl;
+      this.connectWebSocket();
+    } else {
+      // Broadcast join to other active clients via mock broker
+      MockNetworkBroker.broadcast(
+        this.roomName,
+        this,
+        {
+          type: 'peer_join',
+          peer: {
+            id: this.username,
+            name: this.username,
+            color: '#8B5CF6',
+            status: 'connected',
+          },
         },
-      },
-      this.latencyMs
-    );
+        this.latencyMs
+      );
+    }
 
     this.startSimulation();
+  }
+
+  private connectWebSocket(): void {
+    if (typeof WebSocket === 'undefined') return;
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch (e) {}
+    }
+
+    const url = `${this.wsUrl}?room=${encodeURIComponent(this.roomName)}&username=${encodeURIComponent(this.username)}`;
+    try {
+      this.ws = new WebSocket(url);
+
+      this.ws.onopen = () => {
+        this.reconnectAttempts = 0;
+        
+        // Request initial state from other peers
+        this.sendWebSocketMessage({
+          type: 'request_sync',
+          sender: this.username,
+        });
+
+        // Send peer join information
+        this.sendWebSocketMessage({
+          type: 'peer_join',
+          peer: {
+            id: this.username,
+            name: this.username,
+            color: '#8B5CF6',
+            status: 'connected',
+          },
+        });
+
+        // Flush offline message queue
+        while (this.messageQueue.length > 0) {
+          const msg = this.messageQueue.shift();
+          this.sendWebSocketMessage(msg);
+        }
+      };
+
+      this.ws.onmessage = (event: any) => {
+        try {
+          const msg = JSON.parse(event.data);
+          this.receiveWebSocketMessage(msg);
+        } catch (e) {
+          console.error('Failed to parse websocket message', e);
+        }
+      };
+
+      this.ws.onclose = () => {
+        this.ws = null;
+        if (this.connected) {
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+          this.reconnectAttempts++;
+          this.reconnectTimeout = setTimeout(() => {
+            if (this.connected) this.connectWebSocket();
+          }, delay);
+        }
+      };
+
+      this.ws.onerror = (err: any) => {
+        console.error('Collab WebSocket error', err);
+      };
+    } catch (e) {
+      console.error('Failed to create WebSocket connection', e);
+    }
+  }
+
+  private sendWebSocketMessage(msg: any): void {
+    if (this.ws && this.ws.readyState === 1 /* OPEN */) {
+      this.ws.send(JSON.stringify(msg));
+    } else {
+      this.messageQueue.push(msg);
+    }
+  }
+
+  private receiveWebSocketMessage(msg: any): void {
+    if (!this.connected) return;
+
+    if (msg.type === 'request_sync') {
+      // Send our current full state to the requester
+      this.sendWebSocketMessage({
+        type: 'sync_state',
+        state: this.getFullState(),
+        recipient: msg.sender,
+      });
+      return;
+    }
+
+    if (msg.type === 'sync_state') {
+      if (msg.recipient === this.username) {
+        this.mergeState(msg.state);
+      }
+      return;
+    }
+
+    this.receiveMessage(msg);
   }
 
   /**
@@ -410,16 +602,32 @@ export class CollabEngine {
 
     this.stopSimulation();
 
-    // Broadcast leave
-    MockNetworkBroker.broadcast(
-      this.roomName,
-      this,
-      {
-        type: 'peer_leave',
-        peerId: this.username,
-      },
-      this.latencyMs
-    );
+    if (this.ws) {
+      try {
+        this.ws.send(JSON.stringify({
+          type: 'peer_leave',
+          peerId: this.username,
+        }));
+        this.ws.close();
+      } catch (e) {}
+      this.ws = null;
+    } else {
+      // Broadcast leave via mock broker
+      MockNetworkBroker.broadcast(
+        this.roomName,
+        this,
+        {
+          type: 'peer_leave',
+          peerId: this.username,
+        },
+        this.latencyMs
+      );
+    }
+
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
 
     MockNetworkBroker.leave(this.roomName, this);
 
@@ -431,6 +639,8 @@ export class CollabEngine {
     this.commentMetadata.clear();
     this.highlights.clear();
     this.renames.clear();
+    this.messageQueue = [];
+    this.reconnectAttempts = 0;
 
     this.notifyConnectionState();
     this.notifyPeers();
@@ -467,43 +677,45 @@ export class CollabEngine {
             this.lamportClock
           );
 
-          MockNetworkBroker.broadcast(
-            this.roomName,
-            this,
-            {
-              type: 'comment_op',
-              address,
-              op: {
-                type: 'insert',
-                id,
-                char,
-                origin,
-                peerName: this.username,
-                timestamp: Date.now(),
-              },
+          const message = {
+            type: 'comment_op',
+            address,
+            op: {
+              type: 'insert',
+              id,
+              char,
+              origin,
+              peerName: this.username,
+              timestamp: Date.now(),
             },
-            this.latencyMs
-          );
+          };
+
+          if (this.ws) {
+            this.sendWebSocketMessage(message);
+          } else {
+            MockNetworkBroker.broadcast(this.roomName, this, message, this.latencyMs);
+          }
         }
       } else if (diff.type === 'delete') {
         for (let i = 0; i < diff.text.length; i++) {
           const id = ytext.delete(diff.index);
           if (id) {
-            MockNetworkBroker.broadcast(
-              this.roomName,
-              this,
-              {
-                type: 'comment_op',
-                address,
-                op: {
-                  type: 'delete',
-                  id,
-                  peerName: this.username,
-                  timestamp: Date.now(),
-                },
+            const message = {
+              type: 'comment_op',
+              address,
+              op: {
+                type: 'delete',
+                id,
+                peerName: this.username,
+                timestamp: Date.now(),
               },
-              this.latencyMs
-            );
+            };
+
+            if (this.ws) {
+              this.sendWebSocketMessage(message);
+            } else {
+              MockNetworkBroker.broadcast(this.roomName, this, message, this.latencyMs);
+            }
           }
         }
       }
@@ -537,15 +749,16 @@ export class CollabEngine {
     this.highlights.set(address, state);
     this.notifyHighlight(state);
 
-    MockNetworkBroker.broadcast(
-      this.roomName,
-      this,
-      {
-        type: 'highlight_op',
-        state,
-      },
-      this.latencyMs
-    );
+    const message = {
+      type: 'highlight_op',
+      state,
+    };
+
+    if (this.ws) {
+      this.sendWebSocketMessage(message);
+    } else {
+      MockNetworkBroker.broadcast(this.roomName, this, message, this.latencyMs);
+    }
   }
 
   /**
@@ -572,15 +785,16 @@ export class CollabEngine {
     this.renames.set(originalName, state);
     this.notifyRename(state);
 
-    MockNetworkBroker.broadcast(
-      this.roomName,
-      this,
-      {
-        type: 'rename_op',
-        state,
-      },
-      this.latencyMs
-    );
+    const message = {
+      type: 'rename_op',
+      state,
+    };
+
+    if (this.ws) {
+      this.sendWebSocketMessage(message);
+    } else {
+      MockNetworkBroker.broadcast(this.roomName, this, message, this.latencyMs);
+    }
   }
 
   /**

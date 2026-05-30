@@ -95,6 +95,15 @@ export interface GenerationOptions {
   onToken?: (token: string) => void;
 }
 
+export interface InferenceProfile {
+  backend: string;
+  loadTimeMs: number;
+  firstTokenLatencyMs: number;
+  tokensPerSecond: number;
+  totalTokens: number;
+  totalTimeMs: number;
+}
+
 /**
  * OnDeviceLLMManager manages the initialization and execution of tiny local LLMs
  * utilizing either WebNN or ONNX Runtime Web.
@@ -105,6 +114,16 @@ export class OnDeviceLLMManager {
   private activeWebNNContext: MLContext | null = null;
   private isLoaded: boolean = false;
   private config: ModelConfig;
+
+  // Robust Orchestration & Profiling variables
+  private loadedBackend: 'wasm' | 'webgpu' | 'webnn-cpu' | 'webnn-gpu' | 'webnn-npu' | null = null;
+  private status: 'idle' | 'loading' | 'ready' | 'generating' | 'error' = 'idle';
+  private lastProfile: InferenceProfile | null = null;
+  private fallbackLogs: string[] = [];
+  private loadTimeMs: number = 0;
+
+  private onStatusChangeCallback?: (status: 'idle' | 'loading' | 'ready' | 'generating' | 'error') => void;
+  private onFallbackCallback?: (from: string, to: string, error: string) => void;
 
   // Simple mock tokenizer state
   private static readonly mockVocab = [
@@ -172,6 +191,18 @@ export class OnDeviceLLMManager {
   }
 
   /**
+   * Checks if specific backend is supported by the platform
+   */
+  public static async isBackendSupported(
+    backend: 'wasm' | 'webgpu' | 'webnn-cpu' | 'webnn-gpu' | 'webnn-npu'
+  ): Promise<boolean> {
+    if (backend === 'wasm') return true;
+    if (backend === 'webgpu') return await this.isWebGPUSupported();
+    if (backend.startsWith('webnn')) return this.isWebNNSupported();
+    return false;
+  }
+
+  /**
    * Get current model configuration
    */
   public getConfig(): ModelConfig {
@@ -186,6 +217,52 @@ export class OnDeviceLLMManager {
   }
 
   /**
+   * Get active loaded backend
+   */
+  public getLoadedBackend(): 'wasm' | 'webgpu' | 'webnn-cpu' | 'webnn-gpu' | 'webnn-npu' | null {
+    return this.loadedBackend;
+  }
+
+  /**
+   * Get the orchestrator status
+   */
+  public getStatus(): 'idle' | 'loading' | 'ready' | 'generating' | 'error' {
+    return this.status;
+  }
+
+  /**
+   * Get historical backend fallback transition logs
+   */
+  public getFallbackLogs(): string[] {
+    return [...this.fallbackLogs];
+  }
+
+  /**
+   * Get last inference generation execution profile
+   */
+  public getLastProfile(): InferenceProfile | null {
+    return this.lastProfile;
+  }
+
+  /**
+   * Registers event handlers for orchestrator events
+   */
+  public setEventListeners(callbacks: {
+    onStatusChange?: (status: 'idle' | 'loading' | 'ready' | 'generating' | 'error') => void;
+    onFallback?: (from: string, to: string, error: string) => void;
+  }): void {
+    if (callbacks.onStatusChange) this.onStatusChangeCallback = callbacks.onStatusChange;
+    if (callbacks.onFallback) this.onFallbackCallback = callbacks.onFallback;
+  }
+
+  private updateStatus(newStatus: 'idle' | 'loading' | 'ready' | 'generating' | 'error'): void {
+    this.status = newStatus;
+    if (this.onStatusChangeCallback) {
+      this.onStatusChangeCallback(newStatus);
+    }
+  }
+
+  /**
    * Unload model and release resources
    */
   public unloadModel(): void {
@@ -196,14 +273,17 @@ export class OnDeviceLLMManager {
     this.activeWebNNGraph = null;
     this.activeWebNNContext = null;
     this.isLoaded = false;
+    this.loadedBackend = null;
+    this.updateStatus('idle');
   }
 
   /**
-   * Loads and compiles the local model using the specified backend.
+   * Loads and compiles the local model using the specified backend,
+   * falling back sequentially to simpler backends in case of capability gaps or execution errors.
    */
   public async loadModel(
     modelData: ArrayBuffer | string,
-    backend:
+    preferredBackend:
       | 'wasm'
       | 'webgpu'
       | 'webnn-cpu'
@@ -212,68 +292,125 @@ export class OnDeviceLLMManager {
     onProgress?: (progress: number) => void
   ): Promise<void> {
     this.unloadModel();
+    this.updateStatus('loading');
+    this.fallbackLogs = [];
+    const startTime = performance.now();
 
-    // 1. Simulate weight loading / fetching progress
-    if (onProgress) {
-      onProgress(0.1);
-      await new Promise((r) => setTimeout(r, 20));
-      onProgress(0.4);
-      await new Promise((r) => setTimeout(r, 20));
-      onProgress(0.8);
-      await new Promise((r) => setTimeout(r, 10));
-      onProgress(1.0);
-    }
+    // Prioritized fallback queues per requested preferred backend
+    const fallbackMap: Record<string, ('wasm' | 'webgpu' | 'webnn-cpu' | 'webnn-gpu' | 'webnn-npu')[]> = {
+      'webnn-npu': ['webnn-npu', 'webnn-gpu', 'webnn-cpu', 'webgpu', 'wasm'],
+      'webnn-gpu': ['webnn-gpu', 'webnn-cpu', 'webgpu', 'wasm'],
+      'webnn-cpu': ['webnn-cpu', 'wasm'],
+      'webgpu': ['webgpu', 'wasm'],
+      'wasm': ['wasm'],
+    };
 
-    const isWebNNBackend = backend.startsWith('webnn');
+    const fallbacks = fallbackMap[preferredBackend] || [preferredBackend];
+    let loadedSuccessfully = false;
+    let lastErrorMsg = '';
 
-    if (isWebNNBackend) {
-      // Initialize WebNN graph
-      const deviceType = backend.split('-')[1] as 'cpu' | 'gpu' | 'npu';
-      let webnn: ML | undefined;
+    for (let i = 0; i < fallbacks.length; i++) {
+      const currentBackend = fallbacks[i];
 
-      if (typeof navigator !== 'undefined' && navigator.ml) {
-        webnn = navigator.ml;
-      } else {
-        // Fallback/Mock WebNN implementation for tests/node
-        webnn = this.createMockWebNN();
+      try {
+        const isSupported = await OnDeviceLLMManager.isBackendSupported(currentBackend);
+        if (!isSupported) {
+          throw new Error(`Platform capabilities check failed: ${currentBackend} is not supported.`);
+        }
+
+        // Simulate weight loading / fetching progress per backend attempt
+        if (onProgress) {
+          onProgress(0.1);
+          await new Promise((r) => setTimeout(r, 10));
+          onProgress(0.4);
+          await new Promise((r) => setTimeout(r, 10));
+          onProgress(0.8);
+        }
+
+        const isWebNNBackend = currentBackend.startsWith('webnn');
+
+        if (isWebNNBackend) {
+          // Initialize WebNN graph
+          const deviceType = currentBackend.split('-')[1] as 'cpu' | 'gpu' | 'npu';
+          let webnn: ML | undefined;
+
+          if (typeof navigator !== 'undefined' && navigator.ml) {
+            webnn = navigator.ml;
+          } else {
+            // Fallback/Mock WebNN implementation for tests/node
+            webnn = this.createMockWebNN();
+          }
+
+          this.activeWebNNContext = await webnn.createContext({ deviceType });
+          const builder = this.activeWebNNContext.createGraphBuilder();
+
+          // Build mock transformer weight layers to simulate WebNN model optimization
+          const inputIds = builder.input('input_ids', {
+            dataType: 'int32',
+            dimensions: [1, 32],
+          });
+          const weights = builder.constant(
+            { dataType: 'float32', dimensions: [32, 64] },
+            new Float32Array(32 * 64).fill(0.01)
+          );
+          const matmul = builder.matmul(inputIds, weights);
+          const bias = builder.constant(
+            { dataType: 'float32', dimensions: [1, 64] },
+            new Float32Array(64).fill(0.02)
+          );
+          const output = builder.relu(builder.add(matmul, bias));
+
+          this.activeWebNNGraph = await builder.build({ logits: output });
+        } else {
+          // Initialize ONNX Runtime session
+          const mockOrt = this.createMockORT();
+          const sessionOptions: ORTSessionOptions = {
+            executionProviders:
+              currentBackend === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'],
+            graphOptimizationLevel: 'all',
+          };
+
+          this.activeSession = await mockOrt.InferenceSession.create(
+            modelData instanceof ArrayBuffer ? modelData : new ArrayBuffer(1024),
+            sessionOptions
+          );
+        }
+
+        if (onProgress) {
+          onProgress(1.0);
+        }
+
+        this.loadedBackend = currentBackend;
+        this.isLoaded = true;
+        this.loadTimeMs = performance.now() - startTime;
+        this.updateStatus('ready');
+        loadedSuccessfully = true;
+        break;
+      } catch (err: any) {
+        const errorDetail = err?.message || String(err);
+        lastErrorMsg = errorDetail;
+        const nextBackend = fallbacks[i + 1];
+        if (nextBackend) {
+          this.fallbackLogs.push(`Fallback: Attempted ${currentBackend} failed (${errorDetail}). Transitioning to ${nextBackend}.`);
+          if (this.onFallbackCallback) {
+            this.onFallbackCallback(currentBackend, nextBackend, errorDetail);
+          }
+        } else {
+          this.fallbackLogs.push(`Attempted ${currentBackend} failed (${errorDetail}). No remaining fallback backends.`);
+        }
+        // Clean up partial states
+        this.activeWebNNGraph = null;
+        this.activeWebNNContext = null;
+        this.activeSession = null;
       }
-
-      this.activeWebNNContext = await webnn.createContext({ deviceType });
-      const builder = this.activeWebNNContext.createGraphBuilder();
-
-      // Build mock transformer weight layers to simulate WebNN model optimization
-      const inputIds = builder.input('input_ids', {
-        dataType: 'int32',
-        dimensions: [1, 32],
-      });
-      const weights = builder.constant(
-        { dataType: 'float32', dimensions: [32, 64] },
-        new Float32Array(32 * 64).fill(0.01)
-      );
-      const matmul = builder.matmul(inputIds, weights);
-      const bias = builder.constant(
-        { dataType: 'float32', dimensions: [1, 64] },
-        new Float32Array(64).fill(0.02)
-      );
-      const output = builder.relu(builder.add(matmul, bias));
-
-      this.activeWebNNGraph = await builder.build({ logits: output });
-    } else {
-      // Initialize ONNX Runtime session
-      const mockOrt = this.createMockORT();
-      const sessionOptions: ORTSessionOptions = {
-        executionProviders:
-          backend === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'],
-        graphOptimizationLevel: 'all',
-      };
-
-      this.activeSession = await mockOrt.InferenceSession.create(
-        modelData instanceof ArrayBuffer ? modelData : new ArrayBuffer(1024),
-        sessionOptions
-      );
     }
 
-    this.isLoaded = true;
+    if (!loadedSuccessfully) {
+      this.updateStatus('error');
+      throw new Error(
+        `Failed to load local model on preferred backend (${preferredBackend}) or any fallback. Last error: ${lastErrorMsg}`
+      );
+    }
   }
 
   /**
@@ -336,13 +473,23 @@ export class OnDeviceLLMManager {
       );
     }
 
+    this.updateStatus('generating');
+    const startTime = performance.now();
+    let firstTokenLatencyMs = 0;
+
     const maxTokens = options?.maxTokens || 128;
     const temperature = options?.temperature ?? 0.7;
     const tokenCallback = options?.onToken;
+    const signal = options?.signal;
 
     // Simulate input compilation and run WebNN / ONNX inference cycle
     const prompt = `Explain decompiled function ${functionName} in ${arch} assembly:\n${code}`;
     const inputIds = this.tokenize(prompt);
+
+    if (signal?.aborted) {
+      this.updateStatus('ready');
+      throw new DOMException('Explanation aborted by the user.', 'AbortError');
+    }
 
     if (this.activeWebNNGraph) {
       // Simulate WebNN execution overhead
@@ -523,16 +670,45 @@ export class OnDeviceLLMManager {
 
     // Simulate token-by-token streaming output
     const rawTokens = this.tokenize(summary);
+    let totalTokensEmitted = 0;
+
     if (tokenCallback) {
       for (let i = 0; i < Math.min(rawTokens.length, maxTokens); i++) {
+        if (signal?.aborted) {
+          this.updateStatus('ready');
+          throw new DOMException('Explanation aborted by the user.', 'AbortError');
+        }
+
         const tokenStr = this.detokenize([rawTokens[i]]);
         tokenCallback(tokenStr + ' ');
+        totalTokensEmitted++;
+
+        if (firstTokenLatencyMs === 0) {
+          firstTokenLatencyMs = performance.now() - startTime;
+        }
+
         // Inject slight simulated latency depending on temperature
         await new Promise((r) =>
           setTimeout(r, Math.max(1, Math.round(temperature * 5)))
         );
       }
     }
+
+    const totalTimeMs = performance.now() - startTime;
+    if (firstTokenLatencyMs === 0) {
+      firstTokenLatencyMs = totalTimeMs;
+    }
+
+    this.lastProfile = {
+      backend: this.loadedBackend || 'unknown',
+      loadTimeMs: this.loadTimeMs,
+      firstTokenLatencyMs,
+      tokensPerSecond: totalTokensEmitted > 0 ? (totalTokensEmitted / (totalTimeMs / 1000)) : 0,
+      totalTokens: totalTokensEmitted,
+      totalTimeMs,
+    };
+
+    this.updateStatus('ready');
 
     return {
       summary,

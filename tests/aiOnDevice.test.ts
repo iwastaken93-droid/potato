@@ -230,8 +230,63 @@ describe('OnDeviceLLMManager (ONNX / WebNN Mock LLM Wrapper)', () => {
     const manager = new OnDeviceLLMManager();
     await manager.loadModel('mock-model.onnx', 'wasm');
     expect(manager.isModelLoaded()).toBe(true);
+    expect(manager.getStatus()).toBe('ready');
 
     manager.unloadModel();
     expect(manager.isModelLoaded()).toBe(false);
+    expect(manager.getStatus()).toBe('idle');
+  });
+
+  it('should support fallback sequential backend routing and fallback logs', async () => {
+    const manager = new OnDeviceLLMManager();
+    const fallbackSpy = vi.fn();
+    const statusSpy = vi.fn();
+
+    manager.setEventListeners({
+      onFallback: fallbackSpy,
+      onStatusChange: statusSpy,
+    });
+
+    // Requesting webnn-npu which is unsupported in node environment should fall back to wasm
+    await manager.loadModel('mock-model.onnx', 'webnn-npu');
+
+    expect(manager.isModelLoaded()).toBe(true);
+    expect(manager.getLoadedBackend()).toBe('wasm');
+
+    const logs = manager.getFallbackLogs();
+    expect(logs.length).toBeGreaterThan(0);
+    expect(logs[0]).toContain('Transitioning to');
+    expect(fallbackSpy).toHaveBeenCalled();
+    expect(statusSpy).toHaveBeenCalledWith('loading');
+    expect(statusSpy).toHaveBeenCalledWith('ready');
+  });
+
+  it('should generate an execution profile after explanation', async () => {
+    const manager = new OnDeviceLLMManager();
+    await manager.loadModel('mock-model.onnx', 'wasm');
+
+    await manager.explainFunction('test_profile', 'return 1;', 'x86');
+    const profile = manager.getLastProfile();
+
+    expect(profile).not.toBeNull();
+    expect(profile?.backend).toBe('wasm');
+    expect(profile?.loadTimeMs).toBeGreaterThanOrEqual(0);
+    expect(profile?.firstTokenLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(profile?.tokensPerSecond).toBeGreaterThanOrEqual(0);
+    expect(profile?.totalTokens).toBeGreaterThan(0);
+  });
+
+  it('should abort explanation if AbortSignal is triggered', async () => {
+    const manager = new OnDeviceLLMManager();
+    await manager.loadModel('mock-model.onnx', 'wasm');
+
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      manager.explainFunction('test_abort', 'return 1;', 'x86', {
+        signal: controller.signal,
+      })
+    ).rejects.toThrow();
   });
 });

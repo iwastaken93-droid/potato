@@ -1609,15 +1609,27 @@ Test Files   3 failed | 28 passed (31)
 - Added oversized files table with line counts and priority ratings.
 
 
+
 ## [2026-05-30 18:21 AEST] - Expand Syscall & Windows API Emulation
 - Expanded syscall and Windows API emulation in [src/emulator/syscall.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/syscall.ts).
   - Added Windows API hooks: GetLastError, GetStdHandle, WriteFile, ReadFile, ExitProcess, Sleep.
   - Added Linux syscall handlers: sys_close (3), sys_brk (12), sys_getpid (39), sys_getuid (102), sys_getgid (104), sys_clock_gettime (228).
 - Wrote thorough unit tests in [tests/syscall.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/syscall.test.ts) validating the behavior of the new syscalls and Windows APIs.
 - Verified test suite executes successfully with pnpm vitest run tests/syscall.test.ts.
-# #   [ 2 0 2 6 - 0 5 - 3 0   1 8 : 2 2 + 1 0 : 0 0 ]   S e s s i o n   1 3   C l o s e - o u t  
- -   V e r i f i e d   a l l   6 3 2   t e s t s   p a s s i n g   s u c c e s s f u l l y   v i a   p n p m   t e s t .  
- 
+
+## [2026-05-30 18:24 AEST] - Implement HTML/Plaintext Exports & Clean PDF Layout
+- Implemented robust report formatting support in [reportGenerator.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/reportGenerator.ts):
+  - Added `generateHTML(data: ReportData): string` method providing a premium layout using curated CSS colors, modern typography, proper table spacing, and `@media print` rules for clean browser PDF prints.
+  - Added `generatePlaintext(data: ReportData): string` method providing structured plain text output with neat ASCII/padded tables.
+- Updated report viewer in [reportPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/reportPanel.ts):
+  - Integrated "📥 Save HTML" and "📥 Save Text" toolbar export buttons.
+  - Added public API methods `downloadHTML()` and `downloadPlaintext()`.
+  - Refactored `handlePrint()` to open a print preview utilizing the new high-fidelity HTML report format directly instead of simple markdown string translation.
+- Added comprehensive unit tests in [tests/report.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/report.test.ts) and [tests/reportPanel.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/reportPanel.test.ts); verified 22/22 unit tests pass successfully.
+
+# #   [ 2 0 2 6 - 0 5 - 3 0   1 8 : 2 2 + 1 0 : 0 0 ]   S e s s i o n   1 3   C l o s e - o u t  
+ -   V e r i f i e d   a l l   6 3 2   t e s t s   p a s s i n g   s u c c e s s f u l l y   v i a   p n p m   t e s t .  
+ 
 ## [2026-05-30 18:21]
 - Added SSA-based Constant Propagation and Folding pass to [ir.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/ir.ts).
 - Added SSA-based Iterative Dead Code Elimination pass.
@@ -1626,3 +1638,31 @@ Test Files   3 failed | 28 passed (31)
 
 -   P r e p a r e d   g i t   r e p o s i t o r y   f o r   s e s s i o n   c l o s e - o u t .  
  
+## [2026-05-30T18:24:00+10:00] - Real-time Collaboration WebSocket CRDT
+- Expanded [collab.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/network/collab.ts) to support real WebSocket sync protocol.
+- Added full state vector serialization, LWW register state merging, and Yjs-like sequence merging (\MockYText.merge\).
+- Added offline message queue and auto-reconnect backoff mechanism.
+- Added unit tests in [collab.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/collab.test.ts).
+
+
+## [2026-05-30T18:23:40+10:00] Expanded Instruction Tables
+- Expanded x86_64 SSE/AVX opcodes (like sqrt, min, max, andn, ucomi, comi) in [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts)
+- Expanded AArch64 instructions: MOVK, MOVN, CLZ, FCMP in [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts)
+- Expanded Dalvik instructions (move/from16, move/16, move-object, return, return-wide, return-object, const, const-string, const-class, monitor-enter, monitor-exit, new-instance, add-int) in [router.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/router.ts)
+- Added unit tests for new instructions in [router.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/router.test.ts)
+- Verified that all 648 tests pass successfully.
+
+
+## [2026-05-30T18:25:00+10:00] GDB RSP Protocol Test Expansion & Robustness
+- Improved parser robustness in [gdbProtocol.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/gdbProtocol.ts) by catching BigInt parsing syntax errors and handling invalid registers/addresses.
+- Expanded RSP protocol test coverage in [gdbProtocol.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/gdbProtocol.test.ts) to verify edge cases for register reading/writing, memory reading/writing boundary behavior, control flow continue and step behaviors with multiple breakpoint hits, escaping, and parser stream corruption.
+- Verified all 21 tests in the GDB RSP test suite pass successfully.
+
+## [2026-05-30T18:26:00+10:00] Clean Up Dead Files & Unused DevDependencies
+- Removed unused files from `src/ui/`:
+  - [searchView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/searchView.ts)
+  - [dependencyGraphView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/dependencyGraphView.ts)
+  - [memoryMapView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/memoryMapView.ts)
+  - [vulnPanel.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/vulnPanel.ts)
+- Cleaned up unused `devDependencies` in [package.json](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/package.json): `jest`, `ts-jest`, and `@types/jest`.
+- Ran `pnpm install` and verified all tests pass successfully via `pnpm test`.

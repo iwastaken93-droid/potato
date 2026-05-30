@@ -27,3 +27,5 @@ WE WANT TO MINIMISE CONTEXT AS MUCH AS POSSIBLE IF YOU ARE SUBAGENT GIVE SHORT M
   IF YOU ARE A SUBAGENT REMEMBER TO add to DEVLOG.md before finishing
 Do not read devlog.md only add to it it is not meant for you to read 
 ALWAYS USE CAVEMAN SKILL
+IF you are subagent activate caveman full skill
+remember to kill the subagents when they finish

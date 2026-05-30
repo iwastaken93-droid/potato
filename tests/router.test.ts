@@ -307,7 +307,7 @@ describe('DisassemblerRouter Unit Tests', () => {
       expect(instsMovk[0].mnemonic).toBe('movk');
       expect(instsMovk[0].opStr).toBe('x0, #0x1234, lsl #16');
 
-      const dataMovn = new Uint8Array([0x80, 0x46, 0x82, 0x92]);
+      const dataMovn = new Uint8Array([0x80, 0x46, 0xa2, 0x92]);
       const instsMovn = router.disassemble(dataMovn, { arch: 'arm' });
       expect(instsMovn[0].mnemonic).toBe('movn');
       expect(instsMovn[0].opStr).toBe('x0, #0x1234, lsl #16');
@@ -813,4 +813,12 @@ describe('DisassemblerRouter Unit Tests', () => {
     });
 
     it('should handle truncated DEX instructions at the end of stream', () => {
-      // 0x26 opcode expects 6 bytes. We only give it 3 bytes: 0x
+      // 0x26 opcode expects 6 bytes. We only give it 3 bytes: 0x26, 0x01, 0x05
+      const data = new Uint8Array([0x26, 0x01, 0x05]);
+      const insts = router.disassemble(data, { arch: 'dex' });
+      expect(insts.length).toBe(1);
+      expect(insts[0].mnemonic).toBe('db');
+      expect(insts[0].opStr).toBe('0x26, 0x01, 0x05');
+    });
+  });
+});

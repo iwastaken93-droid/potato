@@ -358,6 +358,16 @@ export class ReportPanel {
       'btn-secondary',
       () => this.handleExportJSON()
     );
+    const exportHTMLBtn = this.createButton(
+      '📥 Save HTML',
+      'btn-secondary',
+      () => this.handleExportHTML()
+    );
+    const exportTextBtn = this.createButton(
+      '📥 Save Text',
+      'btn-secondary',
+      () => this.handleExportPlaintext()
+    );
     const printBtn = this.createButton('🖨️ Print PDF', 'btn-primary', () =>
       this.handlePrint()
     );
@@ -365,6 +375,8 @@ export class ReportPanel {
     btnGroup.appendChild(copyBtn);
     btnGroup.appendChild(exportMDBtn);
     btnGroup.appendChild(exportJSONBtn);
+    btnGroup.appendChild(exportHTMLBtn);
+    btnGroup.appendChild(exportTextBtn);
     btnGroup.appendChild(printBtn);
     headerEl.appendChild(btnGroup);
 
@@ -887,6 +899,20 @@ export class ReportPanel {
   }
 
   /**
+   * Public method to download the HTML report.
+   */
+  public downloadHTML() {
+    this.handleExportHTML();
+  }
+
+  /**
+   * Public method to download the Plaintext report.
+   */
+  public downloadPlaintext() {
+    this.handleExportPlaintext();
+  }
+
+  /**
    * Public method to copy report content to clipboard.
    */
   public copyToClipboard() {
@@ -930,9 +956,29 @@ export class ReportPanel {
     );
   }
 
+  private handleExportHTML() {
+    if (!this.currentReportData) return;
+    const html = ReportGenerator.generateHTML(this.currentReportData);
+    this.downloadFile(
+      html,
+      `${this.currentReportData.fileName}_report.html`,
+      'text/html'
+    );
+  }
+
+  private handleExportPlaintext() {
+    if (!this.currentReportData) return;
+    const text = ReportGenerator.generatePlaintext(this.currentReportData);
+    this.downloadFile(
+      text,
+      `${this.currentReportData.fileName}_report.txt`,
+      'text/plain'
+    );
+  }
+
   private handlePrint() {
     if (!this.currentReportData) return;
-    const md = ReportGenerator.generateMarkdown(this.currentReportData);
+    const html = ReportGenerator.generateHTML(this.currentReportData);
 
     if (typeof window === 'undefined' || !window.open) return;
     // Create print-friendly content window
@@ -944,74 +990,7 @@ export class ReportPanel {
       return;
     }
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Binary Analysis Report - ${this.currentReportData.fileName}</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              color: #1a202c;
-              line-height: 1.6;
-              padding: 2rem;
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            h1, h2, h3 {
-              color: #2d3748;
-              border-bottom: 1px solid #e2e8f0;
-              padding-bottom: 0.5rem;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 1.5rem 0;
-            }
-            th, td {
-              border: 1px solid #cbd5e0;
-              padding: 0.5rem 0.75rem;
-              text-align: left;
-              font-size: 0.9rem;
-            }
-            th {
-              background-color: #f7fafc;
-            }
-            code {
-              font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-              background-color: #edf2f7;
-              padding: 0.2rem 0.4rem;
-              border-radius: 3px;
-              font-size: 0.85em;
-            }
-            @media print {
-              body {
-                padding: 0;
-              }
-              button {
-                display: none;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-            <button onclick="window.print()" style="padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer;">Print / Save as PDF</button>
-          </div>
-          <div>
-            \${md.replace(/\\n/g, '<br>').replace(/\\|/g, ' ')} 
-          </div>
-          <script>
-            // Convert markdown tables/sections to clean HTML for display
-            // A simple renderer since we printed clean Markdown to raw text
-            document.body.innerHTML = document.body.innerHTML
-              .replace(/# (.*?)<br>/g, '<h1>$1</h1>')
-              .replace(/## (.*?)<br>/g, '<h2>$1</h2>')
-              .replace(/\`\`\`/g, '')
-              .replace(/\`([\s\S]*?)\`/g, '<code>$1</code>');
-          </script>
-        </body>
-      </html>
-    `);
+    printWindow.document.write(html);
     printWindow.document.close();
   }
 

@@ -301,6 +301,7 @@ export function handleGDBCommand(command: string, emulator: Emulator): string {
   if (command.startsWith('m')) {
     const parts = command.slice(1).split(',');
     if (parts.length !== 2) return 'E01';
+    if (!parts[0]) return 'E01';
     let addr: bigint;
     try {
       addr = BigInt('0x' + parts[0]);
@@ -329,6 +330,7 @@ export function handleGDBCommand(command: string, emulator: Emulator): string {
     const hexData = firstPart.slice(colonIndex + 1);
     const parts = addrLengthPart.split(',');
     if (parts.length !== 2) return 'E01';
+    if (!parts[0]) return 'E01';
     let addr: bigint;
     try {
       addr = BigInt('0x' + parts[0]);

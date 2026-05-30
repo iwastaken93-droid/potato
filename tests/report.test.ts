@@ -274,4 +274,31 @@ describe('ReportGenerator Unit Tests', () => {
       expect(md).toContain('No strings extracted.');
     });
   });
+
+  describe('generateHTML', () => {
+    it('should generate valid HTML containing metadata, sections, symbols, and strings', () => {
+      const html = ReportGenerator.generateHTML(mockBaseData);
+      expect(html).toContain('<!DOCTYPE html>');
+      expect(html).toContain('Binary Analysis Report');
+      expect(html).toContain('test_binary.exe');
+      expect(html).toContain('X86_64');
+      expect(html).toContain('0x140001000');
+      expect(html).toContain('.text');
+      expect(html).toContain('main');
+      expect(html).toContain('C:\\Windows\\System32\\cmd.exe');
+      expect(html).toContain('Print / Save as PDF');
+    });
+  });
+
+  describe('generatePlaintext', () => {
+    it('should generate formatted plain text containing metadata, sections, symbols, and strings', () => {
+      const text = ReportGenerator.generatePlaintext(mockBaseData);
+      expect(text).toContain('BINARY ANALYSIS REPORT: test_binary.exe');
+      expect(text).toContain('File Name:         test_binary.exe');
+      expect(text).toContain('Architecture:      X86_64');
+      expect(text).toContain('.text');
+      expect(text).toContain('main');
+      expect(text).toContain('C:\\Windows\\System32\\cmd.exe');
+    });
+  });
 });

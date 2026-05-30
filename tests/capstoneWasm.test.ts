@@ -64,12 +64,12 @@ describe('CapstoneWasmEngine Unit Tests', () => {
 
     expect(insts[3].address).toBe(0x1005);
     expect(insts[3].mnemonic).toBe('sub');
-    expect(insts[3].opStr).toBe('rsp, 16');
+    expect(insts[3].opStr).toBe('rsp, 0x10');
     expect(insts[3].size).toBe(4);
 
     expect(insts[4].address).toBe(0x1009);
     expect(insts[4].mnemonic).toBe('mov');
-    expect(insts[4].opStr).toBe('eax, 0xdeadbeef');
+    expect(insts[4].opStr).toBe('rax, 0x-21524111');
     expect(insts[4].size).toBe(5);
 
     expect(insts[5].address).toBe(0x100e);
@@ -88,9 +88,9 @@ describe('CapstoneWasmEngine Unit Tests', () => {
 
     // 0xd503201f (nop)
     // 0xd65f03c0 (ret)
-    // 0xe1a00000 (mov x0, x1)
+    // 0xaa0103e0 (mov x0, x1)
     const data = new Uint8Array([
-      0x1f, 0x20, 0x03, 0xd5, 0xc0, 0x03, 0x5f, 0xd6, 0x00, 0x00, 0xa0, 0xe1,
+      0x1f, 0x20, 0x03, 0xd5, 0xc0, 0x03, 0x5f, 0xd6, 0xe0, 0x03, 0x01, 0xaa,
     ]);
 
     const insts = engine.disassemble(data, 0x2000);

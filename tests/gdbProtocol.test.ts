@@ -253,52 +253,66 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
     it('should handle breakpoints and control flow during continue ("c" and "s")', () => {
       const emulator = new Emulator();
 
-      // Mock consecutive valid instructions
-      // Instruction 1: RIP 0x1000 (size 2)
+      // Mock consecutive valid instructions (mov rax, rax is supported)
+      // Instruction 1: RIP 0x1000 (size 3)
       emulator.instructions.set(0x1000, {
         address: 0x1000,
-        mnemonic: 'nop',
-        opStr: '',
-        bytes: new Uint8Array([0x90, 0x90]),
-        size: 2,
-        operands: [],
+        mnemonic: 'mov',
+        opStr: 'rax, rax',
+        bytes: new Uint8Array([0x48, 0x89, 0xc0]),
+        size: 3,
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'reg', reg: 'rax' },
+        ],
       });
-      // Instruction 2: RIP 0x1002 (size 2)
-      emulator.instructions.set(0x1002, {
-        address: 0x1002,
-        mnemonic: 'nop',
-        opStr: '',
-        bytes: new Uint8Array([0x90, 0x90]),
-        size: 2,
-        operands: [],
+      // Instruction 2: RIP 0x1003 (size 3)
+      emulator.instructions.set(0x1003, {
+        address: 0x1003,
+        mnemonic: 'mov',
+        opStr: 'rax, rax',
+        bytes: new Uint8Array([0x48, 0x89, 0xc0]),
+        size: 3,
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'reg', reg: 'rax' },
+        ],
       });
-      // Instruction 3: RIP 0x1004 (size 2)
-      emulator.instructions.set(0x1004, {
-        address: 0x1004,
-        mnemonic: 'nop',
-        opStr: '',
-        bytes: new Uint8Array([0x90, 0x90]),
-        size: 2,
-        operands: [],
+      // Instruction 3: RIP 0x1006 (size 3)
+      emulator.instructions.set(0x1006, {
+        address: 0x1006,
+        mnemonic: 'mov',
+        opStr: 'rax, rax',
+        bytes: new Uint8Array([0x48, 0x89, 0xc0]),
+        size: 3,
+        operands: [
+          { type: 'reg', reg: 'rax' },
+          { type: 'reg', reg: 'rax' },
+        ],
       });
 
       // Call reset after instructions are registered so that they are mapped into memory
       emulator.reset(0x1000);
 
-      // Step with address argument: s1002 should set RIP to 0x1002, step, and stop at 0x1004
-      expect(handleGDBCommand('s1002', emulator)).toBe('S05');
-      expect(emulator.cpu.read('rip')).toBe(0x1004n);
+      // Step with address argument: s1003 should set RIP to 0x1003, step, and stop at 0x1006
+      expect(handleGDBCommand('s1003', emulator)).toBe('S05');
+      expect(emulator.cpu.read('rip')).toBe(0x1006n);
 
       // Continue with address argument and breakpoint
       emulator.cpu.write('rip', 0x1000n);
-      emulator.addBreakpoint(0x1002);
+      emulator.addBreakpoint(0x1003);
+      emulator.addBreakpoint(0x1006);
 
-      // c1000 should set RIP to 0x1000, step over, then hit breakpoint at 0x1002
+      // c1000 should set RIP to 0x1000, step over, then hit breakpoint at 0x1003
       expect(handleGDBCommand('c1000', emulator)).toBe('S05');
-      expect(emulator.cpu.read('rip')).toBe(0x1002n);
+      expect(emulator.cpu.read('rip')).toBe(0x1003n);
 
-      // If we continue again from 0x1002 (where breakpoint is), it should step past it first and then halt/run
-      expect(handleGDBCommand('c', emulator)).toBe('S05'); // hits next breakpoint or end of instruction list (halts at 0x1006 after max steps / unmapped)
+      // If we continue again from 0x1003 (where breakpoint is), it steps past 0x1003 and hits breakpoint at 0x1006
+      expect(handleGDBCommand('c', emulator)).toBe('S05');
+      expect(emulator.cpu.read('rip')).toBe(0x1006n);
+
+      // Continuing from 0x1006 should step past it and then halt (W00) because there are no more instructions
+      expect(handleGDBCommand('c', emulator)).toBe('W00');
     });
 
     it('should handle escaping/checksum edge cases', () => {

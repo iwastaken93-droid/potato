@@ -237,3 +237,186 @@ describe('CollabPanel DOM Tests', () => {
     expect(disconnectBtn).toBeTruthy();
   });
 });
+
+describe('CollabEngine WebSocket Sync Tests', () => {
+  let originalWebSocket: any;
+  let mockWebSocketInstance: any = null;
+  let mockWebSocketConstructor: any;
+  let sentMessages: any[] = [];
+
+  beforeEach(() => {
+    originalWebSocket = (globalThis as any).WebSocket;
+    sentMessages = [];
+    mockWebSocketConstructor = vi.fn().mockImplementation(function (url: string) {
+      this.url = url;
+      this.readyState = 0; // CONNECTING
+      this.send = vi.fn().mockImplementation((data: string) => {
+        sentMessages.push(JSON.parse(data));
+      });
+      this.close = vi.fn();
+      mockWebSocketInstance = this;
+      return this;
+    });
+    (globalThis as any).WebSocket = mockWebSocketConstructor;
+  });
+
+  afterEach(() => {
+    (globalThis as any).WebSocket = originalWebSocket;
+  });
+
+  it('should connect using real WebSocket when wsUrl is provided and trigger request_sync', () => {
+    const engine = new CollabEngine();
+    engine.connect('sync-room', 'Alice', 'ws://localhost:8080/collab');
+
+    expect(mockWebSocketConstructor).toHaveBeenCalledWith(
+      'ws://localhost:8080/collab?room=sync-room&username=Alice'
+    );
+    expect(mockWebSocketInstance).toBeTruthy();
+
+    // Simulate connection open
+    mockWebSocketInstance.readyState = 1; // OPEN
+    mockWebSocketInstance.onopen();
+
+    // Check request_sync was sent
+    expect(sentMessages).toContainEqual({
+      type: 'request_sync',
+      sender: 'Alice',
+    });
+    expect(sentMessages).toContainEqual({
+      type: 'peer_join',
+      peer: {
+        id: 'Alice',
+        name: 'Alice',
+        color: '#8B5CF6',
+        status: 'connected',
+      },
+    });
+
+    engine.disconnect();
+  });
+
+  it('should queue messages while offline and flush when connection opens', () => {
+    const engine = new CollabEngine();
+    engine.connect('sync-room', 'Alice', 'ws://localhost:8080/collab');
+
+    // WebSocket is still CONNECTING (readyState = 0), send highlight
+    engine.sendHighlight(0x1000, '#EF4444');
+
+    // No message sent yet
+    expect(sentMessages.length).toBe(0);
+
+    // Open connection
+    mockWebSocketInstance.readyState = 1; // OPEN
+    mockWebSocketInstance.onopen();
+
+    // Check the queued highlight is sent along with sync request
+    expect(sentMessages).toContainEqual(expect.objectContaining({
+      type: 'highlight_op',
+      state: expect.objectContaining({
+        address: 0x1000,
+        color: '#EF4444',
+      }),
+    }));
+
+    engine.disconnect();
+  });
+
+  it('should handle request_sync and respond with full state', () => {
+    const engine = new CollabEngine();
+    engine.connect('sync-room', 'Alice', 'ws://localhost:8080/collab');
+
+    mockWebSocketInstance.readyState = 1;
+    mockWebSocketInstance.onopen();
+    sentMessages = []; // Reset list
+
+    // Set some local states
+    engine.sendHighlight(0x2000, '#10B981');
+
+    // Simulate receiving request_sync
+    mockWebSocketInstance.onmessage({
+      data: JSON.stringify({
+        type: 'request_sync',
+        sender: 'Bob',
+      }),
+    });
+
+    // Alice should reply with sync_state containing her state
+    expect(sentMessages).toContainEqual(expect.objectContaining({
+      type: 'sync_state',
+      recipient: 'Bob',
+      state: expect.objectContaining({
+        highlights: expect.arrayContaining([
+          expect.arrayContaining([
+            0x2000,
+            expect.objectContaining({ color: '#10B981' })
+          ])
+        ])
+      }),
+    }));
+
+    engine.disconnect();
+  });
+
+  it('should handle sync_state and merge external updates', () => {
+    const engine = new CollabEngine();
+    engine.connect('sync-room', 'Alice', 'ws://localhost:8080/collab');
+
+    mockWebSocketInstance.readyState = 1;
+    mockWebSocketInstance.onopen();
+
+    const externalState = {
+      lamportClock: 10,
+      comments: [
+        {
+          address: 0x3000,
+          items: [{ id: 'Bob:1', char: 'H', origin: null, deleted: false }],
+        },
+      ],
+      highlights: [
+        [
+          0x4000,
+          {
+            address: 0x4000,
+            color: '#3B82F6',
+            peerName: 'Bob',
+            timestamp: Date.now(),
+            clock: 5,
+            client: 'Bob',
+          },
+        ],
+      ],
+      renames: [
+        [
+          'sub_1000',
+          {
+            originalName: 'sub_1000',
+            renamedName: 'run_analysis',
+            type: 'function',
+            peerName: 'Bob',
+            timestamp: Date.now(),
+            clock: 5,
+            client: 'Bob',
+          },
+        ],
+      ],
+    };
+
+    // Receive sync_state message
+    mockWebSocketInstance.onmessage({
+      data: JSON.stringify({
+        type: 'sync_state',
+        recipient: 'Alice',
+        state: externalState,
+      }),
+    });
+
+    // Verify merged comments
+    expect(engine.getComments().get(0x3000)?.comment).toBe('H');
+    // Verify merged highlights
+    expect(engine.getHighlights().get(0x4000)?.color).toBe('#3B82F6');
+    // Verify merged renames
+    expect(engine.getRenames().get('sub_1000')?.renamedName).toBe('run_analysis');
+
+    engine.disconnect();
+  });
+});

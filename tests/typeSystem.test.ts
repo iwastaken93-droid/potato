@@ -97,4 +97,100 @@ describe('TypeSystemPanel Unit Tests', () => {
     // In our parser Vector3D is in the parsed structs, so it resolves to 12
     expect(posField!.size).toBe(12);
   });
+
+  it('should parse C union definitions correctly', () => {
+    const source = `
+      union Value {
+        int i;
+        float f;
+        char buf[8];
+      };
+    `;
+
+    const parsed = panel.parseCStructs(source);
+    expect(parsed.length).toBe(1);
+
+    const valUnion = parsed[0];
+    expect(valUnion.name).toBe('Value');
+    expect(valUnion.isUnion).toBe(true);
+    expect(valUnion.size).toBe(8); // max(4, 4, 8) = 8
+
+    valUnion.fields.forEach((field) => {
+      expect(field.offset).toBe(0);
+    });
+  });
+
+  it('should parse C enum definitions correctly', () => {
+    const source = `
+      enum Color {
+        RED = 0,
+        GREEN = 2,
+        BLUE
+      };
+    `;
+
+    const parsed = panel.parseCStructs(source);
+    expect(parsed.length).toBe(1);
+
+    const colorEnum = parsed[0];
+    expect(colorEnum.name).toBe('Color');
+    expect(colorEnum.isEnum).toBe(true);
+    expect(colorEnum.size).toBe(4);
+    expect(colorEnum.enumValues).toBeDefined();
+    expect(colorEnum.enumValues!.length).toBe(3);
+    expect(colorEnum.enumValues![0]).toEqual({ name: 'RED', value: 0 });
+    expect(colorEnum.enumValues![1]).toEqual({ name: 'GREEN', value: 2 });
+    expect(colorEnum.enumValues![2]).toEqual({ name: 'BLUE', value: 3 });
+  });
+
+  it('should parse C typedefs and resolve aliases correctly', () => {
+    const source = `
+      typedef unsigned int DWORD;
+      typedef struct {
+        DWORD code;
+        char name[8];
+      } Message;
+    `;
+
+    const parsed = panel.parseCStructs(source);
+    // Message structure should be parsed
+    expect(parsed.length).toBe(1);
+
+    const msg = parsed[0];
+    expect(msg.name).toBe('Message');
+    expect(msg.size).toBe(12); // DWORD (4) + name[8] (8) = 12
+
+    const codeField = msg.fields.find((f) => f.name === 'code');
+    expect(codeField).toBeDefined();
+    expect(codeField!.type).toBe('DWORD');
+    expect(codeField!.size).toBe(4);
+  });
+
+  it('should parse inline nested structures correctly', () => {
+    const source = `
+      struct Outer {
+        int a;
+        struct Inner {
+          char b;
+        } nested;
+      };
+    `;
+
+    const parsed = panel.parseCStructs(source);
+    // Should parse both Inner and Outer
+    expect(parsed.length).toBe(2);
+
+    const inner = parsed.find((s) => s.name === 'Inner');
+    const outer = parsed.find((s) => s.name === 'Outer');
+
+    expect(inner).toBeDefined();
+    expect(inner!.size).toBe(1);
+
+    expect(outer).toBeDefined();
+    expect(outer!.size).toBe(5); // int a (4) + Inner nested (1) = 5
+    const nestedField = outer!.fields.find((f) => f.name === 'nested');
+    expect(nestedField).toBeDefined();
+    expect(nestedField!.type).toBe('Inner');
+    expect(nestedField!.size).toBe(1);
+  });
 });

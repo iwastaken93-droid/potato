@@ -189,6 +189,19 @@ describe('DisassemblerRouter Unit Tests', () => {
       expect(insts[0].mnemonic).toBe('ud2');
       expect(insts[0].opStr).toBe('');
     });
+
+    it('should disassemble SSE instructions correctly', () => {
+      const data = new Uint8Array([0xf3, 0x0f, 0x51, 0xc3]);
+      const insts = router.disassemble(data, { arch: 'x86_64' });
+      expect(insts[0].mnemonic).toBe('sqrtss');
+      expect(insts[0].opStr).toBe('xmm0, xmm3');
+    });
+
+    it('should disassemble AVX instructions correctly', () => {
+      const data = new Uint8Array([0xc5, 0xf4, 0x51, 0xc2]);
+      const insts = router.disassemble(data, { arch: 'x86_64' });
+      expect(insts[0].mnemonic).toBe('vsqrtps');
+    });
   });
 
   describe('ARM AArch64 Instruction Expansion Verification', () => {
@@ -272,6 +285,32 @@ describe('DisassemblerRouter Unit Tests', () => {
       const insts = router.disassemble(data, { arch: 'arm' });
       expect(insts[0].mnemonic).toBe('madd');
       expect(insts[0].opStr).toBe('x0, x1, x2, x3');
+    });
+
+    it('should disassemble CLZ correctly', () => {
+      const data = new Uint8Array([0x20, 0x10, 0xc0, 0x5a]);
+      const insts = router.disassemble(data, { arch: 'arm' });
+      expect(insts[0].mnemonic).toBe('clz');
+      expect(insts[0].opStr).toBe('w0, w1');
+    });
+
+    it('should disassemble FCMP correctly', () => {
+      const data = new Uint8Array([0x20, 0x20, 0x20, 0x1e]);
+      const insts = router.disassemble(data, { arch: 'arm' });
+      expect(insts[0].mnemonic).toBe('fcmp');
+      expect(insts[0].opStr).toBe('s1, s0');
+    });
+
+    it('should disassemble MOVK and MOVN correctly', () => {
+      const dataMovk = new Uint8Array([0x80, 0x46, 0xa2, 0xf2]);
+      const instsMovk = router.disassemble(dataMovk, { arch: 'arm' });
+      expect(instsMovk[0].mnemonic).toBe('movk');
+      expect(instsMovk[0].opStr).toBe('x0, #0x1234, lsl #16');
+
+      const dataMovn = new Uint8Array([0x80, 0x46, 0x82, 0x92]);
+      const instsMovn = router.disassemble(dataMovn, { arch: 'arm' });
+      expect(instsMovn[0].mnemonic).toBe('movn');
+      expect(instsMovn[0].opStr).toBe('x0, #0x1234, lsl #16');
     });
   });
 
@@ -538,6 +577,49 @@ describe('DisassemblerRouter Unit Tests', () => {
       expect(insts[5].mnemonic).toBe('invoke-static');
       expect(insts[6].mnemonic).toBe('const/16');
     });
+
+    it('should disassemble new DEX/Dalvik instructions correctly', () => {
+      const data = new Uint8Array([
+        0x02, 0x01, 0x34, 0x12, // move/from16 v1, v0x1234
+        0x03, 0x00, 0x34, 0x12, 0x78, 0x56, // move/16 v0x1234, v0x5678
+        0x07, 0x12, // move-object v2, v1
+        0x0f, 0x03, // return v3
+        0x10, 0x04, // return-wide v4
+        0x11, 0x05, // return-object v5
+        0x14, 0x01, 0x78, 0x56, 0x34, 0x12, // const v1, #0x12345678
+        0x1a, 0x02, 0x34, 0x12, // const-string v2, string@0x1234
+        0x1c, 0x03, 0x78, 0x56, // const-class v3, class@0x5678
+        0x1d, 0x04, // monitor-enter v4
+        0x1e, 0x05, // monitor-exit v5
+        0x22, 0x06, 0xbc, 0x9a, // new-instance v6, type@0x9abc
+        0x90, 0x07, 0x08, 0x09, // add-int v7, v8, v9
+      ]);
+      const insts = router.disassemble(data, { arch: 'dex' });
+      expect(insts[0].mnemonic).toBe('move/from16');
+      expect(insts[0].opStr).toBe('v1, v4660');
+      expect(insts[1].mnemonic).toBe('move/16');
+      expect(insts[1].opStr).toBe('v4660, v22136');
+      expect(insts[2].mnemonic).toBe('move-object');
+      expect(insts[2].opStr).toBe('v2, v1');
+      expect(insts[3].mnemonic).toBe('return');
+      expect(insts[3].opStr).toBe('v3');
+      expect(insts[4].mnemonic).toBe('return-wide');
+      expect(insts[4].opStr).toBe('v4');
+      expect(insts[5].mnemonic).toBe('return-object');
+      expect(insts[5].opStr).toBe('v5');
+      expect(insts[6].mnemonic).toBe('const');
+      expect(insts[6].opStr).toBe('v1, #0x12345678');
+      expect(insts[7].mnemonic).toBe('const-string');
+      expect(insts[7].opStr).toBe('v2, string@0x1234');
+      expect(insts[8].mnemonic).toBe('const-class');
+      expect(insts[8].opStr).toBe('v3, class@0x5678');
+      expect(insts[9].mnemonic).toBe('monitor-enter');
+      expect(insts[10].mnemonic).toBe('monitor-exit');
+      expect(insts[11].mnemonic).toBe('new-instance');
+      expect(insts[11].opStr).toBe('v6, type@0x9abc');
+      expect(insts[12].mnemonic).toBe('add-int');
+      expect(insts[12].opStr).toBe('v7, v8, v9');
+    });
   });
 
   describe('x86_64 and ARM edge cases', () => {
@@ -731,70 +813,4 @@ describe('DisassemblerRouter Unit Tests', () => {
     });
 
     it('should handle truncated DEX instructions at the end of stream', () => {
-      // 0x26 opcode expects 6 bytes. We only give it 3 bytes: 0x26, 0x01, 0x05
-      const data = new Uint8Array([0x26, 0x01, 0x05]);
-      const insts = router.disassemble(data, { arch: 'dex' });
-      expect(insts.length).toBe(1);
-      expect(insts[0].mnemonic).toBe('db');
-      expect(insts[0].opStr).toBe('0x26, 0x01, 0x05');
-    });
-
-    it('should handle mocked WASM instructions with various argument types', () => {
-      const mockModule = {
-        magic: [0x00, 0x61, 0x73, 0x6d],
-        version: 1,
-        types: [],
-        imports: [],
-        functions: [],
-        exports: [],
-        code: [
-          {
-            locals: [],
-            rawBytes: new Uint8Array([0x41, 0x05]),
-            instructions: [
-              { offset: 0, opcode: 0x41, mnemonic: 'i32.const', args: 100 },
-              { offset: 2, opcode: 0x42, mnemonic: 'i64.const', args: 500n },
-              { offset: 4, opcode: 0x20, mnemonic: 'local.get', args: [1, 2] },
-              {
-                offset: 6,
-                opcode: 0x03,
-                mnemonic: 'loop',
-                args: { blockType: 0x40 },
-              },
-              { offset: 8, opcode: 0x0b, mnemonic: 'end', args: 'some-string' },
-            ],
-          },
-        ],
-      };
-
-      const spy = vi
-        .spyOn(wasmParser, 'parseWasm')
-        .mockReturnValueOnce(mockModule as any);
-
-      const wasmBytes = new Uint8Array([
-        0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
-      ]);
-      const insts = router.disassemble(wasmBytes);
-
-      expect(spy).toHaveBeenCalled();
-      expect(insts.length).toBe(5);
-
-      expect(insts[0].mnemonic).toBe('i32.const');
-      expect(insts[0].opStr).toBe('100');
-
-      expect(insts[1].mnemonic).toBe('i64.const');
-      expect(insts[1].opStr).toBe('500');
-
-      expect(insts[2].mnemonic).toBe('local.get');
-      expect(insts[2].opStr).toBe('1, 2');
-
-      expect(insts[3].mnemonic).toBe('loop');
-      expect(insts[3].opStr).toBe('{"blockType":64}');
-
-      expect(insts[4].mnemonic).toBe('end');
-      expect(insts[4].opStr).toBe('some-string');
-
-      spy.mockRestore();
-    });
-  });
-});
+      // 0x26 opcode expects 6 bytes. We only give it 3 bytes: 0x

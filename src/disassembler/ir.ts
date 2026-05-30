@@ -1033,4 +1033,429 @@ export class IROptimizer {
 
     return cfg;
   }
+
+  /**
+   * SSA-based Constant Propagation and Folding.
+   * Propagates constant definitions through SSA variables and folds operations.
+   *
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph.
+   */
+  public ssaConstantFolding(cfg: IRCFG): IRCFG {
+    const constants = new Map<string, number | bigint>();
+    let changed = true;
+
+    while (changed) {
+      changed = false;
+
+      for (const block of cfg.blocks.values()) {
+        for (const inst of block.instructions) {
+          if (inst.op === IROp.PHI && inst.args.length > 0) {
+            const resolvedArgs = inst.args.map((arg) => {
+              if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+                const key = `${arg.name}_${arg.version}`;
+                if (constants.has(key)) {
+                  return { type: 'imm', value: constants.get(key) };
+                }
+              }
+              return arg;
+            });
+            if (resolvedArgs.every((arg) => arg.type === 'imm' && arg.value !== undefined)) {
+              const firstVal = resolvedArgs[0].value;
+              if (resolvedArgs.every((arg) => arg.value === firstVal)) {
+                inst.op = IROp.MOV;
+                inst.args = [{ type: 'imm', value: firstVal! }];
+                if (inst.dest && inst.dest.name && inst.dest.version !== undefined) {
+                  const destKey = `${inst.dest.name}_${inst.dest.version}`;
+                  if (constants.get(destKey) !== firstVal) {
+                    constants.set(destKey, firstVal!);
+                    changed = true;
+                  }
+                }
+              }
+            }
+            continue;
+          }
+
+          for (let i = 0; i < inst.args.length; i++) {
+            const arg = inst.args[i];
+            if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+              const key = `${arg.name}_${arg.version}`;
+              if (constants.has(key)) {
+                inst.args[i] = { type: 'imm', value: constants.get(key) };
+                changed = true;
+              }
+            }
+          }
+
+          if (
+            inst.args.length === 2 &&
+            inst.args.every((arg) => arg.type === 'imm')
+          ) {
+            const val1 = Number(inst.args[0].value ?? 0);
+            const val2 = Number(inst.args[1].value ?? 0);
+            let foldedValue: number | null = null;
+
+            switch (inst.op) {
+              case IROp.ADD:
+                foldedValue = val1 + val2;
+                break;
+              case IROp.SUB:
+                foldedValue = val1 - val2;
+                break;
+              case IROp.MUL:
+                foldedValue = val1 * val2;
+                break;
+              case IROp.DIV:
+                if (val2 !== 0) foldedValue = Math.floor(val1 / val2);
+                break;
+              case IROp.AND:
+                foldedValue = val1 & val2;
+                break;
+              case IROp.OR:
+                foldedValue = val1 | val2;
+                break;
+              case IROp.XOR:
+                foldedValue = val1 ^ val2;
+                break;
+            }
+
+            if (foldedValue !== null && inst.dest && inst.dest.name && inst.dest.version !== undefined) {
+              inst.op = IROp.MOV;
+              inst.args = [{ type: 'imm', value: foldedValue }];
+              const destKey = `${inst.dest.name}_${inst.dest.version}`;
+              if (constants.get(destKey) !== foldedValue) {
+                constants.set(destKey, foldedValue);
+                changed = true;
+              }
+            }
+          }
+
+          if (
+            inst.op === IROp.MOV &&
+            inst.dest &&
+            inst.dest.name &&
+            inst.dest.version !== undefined &&
+            inst.args.length === 1 &&
+            inst.args[0].type === 'imm' &&
+            inst.args[0].value !== undefined
+          ) {
+            const destKey = `${inst.dest.name}_${inst.dest.version}`;
+            const val = inst.args[0].value;
+            if (constants.get(destKey) !== val) {
+              constants.set(destKey, val);
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+
+    return cfg;
+  }
+
+  /**
+   * SSA-based Iterative Dead Code Elimination (DCE).
+   * Iteratively removes instructions whose outputs are never read.
+   *
+   * @param cfg The IR Control Flow Graph to optimize.
+   * @returns The optimized IR Control Flow Graph.
+   */
+  public ssaDeadCodeElimination(cfg: IRCFG): IRCFG {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const readCount = new Map<string, number>();
+
+      for (const block of cfg.blocks.values()) {
+        for (const inst of block.instructions) {
+          for (const arg of inst.args) {
+            if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+              const key = `${arg.name}_${arg.version}`;
+              readCount.set(key, (readCount.get(key) ?? 0) + 1);
+            }
+          }
+        }
+      }
+
+      for (const block of cfg.blocks.values()) {
+        const initialCount = block.instructions.length;
+        block.instructions = block.instructions.filter((inst) => {
+          if (
+            [IROp.STORE, IROp.JMP, IROp.BRANCH, IROp.RET, IROp.CALL].includes(
+              inst.op
+            )
+          ) {
+            return true;
+          }
+
+          if (
+            inst.dest &&
+            inst.dest.type === 'var' &&
+            inst.dest.name &&
+            inst.dest.version !== undefined
+          ) {
+            const key = `${inst.dest.name}_${inst.dest.version}`;
+            const reads = readCount.get(key) ?? 0;
+            return reads > 0;
+          }
+
+          return true;
+        });
+
+        if (block.instructions.length !== initialCount) {
+          changed = true;
+        }
+      }
+    }
+
+    return cfg;
+  }
+
+  /**
+   * Performs Live Variable Analysis on the SSA CFG.
+   */
+  public performLivenessAnalysis(cfg: IRCFG): {
+    liveIn: Map<string, Set<string>>;
+    liveOut: Map<string, Set<string>>;
+  } {
+    const liveIn = new Map<string, Set<string>>();
+    const liveOut = new Map<string, Set<string>>();
+    const ueVar = new Map<string, Set<string>>();
+    const varKill = new Map<string, Set<string>>();
+
+    for (const [blockId, block] of cfg.blocks.entries()) {
+      liveIn.set(blockId, new Set());
+      liveOut.set(blockId, new Set());
+      const blockUeVar = new Set<string>();
+      const blockVarKill = new Set<string>();
+
+      for (const inst of block.instructions) {
+        if (inst.op !== IROp.PHI) {
+          for (const arg of inst.args) {
+            if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+              const varKey = `${arg.name}_${arg.version}`;
+              if (!blockVarKill.has(varKey)) {
+                blockUeVar.add(varKey);
+              }
+            }
+          }
+        }
+
+        if (inst.dest && inst.dest.type === 'var' && inst.dest.name && inst.dest.version !== undefined) {
+          const varKey = `${inst.dest.name}_${inst.dest.version}`;
+          blockVarKill.add(varKey);
+        }
+      }
+
+      ueVar.set(blockId, blockUeVar);
+      varKill.set(blockId, blockVarKill);
+    }
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+
+      for (const [blockId, block] of cfg.blocks.entries()) {
+        const currentLiveOut = liveOut.get(blockId) || new Set();
+        const newLiveOut = new Set<string>();
+
+        for (const succId of block.successors) {
+          const succBlock = cfg.blocks.get(succId);
+          if (!succBlock) continue;
+
+          const succLiveIn = liveIn.get(succId) || new Set();
+          for (const v of succLiveIn) {
+            let isPhiDest = false;
+            for (const inst of succBlock.instructions) {
+              if (inst.op === IROp.PHI && inst.dest && inst.dest.name && inst.dest.version !== undefined) {
+                if (`${inst.dest.name}_${inst.dest.version}` === v) {
+                  isPhiDest = true;
+                  break;
+                }
+              }
+            }
+            if (!isPhiDest) {
+              newLiveOut.add(v);
+            }
+          }
+
+          const predIndex = succBlock.predecessors.indexOf(blockId);
+          if (predIndex !== -1) {
+            for (const inst of succBlock.instructions) {
+              if (inst.op === IROp.PHI && inst.args[predIndex]) {
+                const arg = inst.args[predIndex];
+                if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+                  newLiveOut.add(`${arg.name}_${arg.version}`);
+                }
+              }
+            }
+          }
+        }
+
+        if (newLiveOut.size !== currentLiveOut.size || Array.from(newLiveOut).some(v => !currentLiveOut.has(v))) {
+          liveOut.set(blockId, newLiveOut);
+          changed = true;
+        }
+
+        const blockUeVar = ueVar.get(blockId) || new Set();
+        const blockVarKill = varKill.get(blockId) || new Set();
+        const newLiveIn = new Set(blockUeVar);
+        for (const v of newLiveOut) {
+          if (!blockVarKill.has(v)) {
+            newLiveIn.add(v);
+          }
+        }
+
+        const currentLiveIn = liveIn.get(blockId) || new Set();
+        if (newLiveIn.size !== currentLiveIn.size || Array.from(newLiveIn).some(v => !currentLiveIn.has(v))) {
+          liveIn.set(blockId, newLiveIn);
+          changed = true;
+        }
+      }
+    }
+
+    return { liveIn, liveOut };
+  }
+
+  /**
+   * Constructs the Interference Graph of SSA variables.
+   */
+  public buildInterferenceGraph(
+    cfg: IRCFG,
+    liveOut: Map<string, Set<string>>
+  ): Map<string, Set<string>> {
+    const interference = new Map<string, Set<string>>();
+
+    const addInterference = (u: string, v: string) => {
+      if (u === v) return;
+      if (!interference.has(u)) interference.set(u, new Set());
+      if (!interference.has(v)) interference.set(v, new Set());
+      interference.get(u)!.add(v);
+      interference.get(v)!.add(u);
+    };
+
+    for (const block of cfg.blocks.values()) {
+      for (const inst of block.instructions) {
+        if (inst.dest && inst.dest.type === 'var' && inst.dest.name && inst.dest.version !== undefined) {
+          const key = `${inst.dest.name}_${inst.dest.version}`;
+          if (!interference.has(key)) interference.set(key, new Set());
+        }
+        for (const arg of inst.args) {
+          if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+            const key = `${arg.name}_${arg.version}`;
+            if (!interference.has(key)) interference.set(key, new Set());
+          }
+        }
+      }
+    }
+
+    for (const [blockId, block] of cfg.blocks.entries()) {
+      const live = new Set(liveOut.get(blockId) || new Set());
+
+      for (let i = block.instructions.length - 1; i >= 0; i--) {
+        const inst = block.instructions[i];
+
+        if (inst.dest && inst.dest.type === 'var' && inst.dest.name && inst.dest.version !== undefined) {
+          const destKey = `${inst.dest.name}_${inst.dest.version}`;
+          for (const v of live) {
+            addInterference(destKey, v);
+          }
+          live.delete(destKey);
+        }
+
+        if (inst.op !== IROp.PHI) {
+          for (const arg of inst.args) {
+            if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+              live.add(`${arg.name}_${arg.version}`);
+            }
+          }
+        }
+      }
+    }
+
+    return interference;
+  }
+
+  /**
+   * Color the interference graph using available registers.
+   */
+  public allocateRegisters(
+    cfg: IRCFG,
+    availableRegisters: string[]
+  ): { mapping: Map<string, string>; spilled: Set<string> } {
+    const { liveOut } = this.performLivenessAnalysis(cfg);
+    const interference = this.buildInterferenceGraph(cfg, liveOut);
+
+    const mapping = new Map<string, string>();
+    const spilled = new Set<string>();
+
+    const vars = Array.from(interference.keys()).sort((a, b) => {
+      const degA = interference.get(a)?.size ?? 0;
+      const degB = interference.get(b)?.size ?? 0;
+      return degB - degA;
+    });
+
+    for (const v of vars) {
+      const neighbors = interference.get(v) || new Set();
+      const usedRegs = new Set<string>();
+      for (const n of neighbors) {
+        if (mapping.has(n)) {
+          usedRegs.add(mapping.get(n)!);
+        }
+      }
+
+      let allocated = false;
+      for (const reg of availableRegisters) {
+        if (!usedRegs.has(reg)) {
+          mapping.set(v, reg);
+          allocated = true;
+          break;
+        }
+      }
+
+      if (!allocated) {
+        spilled.add(v);
+      }
+    }
+
+    return { mapping, spilled };
+  }
+
+  /**
+   * Apply the register allocation mapping to rewrite the CFG operands.
+   */
+  public applyRegisterAllocation(
+    cfg: IRCFG,
+    mapping: Map<string, string>
+  ): IRCFG {
+    for (const block of cfg.blocks.values()) {
+      for (const inst of block.instructions) {
+        if (inst.dest && inst.dest.type === 'var' && inst.dest.name && inst.dest.version !== undefined) {
+          const key = `${inst.dest.name}_${inst.dest.version}`;
+          if (mapping.has(key)) {
+            inst.dest = {
+              type: 'reg',
+              name: mapping.get(key)!,
+            };
+          }
+        }
+
+        inst.args = inst.args.map((arg) => {
+          if (arg.type === 'var' && arg.name && arg.version !== undefined) {
+            const key = `${arg.name}_${arg.version}`;
+            if (mapping.has(key)) {
+              return {
+                type: 'reg',
+                name: mapping.get(key)!,
+              };
+            }
+          }
+          return arg;
+        });
+      }
+    }
+    return cfg;
+  }
 }
+

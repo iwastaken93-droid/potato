@@ -1,6 +1,34 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ApplicationCoordinator } from '../src/main.js';
+import { GDBPanel } from '../src/ui/gdbPanel.js';
+import { MachoObjcPanel } from '../src/ui/machoObjcPanel.js';
+import { SearchPanel } from '../src/ui/searchPanel.js';
+import { ReportPanel } from '../src/ui/reportPanel.js';
+import { YaraPanel } from '../src/ui/yaraPanel.js';
+import { MetadataPanel } from '../src/ui/metadataPanel.js';
+import { TypeSystemPanel } from '../src/ui/typeSystemPanel.js';
+import { DiffPanel } from '../src/ui/diffPanel.js';
+import { EmulatorPanel } from '../src/ui/emulatorPanel.js';
+import { CollabPanel } from '../src/ui/collabPanel.js';
+import { PluginsPanel } from '../src/ui/pluginsPanel.js';
+import { DemanglerPanel } from '../src/ui/demanglerPanel.js';
+import { AIPanel } from '../src/ui/aiPanel.js';
+
+const PANEL_REGISTRY = (globalThis as any).PANEL_REGISTRY || ((globalThis as any).PANEL_REGISTRY = {});
+PANEL_REGISTRY['GDBPanel'] = GDBPanel;
+PANEL_REGISTRY['MachoObjcPanel'] = MachoObjcPanel;
+PANEL_REGISTRY['SearchPanel'] = SearchPanel;
+PANEL_REGISTRY['ReportPanel'] = ReportPanel;
+PANEL_REGISTRY['YaraPanel'] = YaraPanel;
+PANEL_REGISTRY['MetadataPanel'] = MetadataPanel;
+PANEL_REGISTRY['TypeSystemPanel'] = TypeSystemPanel;
+PANEL_REGISTRY['DiffPanel'] = DiffPanel;
+PANEL_REGISTRY['EmulatorPanel'] = EmulatorPanel;
+PANEL_REGISTRY['CollabPanel'] = CollabPanel;
+PANEL_REGISTRY['PluginsPanel'] = PluginsPanel;
+PANEL_REGISTRY['DemanglerPanel'] = DemanglerPanel;
+PANEL_REGISTRY['AIPanel'] = AIPanel;
 
 // Define globally required mocks for JSDOM
 if (typeof global.ResizeObserver === 'undefined') {

@@ -20,6 +20,9 @@ export interface StructDefinition {
   size: number;
   fields: StructField[];
   description?: string;
+  isUnion?: boolean;
+  isEnum?: boolean;
+  enumValues?: { name: string; value: number }[];
 }
 
 export interface TypeSystemPanelOptions {
@@ -36,6 +39,7 @@ export class TypeSystemPanel {
   private selectedStructName: string = '';
   private searchQuery: string = '';
   private pointerSize: number = 8; // Default 64-bit
+  private typedefs: Record<string, string> = {};
 
   // DOM elements
   private rootEl!: HTMLDivElement;
@@ -46,12 +50,14 @@ export class TypeSystemPanel {
   constructor(container: HTMLElement, options: TypeSystemPanelOptions = {}) {
     this.container = container;
     this.options = options;
+    this.typedefs = {};
 
     this.initDefaultStructs();
     this.initLayout();
     this.setupEvents();
     this.render();
   }
+
 
   /**
    * Updates pointer size based on architecture
@@ -305,6 +311,23 @@ export class TypeSystemPanel {
   }
 
   private recalculateStructSize(s: StructDefinition) {
+    if (s.isEnum) {
+      s.size = 4;
+      return;
+    }
+    if (s.isUnion) {
+      let maxSize = 0;
+      for (const field of s.fields) {
+        field.offset = 0;
+        field.size = this.resolveFieldSize(field.type);
+        if (field.size > maxSize) {
+          maxSize = field.size;
+        }
+      }
+      s.size = maxSize;
+      return;
+    }
+
     let currentOffset = 0;
     for (const field of s.fields) {
       field.offset = currentOffset;
@@ -476,6 +499,8 @@ export class TypeSystemPanel {
       return;
     }
 
+    const typeKind = struct.isEnum ? 'enum' : (struct.isUnion ? 'union' : 'struct');
+
     // Main detail container
     const header = document.createElement('div');
     header.style.cssText = `
@@ -488,13 +513,13 @@ export class TypeSystemPanel {
     header.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 0.25rem;">
         <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-          📦 struct ${struct.name}
+          📦 ${typeKind} ${struct.name}
           <span class="type-badge" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">Size: ${struct.size} bytes</span>
         </h2>
         <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${struct.description || 'No description provided.'}</p>
       </div>
       <div style="display: flex; gap: 0.5rem;">
-        <button class="btn btn-secondary" id="btn-delete-struct" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Delete Struct</button>
+        <button class="btn btn-secondary" id="btn-delete-struct" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Delete Type</button>
       </div>
     `;
     header
@@ -502,6 +527,110 @@ export class TypeSystemPanel {
       .addEventListener('click', () => {
         this.deleteStruct(struct.name);
       });
+
+    if (struct.isEnum) {
+      // Render Enum values table and form to add enum value
+      const enumValuesSection = document.createElement('div');
+      enumValuesSection.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      `;
+      enumValuesSection.innerHTML = `
+        <h3 style="margin: 0; font-size: 0.95rem; color: var(--text-primary);">Enum Constants</h3>
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; background: rgba(0, 0, 0, 0.1); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-color);">
+          <thead>
+            <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+              <th style="padding: 0.75rem 1rem;">Constant Name</th>
+              <th style="padding: 0.75rem 1rem;">Value (Dec)</th>
+              <th style="padding: 0.75rem 1rem;">Value (Hex)</th>
+              <th style="padding: 0.75rem 1rem; text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="enum-values-body">
+          </tbody>
+        </table>
+      `;
+      
+      const valBody = enumValuesSection.querySelector('#enum-values-body')!;
+      if (!struct.enumValues || struct.enumValues.length === 0) {
+        valBody.innerHTML = `
+          <tr>
+            <td colspan="4" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+              No constants defined. Add values below.
+            </td>
+          </tr>
+        `;
+      } else {
+        struct.enumValues.forEach((ev: { name: string; value: number }, index: number) => {
+          const row = document.createElement('tr');
+          row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.03)';
+          row.innerHTML = `
+            <td style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-primary);">${ev.name}</td>
+            <td style="padding: 0.75rem 1rem; font-family: var(--font-mono);">${ev.value}</td>
+            <td style="padding: 0.75rem 1rem; font-family: var(--font-mono); color: var(--text-muted);">0x${ev.value.toString(16).toUpperCase()}</td>
+            <td style="padding: 0.75rem 1rem; text-align: right;">
+              <button class="btn btn-secondary btn-delete-enum-val" data-index="${index}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Remove</button>
+            </td>
+          `;
+          row.querySelector('.btn-delete-enum-val')!.addEventListener('click', () => {
+            struct.enumValues!.splice(index, 1);
+            this.render();
+          });
+          valBody.appendChild(row);
+        });
+      }
+      
+      // Add enum constant form
+      const addEnumValForm = document.createElement('div');
+      addEnumValForm.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: rgba(255, 255, 255, 0.01);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.25rem;
+      `;
+      addEnumValForm.innerHTML = `
+        <h4 style="margin: 0; font-size: 0.9rem; color: var(--text-primary);">+ Add Enum Constant</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="new-enum-name">Constant Name</label>
+            <input type="text" id="new-enum-name" class="search-input" placeholder="e.g. VAL_MAX" style="padding: 0.5rem;">
+          </div>
+          <div class="form-group">
+            <label for="new-enum-value">Value (Optional)</label>
+            <input type="number" id="new-enum-value" class="search-input" placeholder="Auto" style="padding: 0.5rem;">
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-add-enum-val" style="padding: 0.5rem; font-size: 0.85rem; align-self: flex-start;">Add Constant</button>
+      `;
+      
+      addEnumValForm.querySelector('#btn-add-enum-val')!.addEventListener('click', () => {
+        const nameEl = addEnumValForm.querySelector('#new-enum-name') as HTMLInputElement;
+        const valEl = addEnumValForm.querySelector('#new-enum-value') as HTMLInputElement;
+        const cName = nameEl.value.trim();
+        if (!cName) {
+          alert('Constant name is required.');
+          return;
+        }
+        let nextVal = 0;
+        if (struct.enumValues && struct.enumValues.length > 0) {
+          nextVal = struct.enumValues[struct.enumValues.length - 1].value + 1;
+        }
+        const finalVal = valEl.value ? parseInt(valEl.value, 10) : nextVal;
+        
+        if (!struct.enumValues) struct.enumValues = [];
+        struct.enumValues.push({ name: cName, value: finalVal });
+        this.render();
+      });
+      
+      detailArea.appendChild(header);
+      detailArea.appendChild(enumValuesSection);
+      detailArea.appendChild(addEnumValForm);
+      return;
+    }
 
     // Code Preview section & Visualizer section container
     const layoutContainer = document.createElement('div');
@@ -517,6 +646,7 @@ export class TypeSystemPanel {
     // Render cells in Visualizer
     const visualizer = document.createElement('div');
     visualizer.className = 'layout-visualizer-grid';
+
 
     if (struct.fields.length === 0) {
       visualizer.innerHTML = `
@@ -957,7 +1087,7 @@ struct PlayerInfo {
   }
 
   /**
-   * Simple parser for C structs
+   * Simple parser for C structs, unions, enums, nested structures, and typedefs
    */
   public parseCStructs(source: string): StructDefinition[] {
     const structs: StructDefinition[] = [];
@@ -965,111 +1095,291 @@ struct PlayerInfo {
     // Strip comments
     const cleanSource = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
 
-    // Find struct definitions
-    const structRegex = /struct\s+(\w+)\s*\{([^}]+)\}/g;
-    let match;
+    const tokenRegex = /\b(?:struct|union|enum|typedef)\b|[a-zA-Z_]\w*|0[xX][0-9a-fA-F]+|-?\d+|[*{}[\],;=]/g;
+    const tokens = cleanSource.match(tokenRegex) || [];
+    let i = 0;
 
-    while ((match = structRegex.exec(cleanSource)) !== null) {
-      const structName = match[1];
-      const fieldsBody = match[2];
-      const fields: StructField[] = [];
+    const peek = (offset = 0) => tokens[i + offset] || '';
+    const consume = (expected?: string) => {
+      const tok = tokens[i++];
+      if (expected && tok !== expected) {
+        // syntax error or fallback
+      }
+      return tok;
+    };
 
-      const fieldLines = fieldsBody.split(';');
-      let currentOffset = 0;
-
-      for (let line of fieldLines) {
-        line = line.trim();
-        if (!line) continue;
-
-        // Match type, pointer indicator, field name, array brackets
-        // e.g. "unsigned int flags" or "struct Vector3 pos" or "char name[32]" or "struct Player* target"
-        const fieldRegex =
-          /^(struct\s+\w+|\w+)\s*(\*+)?\s*(\w+)(?:\[(\d+)\])?$/;
-        const fieldMatch = line.match(fieldRegex);
-
-        if (fieldMatch) {
-          let typeName = fieldMatch[1].replace(/^struct\s+/, '').trim();
-          const isPointer = !!fieldMatch[2];
-          const fieldName = fieldMatch[3];
-          const arraySizeStr = fieldMatch[4];
-
-          let size = 0;
-          const arrayLength = arraySizeStr
-            ? parseInt(arraySizeStr, 10)
-            : undefined;
-
-          if (isPointer) {
-            size = this.pointerSize;
-            typeName = typeName + '*';
-          } else {
-            // Find base size
-            const lower = typeName.toLowerCase();
-            if (
-              lower === 'char' ||
-              lower === 'uint8_t' ||
-              lower === 'int8_t' ||
-              lower === 'byte'
-            ) {
-              size = 1;
-            } else if (
-              lower === 'short' ||
-              lower === 'uint16_t' ||
-              lower === 'int16_t'
-            ) {
-              size = 2;
-            } else if (
-              lower === 'int' ||
-              lower === 'uint32_t' ||
-              lower === 'int32_t' ||
-              lower === 'float'
-            ) {
-              size = 4;
-            } else if (
-              lower === 'long' ||
-              lower === 'uint64_t' ||
-              lower === 'int64_t' ||
-              lower === 'double' ||
-              lower === 'long long'
-            ) {
-              size = 8;
-            } else {
-              // check parsed or existing structs
-              const found = [...structs, ...this.structs].find(
-                (s) => s.name === typeName
-              );
-              if (found) {
-                size = found.size;
-              } else {
-                size = 4; // fallback
-              }
-            }
-
-            if (arrayLength !== undefined) {
-              size *= arrayLength;
-            }
-          }
-
-          fields.push({
-            name: fieldName,
-            type:
-              typeName + (arrayLength !== undefined ? `[${arrayLength}]` : ''),
-            offset: currentOffset,
-            size: size,
-            arrayLength: arrayLength,
-            description: `Parsed field of type ${typeName}`,
-          });
-
-          currentOffset += size;
+    const isDefinition = (): boolean => {
+      let lookahead = 0;
+      while (tokens[i + lookahead] && tokens[i + lookahead] !== ';') {
+        if (tokens[i + lookahead] === '{') {
+          return true;
         }
+        lookahead++;
+      }
+      return false;
+    };
+
+    const parseStructOrUnion = (isTypedef = false): StructDefinition | null => {
+      const kind = consume(); // 'struct' or 'union'
+      let name = '';
+      if (peek() !== '{') {
+        name = consume();
       }
 
-      structs.push({
-        name: structName,
-        size: currentOffset,
-        fields: fields,
-        description: `Parsed from C struct definition`,
-      });
+      if (peek() === '{') {
+        consume('{');
+        const fields: StructField[] = [];
+
+        while (i < tokens.length && peek() !== '}') {
+          if ((peek() === 'struct' || peek() === 'union') && isDefinition()) {
+            const nested = parseStructOrUnion(false);
+            if (nested) {
+              structs.push(nested);
+              let fieldName = '';
+              let arrayLength: number | undefined;
+              let isPointer = false;
+              while (peek() === '*') {
+                consume();
+                isPointer = true;
+              }
+              if (peek() !== ';') {
+                fieldName = consume();
+              }
+              if (peek() === '[') {
+                consume('[');
+                const sizeTok = consume();
+                arrayLength = parseInt(sizeTok, 10);
+                consume(']');
+              }
+              consume(';');
+
+              if (fieldName) {
+                fields.push({
+                  name: fieldName,
+                  type: nested.name + (isPointer ? '*' : '') + (arrayLength !== undefined ? `[${arrayLength}]` : ''),
+                  offset: 0,
+                  size: 0,
+                  arrayLength,
+                  description: `Nested ${nested.isUnion ? 'union' : 'struct'} field`
+                });
+              }
+            }
+          } else if (peek() === 'enum' && isDefinition()) {
+            const nestedEnum = parseEnum(false);
+            if (nestedEnum) {
+              structs.push(nestedEnum);
+              let fieldName = '';
+              if (peek() !== ';') {
+                fieldName = consume();
+              }
+              consume(';');
+              if (fieldName) {
+                fields.push({
+                  name: fieldName,
+                  type: nestedEnum.name,
+                  offset: 0,
+                  size: 4,
+                  description: `Nested enum field`
+                });
+              }
+            }
+          } else {
+            // Regular field
+            const fieldTokens: string[] = [];
+            while (i < tokens.length && peek() !== ';' && peek() !== '}') {
+              fieldTokens.push(consume());
+            }
+            if (peek() === ';') {
+              consume(';');
+            }
+
+            if (fieldTokens.length > 0) {
+              let arrayLength: number | undefined;
+              if (fieldTokens[fieldTokens.length - 1] === ']') {
+                fieldTokens.pop(); // ]
+                const lenStr = fieldTokens.pop(); // length
+                fieldTokens.pop(); // [
+                if (lenStr) {
+                  arrayLength = parseInt(lenStr, 10);
+                }
+              }
+
+              let isPointer = false;
+              const fieldName = fieldTokens.pop() || '';
+              while (fieldTokens.length > 0 && fieldTokens[fieldTokens.length - 1] === '*') {
+                fieldTokens.pop();
+                isPointer = true;
+              }
+
+              let fieldType = fieldTokens.join(' ');
+              fieldType = fieldType.replace(/^(struct|union)\s+/, '');
+              if (isPointer) {
+                fieldType += '*';
+              }
+
+              if (fieldName) {
+                fields.push({
+                  name: fieldName,
+                  type: fieldType + (arrayLength !== undefined ? `[${arrayLength}]` : ''),
+                  offset: 0,
+                  size: 0,
+                  arrayLength,
+                  description: `Parsed field of type ${fieldType}`
+                });
+              }
+            }
+          }
+        }
+
+        consume('}');
+
+        let alias = '';
+        if (isTypedef) {
+          if (peek() !== ';') {
+            alias = consume();
+          }
+          if (peek() === ';') {
+            consume(';');
+          }
+        }
+
+        const structName = isTypedef ? (alias || name) : (name || alias);
+        if (structName) {
+          const isUnion = kind === 'union';
+          const def: StructDefinition = {
+            name: structName,
+            size: 0,
+            fields,
+            description: `Parsed from C ${kind} definition`,
+            isUnion
+          };
+          if (isTypedef && name && alias && name !== alias) {
+            this.typedefs[alias] = name;
+          }
+          return def;
+        }
+      } else {
+        if (peek() === ';') {
+          consume(';');
+        }
+      }
+      return null;
+    };
+
+    const parseEnum = (isTypedef = false): StructDefinition | null => {
+      consume('enum');
+      let name = '';
+      if (peek() !== '{') {
+        name = consume();
+      }
+
+      if (peek() === '{') {
+        consume('{');
+        const enumValues: { name: string; value: number }[] = [];
+        let currentValue = 0;
+
+        while (i < tokens.length && peek() !== '}') {
+          const valName = consume();
+          let val = currentValue;
+          if (peek() === '=') {
+            consume('=');
+            const valStr = consume();
+            if (valStr.startsWith('0x') || valStr.startsWith('0X')) {
+              val = parseInt(valStr, 16);
+            } else {
+              val = parseInt(valStr, 10);
+            }
+            currentValue = val;
+          }
+          enumValues.push({ name: valName, value: val });
+          currentValue++;
+
+          if (peek() === ',') {
+            consume(',');
+          }
+        }
+        consume('}');
+
+        let alias = '';
+        if (isTypedef) {
+          if (peek() !== ';') {
+            alias = consume();
+          }
+          if (peek() === ';') {
+            consume(';');
+          }
+        }
+
+        const enumName = isTypedef ? (alias || name) : (name || alias);
+        if (enumName) {
+          const def: StructDefinition = {
+            name: enumName,
+            size: 4,
+            fields: [],
+            enumValues,
+            description: `Parsed from C enum definition`,
+            isEnum: true
+          };
+          if (isTypedef && name && alias && name !== alias) {
+            this.typedefs[alias] = name;
+          }
+          return def;
+        }
+      } else {
+        if (peek() === ';') {
+          consume(';');
+        }
+      }
+      return null;
+    };
+
+    const parseTypedef = () => {
+      consume('typedef');
+      if ((peek() === 'struct' || peek() === 'union') && isDefinition()) {
+        const s = parseStructOrUnion(true);
+        if (s) structs.push(s);
+      } else if (peek() === 'enum' && isDefinition()) {
+        const e = parseEnum(true);
+        if (e) structs.push(e);
+      } else {
+        const typeTokens: string[] = [];
+        while (i < tokens.length && peek() !== ';') {
+          typeTokens.push(consume());
+        }
+        if (peek() === ';') {
+          consume(';');
+        }
+
+        if (typeTokens.length >= 2) {
+          const alias = typeTokens.pop()!;
+          const underlying = typeTokens.join(' ');
+          this.typedefs[alias] = underlying;
+        }
+      }
+    };
+
+    while (i < tokens.length) {
+      const tok = peek();
+      if (tok === 'typedef') {
+        parseTypedef();
+      } else if ((tok === 'struct' || tok === 'union') && isDefinition()) {
+        const s = parseStructOrUnion();
+        if (s) structs.push(s);
+      } else if (tok === 'enum' && isDefinition()) {
+        const e = parseEnum();
+        if (e) structs.push(e);
+      } else {
+        i++;
+      }
     }
+
+    // Temporarily merge for size recalculation
+    const originalStructs = [...this.structs];
+    this.structs = [...originalStructs, ...structs];
+    for (const s of structs) {
+      this.recalculateStructSize(s);
+    }
+    this.structs = originalStructs;
 
     return structs;
   }

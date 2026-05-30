@@ -5,6 +5,7 @@ import {
   matchPattern,
   evaluateCondition,
   YaraEngine,
+  serializeYaraRules,
 } from '../src/analyzer/yara.js';
 
 describe('YARA-like Signature Engine Unit Tests', () => {
@@ -210,4 +211,63 @@ describe('YARA-like Signature Engine Unit Tests', () => {
       expect(elfResult?.matches).toHaveLength(0);
     });
   });
+
+  describe('serializeYaraRules', () => {
+    it('should serialize YaraRule objects back to a YARA rule string correctly', () => {
+      const originalRules = [
+        {
+          name: 'TestRule',
+          meta: {
+            author: 'Antigravity',
+            version: 1.2,
+            is_active: true,
+          },
+          strings: [
+            {
+              id: '$text_str',
+              type: 'text' as const,
+              value: 'hello',
+              modifiers: { ascii: true, wide: false, nocase: true },
+            },
+            {
+              id: '$wide_str',
+              type: 'text' as const,
+              value: 'world',
+              modifiers: { ascii: false, wide: true, nocase: false },
+            },
+            {
+              id: '$hex_str',
+              type: 'hex' as const,
+              value: '48 8d ?? 55',
+              modifiers: { ascii: true, wide: false, nocase: false },
+            },
+          ],
+          condition: '$text_str and ($wide_str or not $hex_str)',
+        },
+      ];
+
+      const serialized = serializeYaraRules(originalRules);
+      expect(serialized).toContain('rule TestRule {');
+      expect(serialized).toContain('author = "Antigravity"');
+      expect(serialized).toContain('version = 1.2');
+      expect(serialized).toContain('is_active = true');
+      expect(serialized).toContain('$text_str = "hello" nocase ascii');
+      expect(serialized).toContain('$wide_str = "world" wide');
+      expect(serialized).toContain('$hex_str = { 48 8d ?? 55 } ascii');
+      expect(serialized).toContain('$text_str and ($wide_str or not $hex_str)');
+
+      // Verify it roundtrips back to the same structure
+      const parsed = parseYaraRules(serialized);
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0].name).toBe('TestRule');
+      expect(parsed[0].meta).toEqual(originalRules[0].meta);
+      expect(parsed[0].strings[0].value).toBe('hello');
+      expect(parsed[0].strings[0].modifiers?.nocase).toBe(true);
+      expect(parsed[0].strings[0].modifiers?.ascii).toBe(true);
+      expect(parsed[0].strings[1].value).toBe('world');
+      expect(parsed[0].strings[1].modifiers?.wide).toBe(true);
+      expect(parsed[0].strings[2].value).toBe('48 8d ?? 55');
+    });
+  });
 });
+

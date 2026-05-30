@@ -278,7 +278,7 @@ export class DisassemblerRouter {
 
       for (let i = 0; i < wasmModule.code.length; i++) {
         const body = wasmModule.code[i];
-        let currentOffset = 0;
+        const currentOffset = 0;
 
         for (let j = 0; j < body.instructions.length; j++) {
           const wasmInst = body.instructions[j];
@@ -1260,8 +1260,11 @@ export class DisassemblerRouter {
                 0x57: 'vxorps',
                 0x54: 'vandps',
                 0x56: 'vorps',
+                0x51: 'vsqrtps',
+                0x5d: 'vminps',
+                0x5f: 'vmaxps',
+                0x55: 'vandnps',
               };
-
               const avxMnemonic = avxOps[avxOpcode];
               if (avxMnemonic) {
                 mnemonic = avxMnemonic;
@@ -1303,6 +1306,12 @@ export class DisassemblerRouter {
             0x57: prefix === 0x66 ? 'xorpd' : 'xorps',
             0x54: prefix === 0x66 ? 'andpd' : 'andps',
             0x56: prefix === 0x66 ? 'orpd' : 'orps',
+            0x51: prefix === 0x66 ? 'sqrtpd' : prefix === 0xf3 ? 'sqrtss' : prefix === 0xf2 ? 'sqrtsd' : 'sqrtps',
+            0x5d: prefix === 0x66 ? 'minpd' : prefix === 0xf3 ? 'minss' : prefix === 0xf2 ? 'minsd' : 'minps',
+            0x5f: prefix === 0x66 ? 'maxpd' : prefix === 0xf3 ? 'maxss' : prefix === 0xf2 ? 'maxsd' : 'maxps',
+            0x55: prefix === 0x66 ? 'andnpd' : 'andnps',
+            0x2e: prefix === 0x66 ? 'ucomisd' : 'ucomiss',
+            0x2f: prefix === 0x66 ? 'comisd' : 'comiss',
           };
 
           if (sseOps[opcode] !== undefined && nextByteIdx < data.length) {
@@ -1548,31 +1557,46 @@ export class DisassemblerRouter {
           { type: 'imm', imm: dest },
         ];
       }
-      // FADD / FSUB / FMUL / FDIV (scalar floating point)
-      else if ((val & 0xffa0fc00) === 0x1e202800 || (val & 0xffa0fc00) === 0x1e203800 || (val & 0xffa0fc00) === 0x1e200800 || (val & 0xffa0fc00) === 0x1e201800) {
+      // FADD / FSUB / FMUL / FDIV / FCMP (scalar floating point)
+      else if (
+        (val & 0xffa0fc00) === 0x1e202800 ||
+        (val & 0xffa0fc00) === 0x1e203800 ||
+        (val & 0xffa0fc00) === 0x1e200800 ||
+        (val & 0xffa0fc00) === 0x1e201800 ||
+        (val & 0xffa0fc1f) === 0x1e202000
+      ) {
         const sz = (val >> 22) & 1;
         const regPrefix = sz === 1 ? 'd' : 's';
-        const rd = val & 0x1f;
         const rn = (val >> 5) & 0x1f;
         const rm = (val >> 16) & 0x1f;
         
-        const rdName = regPrefix + rd;
         const rnName = regPrefix + rn;
         const rmName = regPrefix + rm;
 
-        const fOps: Record<number, string> = {
-          0x1e202800: 'fadd',
-          0x1e203800: 'fsub',
-          0x1e200800: 'fmul',
-          0x1e201800: 'fdiv',
-        };
-        mnemonic = fOps[val & 0xffa0fc00];
-        opStr = `${rdName}, ${rnName}, ${rmName}`;
-        operands = [
-          { type: 'reg', reg: rdName },
-          { type: 'reg', reg: rnName },
-          { type: 'reg', reg: rmName },
-        ];
+        if ((val & 0xffa0fc1f) === 0x1e202000) {
+          mnemonic = 'fcmp';
+          opStr = `${rnName}, ${rmName}`;
+          operands = [
+            { type: 'reg', reg: rnName },
+            { type: 'reg', reg: rmName },
+          ];
+        } else {
+          const rd = val & 0x1f;
+          const rdName = regPrefix + rd;
+          const fOps: Record<number, string> = {
+            0x1e202800: 'fadd',
+            0x1e203800: 'fsub',
+            0x1e200800: 'fmul',
+            0x1e201800: 'fdiv',
+          };
+          mnemonic = fOps[val & 0xffa0fc00];
+          opStr = `${rdName}, ${rnName}, ${rmName}`;
+          operands = [
+            { type: 'reg', reg: rdName },
+            { type: 'reg', reg: rnName },
+            { type: 'reg', reg: rmName },
+          ];
+        }
       }
       // CSEL (Conditional Select)
       else if ((val & 0xffe00c00) === 0x1a800000) {
@@ -1913,13 +1937,34 @@ export class DisassemblerRouter {
           { type: 'reg', reg: rtName },
         ];
       }
+      // CLZ (Count Leading Zeros)
+      else if ((val & 0x7ffffc00) === 0x5ac01000) {
+        mnemonic = 'clz';
+        const sf = (val >> 31) & 1;
+        const rd = val & 0x1f;
+        const rn = (val >> 5) & 0x1f;
+        const rdName = (sf ? 'x' : 'w') + rd;
+        const rnName = (sf ? 'x' : 'w') + rn;
+        opStr = `${rdName}, ${rnName}`;
+        operands = [
+          { type: 'reg', reg: rdName },
+          { type: 'reg', reg: rnName },
+        ];
+      }
       // MOVZ / MOVK / MOVN (Move immediate)
-      else if ((val & 0xff800000) >>> 0 === 0xd2800000) {
-        mnemonic = 'mov';
+      else if (
+        (val & 0xff800000) >>> 0 === 0xd2800000 ||
+        (val & 0xff800000) >>> 0 === 0xf2800000 ||
+        (val & 0xff800000) >>> 0 === 0x92800000
+      ) {
+        const op = (val >> 29) & 3;
+        mnemonic = op === 2 ? 'mov' : op === 3 ? 'movk' : 'movn';
         const rd = val & 0x1f;
         const imm = (val >> 5) & 0xffff;
+        const hw = (val >> 21) & 3;
         const rdName = regs[rd] || 'x0';
-        opStr = `${rdName}, #0x${imm.toString(16)}`;
+        const shiftStr = hw > 0 ? `, lsl #${hw * 16}` : '';
+        opStr = `${rdName}, #0x${imm.toString(16)}${shiftStr}`;
         operands = [
           { type: 'reg', reg: rdName },
           { type: 'imm', imm },
@@ -2120,6 +2165,119 @@ export class DisassemblerRouter {
           { type: 'reg', reg: `v${vB}` },
         ];
         size = 2;
+      } else if (opcode === 0x02) {
+        mnemonic = 'move/from16';
+        const vA = data[i + 1];
+        const vB = data[i + 2] | (data[i + 3] << 8);
+        opStr = `v${vA}, v${vB}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'reg', reg: `v${vB}` },
+        ];
+        size = 4;
+      } else if (opcode === 0x03) {
+        mnemonic = 'move/16';
+        const vA = data[i + 2] | (data[i + 3] << 8);
+        const vB = data[i + 4] | (data[i + 5] << 8);
+        opStr = `v${vA}, v${vB}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'reg', reg: `v${vB}` },
+        ];
+        size = 6;
+      } else if (opcode === 0x07) {
+        mnemonic = 'move-object';
+        const vA = data[i + 1] & 0xf;
+        const vB = (data[i + 1] >> 4) & 0xf;
+        opStr = `v${vA}, v${vB}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'reg', reg: `v${vB}` },
+        ];
+        size = 2;
+      } else if (opcode === 0x0f) {
+        mnemonic = 'return';
+        const vA = data[i + 1];
+        opStr = `v${vA}`;
+        operands = [{ type: 'reg', reg: `v${vA}` }];
+        size = 2;
+      } else if (opcode === 0x10) {
+        mnemonic = 'return-wide';
+        const vA = data[i + 1];
+        opStr = `v${vA}`;
+        operands = [{ type: 'reg', reg: `v${vA}` }];
+        size = 2;
+      } else if (opcode === 0x11) {
+        mnemonic = 'return-object';
+        const vA = data[i + 1];
+        opStr = `v${vA}`;
+        operands = [{ type: 'reg', reg: `v${vA}` }];
+        size = 2;
+      } else if (opcode === 0x14) {
+        mnemonic = 'const';
+        const vA = data[i + 1];
+        const val = data[i + 2] | (data[i + 3] << 8) | (data[i + 4] << 16) | (data[i + 5] << 24);
+        const signedVal = val > 0x7fffffff ? val - 0x100000000 : val;
+        opStr = `v${vA}, #0x${signedVal.toString(16)}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'imm', imm: signedVal },
+        ];
+        size = 6;
+      } else if (opcode === 0x1a) {
+        mnemonic = 'const-string';
+        const vA = data[i + 1];
+        const stringIdx = data[i + 2] | (data[i + 3] << 8);
+        opStr = `v${vA}, string@0x${stringIdx.toString(16)}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'imm', imm: stringIdx },
+        ];
+        size = 4;
+      } else if (opcode === 0x1c) {
+        mnemonic = 'const-class';
+        const vA = data[i + 1];
+        const typeIdx = data[i + 2] | (data[i + 3] << 8);
+        opStr = `v${vA}, class@0x${typeIdx.toString(16)}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'imm', imm: typeIdx },
+        ];
+        size = 4;
+      } else if (opcode === 0x1d) {
+        mnemonic = 'monitor-enter';
+        const vA = data[i + 1];
+        opStr = `v${vA}`;
+        operands = [{ type: 'reg', reg: `v${vA}` }];
+        size = 2;
+      } else if (opcode === 0x1e) {
+        mnemonic = 'monitor-exit';
+        const vA = data[i + 1];
+        opStr = `v${vA}`;
+        operands = [{ type: 'reg', reg: `v${vA}` }];
+        size = 2;
+      } else if (opcode === 0x22) {
+        mnemonic = 'new-instance';
+        const vA = data[i + 1];
+        const typeIdx = data[i + 2] | (data[i + 3] << 8);
+        opStr = `v${vA}, type@0x${typeIdx.toString(16)}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'imm', imm: typeIdx },
+        ];
+        size = 4;
+      } else if (opcode === 0x90) {
+        mnemonic = 'add-int';
+        const vA = data[i + 1];
+        const vB = data[i + 2];
+        const vC = data[i + 3];
+        opStr = `v${vA}, v${vB}, v${vC}`;
+        operands = [
+          { type: 'reg', reg: `v${vA}` },
+          { type: 'reg', reg: `v${vB}` },
+          { type: 'reg', reg: `v${vC}` },
+        ];
+        size = 4;
       } else if (opcode === 0x12) {
         mnemonic = 'const/4';
         const vA = data[i + 1] & 0xf;

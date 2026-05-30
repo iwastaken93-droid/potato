@@ -301,7 +301,12 @@ export function handleGDBCommand(command: string, emulator: Emulator): string {
   if (command.startsWith('m')) {
     const parts = command.slice(1).split(',');
     if (parts.length !== 2) return 'E01';
-    const addr = BigInt('0x' + parts[0]);
+    let addr: bigint;
+    try {
+      addr = BigInt('0x' + parts[0]);
+    } catch {
+      return 'E03';
+    }
     const length = parseInt(parts[1], 16);
     if (isNaN(length) || length < 0) return 'E01';
     try {
@@ -324,7 +329,12 @@ export function handleGDBCommand(command: string, emulator: Emulator): string {
     const hexData = firstPart.slice(colonIndex + 1);
     const parts = addrLengthPart.split(',');
     if (parts.length !== 2) return 'E01';
-    const addr = BigInt('0x' + parts[0]);
+    let addr: bigint;
+    try {
+      addr = BigInt('0x' + parts[0]);
+    } catch {
+      return 'E03';
+    }
     const length = parseInt(parts[1], 16);
     if (isNaN(length) || length < 0) return 'E01';
 
@@ -343,8 +353,12 @@ export function handleGDBCommand(command: string, emulator: Emulator): string {
   if (command.startsWith('s')) {
     const addrStr = command.slice(1);
     if (addrStr) {
-      const addr = BigInt('0x' + addrStr);
-      emulator.cpu.write('rip', addr);
+      try {
+        const addr = BigInt('0x' + addrStr);
+        emulator.cpu.write('rip', addr);
+      } catch {
+        return 'E01';
+      }
     }
     const result = emulator.step();
     if (result.halted) {
@@ -356,8 +370,12 @@ export function handleGDBCommand(command: string, emulator: Emulator): string {
   if (command.startsWith('c')) {
     const addrStr = command.slice(1);
     if (addrStr) {
-      const addr = BigInt('0x' + addrStr);
-      emulator.cpu.write('rip', addr);
+      try {
+        const addr = BigInt('0x' + addrStr);
+        emulator.cpu.write('rip', addr);
+      } catch {
+        return 'E01';
+      }
     }
     let stepCount = 0;
     const maxSteps = 1000;

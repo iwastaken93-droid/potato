@@ -468,3 +468,53 @@ export class YaraEngine {
     return results;
   }
 }
+
+/**
+ * Serializes structured YaraRule objects back to a YARA rule string.
+ */
+export function serializeYaraRules(rules: YaraRule[]): string {
+  return rules
+    .map((rule) => {
+      let out = `rule ${rule.name} {\n`;
+      if (rule.meta && Object.keys(rule.meta).length > 0) {
+        out += `    meta:\n`;
+        for (const [key, val] of Object.entries(rule.meta)) {
+          if (typeof val === 'string') {
+            out += `        ${key} = "${val}"\n`;
+          } else {
+            out += `        ${key} = ${val}\n`;
+          }
+        }
+      }
+      if (rule.strings && rule.strings.length > 0) {
+        out += `    strings:\n`;
+        for (const pattern of rule.strings) {
+          const modArray: string[] = [];
+          if (pattern.modifiers?.nocase) modArray.push('nocase');
+          if (pattern.modifiers?.ascii) modArray.push('ascii');
+          if (pattern.modifiers?.wide) modArray.push('wide');
+          const mods = modArray.length > 0 ? ` ${modArray.join(' ')}` : '';
+          
+          const cleanId = pattern.id.startsWith('$') ? pattern.id.substring(1) : pattern.id;
+
+          if (pattern.type === 'text') {
+            const escaped = pattern.value
+              .replace(/\\/g, '\\\\')
+              .replace(/"/g, '\\"')
+              .replace(/\n/g, '\\n')
+              .replace(/\r/g, '\\r')
+              .replace(/\t/g, '\\t');
+            out += `        $${cleanId} = "${escaped}"${mods}\n`;
+          } else {
+            out += `        $${cleanId} = { ${pattern.value} }${mods}\n`;
+          }
+        }
+      }
+      out += `    condition:\n`;
+      out += `        ${rule.condition}\n`;
+      out += `}`;
+      return out;
+    })
+    .join('\n\n');
+}
+

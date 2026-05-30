@@ -10,6 +10,7 @@ import {
   YaraScanResult,
   YaraRule,
   parseYaraRules,
+  serializeYaraRules,
 } from '../analyzer/yara.js';
 
 export interface YaraPanelOptions {
@@ -474,6 +475,13 @@ rule Common_Strings {
    */
   public exportRules(): string {
     return this.currentRulesSource;
+  }
+
+  /**
+   * Exports the compiled rules list as a serialized YARA rule string.
+   */
+  public exportCompiledRules(): string {
+    return serializeYaraRules(this.yaraEngine.getRules());
   }
 
   /**

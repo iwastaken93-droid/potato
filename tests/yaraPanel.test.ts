@@ -58,6 +58,31 @@ describe('YaraPanel Unit Tests', () => {
     expect(panel.exportRules()).toBe(testRule);
   });
 
+  it('should export compiled rules as serialized YARA rules string correctly', () => {
+    const editor = container.querySelector(
+      '.yara-textarea'
+    ) as HTMLTextAreaElement;
+    const testRule = `rule TestCompiledExport {
+      meta:
+          description = "Test meta"
+      strings:
+          $a = "test" ascii
+      condition:
+          $a
+    }`;
+    editor.value = testRule;
+    editor.dispatchEvent(new Event('input'));
+    
+    // Trigger compilation by calling updateData or scan
+    panel.updateData(new Uint8Array([0x74, 0x65, 0x73, 0x74]), []);
+
+    const compiledStr = panel.exportCompiledRules();
+    expect(compiledStr).toContain('rule TestCompiledExport {');
+    expect(compiledStr).toContain('description = "Test meta"');
+    expect(compiledStr).toContain('$a = "test" ascii');
+    expect(compiledStr).toContain('condition:');
+  });
+
   it('should trigger file input selection when import button is clicked', () => {
     const fileInput = container.querySelector(
       '#yara-file-input'

@@ -66,6 +66,52 @@ export class SyscallHandler {
       emu.cpu.write('rax', allocAddr);
     });
 
+    this.registerWindowsHook('VirtualProtect', (emu) => {
+      const args = this.getWindowsArgs(emu, 4);
+      const lpAddress = args[0];
+      const dwSize = Number(args[1]);
+      const flNewProtect = Number(args[2]);
+      const lpflOldProtect = args[3];
+
+      const region = emu.memory.getRegionAt(lpAddress);
+      if (region) {
+        if (lpflOldProtect !== 0n) {
+          let oldProtect = 0x01; // PAGE_NOACCESS
+          const p = region.permissions;
+          if (p.read && p.write && p.execute) {
+            oldProtect = 0x40; // PAGE_EXECUTE_READWRITE
+          } else if (p.read && !p.write && p.execute) {
+            oldProtect = 0x20; // PAGE_EXECUTE_READ
+          } else if (p.read && p.write && !p.execute) {
+            oldProtect = 0x04; // PAGE_READWRITE
+          } else if (p.read && !p.write && !p.execute) {
+            oldProtect = 0x02; // PAGE_READONLY
+          }
+          emu.memory.write32(lpflOldProtect, oldProtect);
+        }
+
+        region.permissions.read = flNewProtect !== 0x01;
+        region.permissions.write = (flNewProtect & 0x44) !== 0 || flNewProtect === 0x04;
+        region.permissions.execute = (flNewProtect & 0x60) !== 0;
+
+        emu.cpu.write('rax', 1n);
+      } else {
+        emu.cpu.write('rax', 0n);
+      }
+    });
+
+    this.registerWindowsHook('CreateFileA', (emu) => {
+      const args = this.getWindowsArgs(emu, 7);
+      const lpFileName = args[0];
+      const fileName = lpFileName !== 0n ? this.readNullTerminatedString(emu.memory, lpFileName) : 'unknown';
+      emu.cpu.write('rax', 0x444n); // dummy handle
+    });
+
+    this.registerWindowsHook('CloseHandle', (emu) => {
+      const args = this.getWindowsArgs(emu, 1);
+      emu.cpu.write('rax', 1n); // TRUE
+    });
+
     this.registerWindowsHook('GetProcAddress', (emu) => {
       const args = this.getWindowsArgs(emu, 2);
       const hModule = args[0];
@@ -112,6 +158,67 @@ export class SyscallHandler {
         lpLibFileNamePtr
       );
       emu.cpu.write('rax', 0x78000000n); // dummy library handle
+    });
+
+    this.registerWindowsHook('GetLastError', (emu) => {
+      emu.cpu.write('rax', 0n);
+    });
+
+    this.registerWindowsHook('GetStdHandle', (emu) => {
+      const args = this.getWindowsArgs(emu, 1);
+      const nStdHandle = Number(args[0]);
+      if (nStdHandle === -10 || nStdHandle === 0xfffffff6) {
+        emu.cpu.write('rax', 0x100n);
+      } else if (nStdHandle === -11 || nStdHandle === 0xfffffff5) {
+        emu.cpu.write('rax', 0x200n);
+      } else if (nStdHandle === -12 || nStdHandle === 0xfffffff4) {
+        emu.cpu.write('rax', 0x300n);
+      } else {
+        emu.cpu.write('rax', 0n);
+      }
+    });
+
+    this.registerWindowsHook('WriteFile', (emu) => {
+      const args = this.getWindowsArgs(emu, 5);
+      const hFile = args[0];
+      const lpBuffer = args[1];
+      const nNumberOfBytesToWrite = Number(args[2]);
+      const lpNumberOfBytesWritten = args[3];
+
+      const buffer = emu.memory.readBuffer(lpBuffer, nNumberOfBytesToWrite);
+      const text = new TextDecoder().decode(buffer);
+
+      if (hFile === 0x200n) {
+        this.context.stdout += text;
+      } else if (hFile === 0x300n) {
+        this.context.stderr += text;
+      }
+
+      if (lpNumberOfBytesWritten !== 0n) {
+        emu.memory.write32(lpNumberOfBytesWritten, nNumberOfBytesToWrite);
+      }
+      emu.cpu.write('rax', 1n); // TRUE
+    });
+
+    this.registerWindowsHook('ReadFile', (emu) => {
+      const args = this.getWindowsArgs(emu, 5);
+      const lpNumberOfBytesRead = args[3];
+      if (lpNumberOfBytesRead !== 0n) {
+        emu.memory.write32(lpNumberOfBytesRead, 0);
+      }
+      emu.cpu.write('rax', 1n); // TRUE
+    });
+
+    this.registerWindowsHook('ExitProcess', (emu) => {
+      const args = this.getWindowsArgs(emu, 1);
+      const uExitCode = Number(args[0]);
+      this.context.exitCode = uExitCode;
+      emu.pause();
+      emu.cpu.write('rax', 0n);
+    });
+
+    this.registerWindowsHook('Sleep', (emu) => {
+      emu.cpu.write('rax', 0n);
     });
   }
 
@@ -176,11 +283,41 @@ export class SyscallHandler {
       case 1n: // sys_write
         this.handleSysWrite(emu);
         break;
+      case 3n: // sys_close
+        this.handleSysClose(emu);
+        break;
       case 9n: // sys_mmap
         this.handleSysMmap(emu);
         break;
+      case 10n: // sys_mprotect
+        this.handleSysMprotect(emu);
+        break;
+      case 12n: // sys_brk
+        this.handleSysBrk(emu);
+        break;
+      case 35n: // sys_nanosleep
+        this.handleSysNanosleep(emu);
+        break;
+      case 39n: // sys_getpid
+        this.handleSysGetpid(emu);
+        break;
+      case 56n: // sys_clone
+        this.handleSysClone(emu);
+        break;
       case 60n: // sys_exit
         this.handleSysExit(emu);
+        break;
+      case 61n: // sys_wait4
+        this.handleSysWait4(emu);
+        break;
+      case 102n: // sys_getuid
+        this.handleSysGetuid(emu);
+        break;
+      case 104n: // sys_getgid
+        this.handleSysGetgid(emu);
+        break;
+      case 228n: // sys_clock_gettime
+        this.handleSysClockGettime(emu);
         break;
       default:
         throw new Error(`Unsupported Linux syscall: ${syscallNum}`);
@@ -241,6 +378,74 @@ export class SyscallHandler {
     const status = Number(emu.cpu.read('rdi'));
     this.context.exitCode = status;
     emu.pause(); // Stop emulator run loop
+    emu.cpu.write('rax', 0n);
+  }
+
+  private handleSysMprotect(emu: Emulator): void {
+    const addr = emu.cpu.read('rdi');
+    const len = Number(emu.cpu.read('rsi'));
+    const prot = Number(emu.cpu.read('rdx'));
+
+    const region = emu.memory.getRegionAt(addr);
+    if (region) {
+      region.permissions.read = (prot & 1) !== 0;
+      region.permissions.write = (prot & 2) !== 0;
+      region.permissions.execute = (prot & 4) !== 0;
+      emu.cpu.write('rax', 0n);
+    } else {
+      emu.cpu.write('rax', 18446744073709551615n); // -1n (unsigned)
+    }
+  }
+
+  private handleSysNanosleep(emu: Emulator): void {
+    emu.cpu.write('rax', 0n);
+  }
+
+  private handleSysClone(emu: Emulator): void {
+    emu.cpu.write('rax', 5678n);
+  }
+
+  private handleSysWait4(emu: Emulator): void {
+    const pid = emu.cpu.read('rdi');
+    const wstatusPtr = emu.cpu.read('rsi');
+    if (wstatusPtr !== 0n) {
+      emu.memory.write32(wstatusPtr, 0);
+    }
+    const isMinusOne = pid === -1n || pid === 18446744073709551615n;
+    emu.cpu.write('rax', isMinusOne ? 5678n : pid);
+  }
+
+  private handleSysClose(emu: Emulator): void {
+    emu.cpu.write('rax', 0n);
+  }
+
+  private handleSysBrk(emu: Emulator): void {
+    const brkAddr = emu.cpu.read('rdi');
+    if (brkAddr === 0n) {
+      emu.cpu.write('rax', 0x50000000n);
+    } else {
+      emu.cpu.write('rax', brkAddr);
+    }
+  }
+
+  private handleSysGetpid(emu: Emulator): void {
+    emu.cpu.write('rax', 1234n);
+  }
+
+  private handleSysGetuid(emu: Emulator): void {
+    emu.cpu.write('rax', 1000n);
+  }
+
+  private handleSysGetgid(emu: Emulator): void {
+    emu.cpu.write('rax', 1000n);
+  }
+
+  private handleSysClockGettime(emu: Emulator): void {
+    const tpPtr = emu.cpu.read('rsi');
+    if (tpPtr !== 0n) {
+      emu.memory.write64(tpPtr, 1600000000n);
+      emu.memory.write64(tpPtr + 8n, 0n);
+    }
     emu.cpu.write('rax', 0n);
   }
 

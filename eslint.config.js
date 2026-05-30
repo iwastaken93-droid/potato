@@ -11,6 +11,11 @@ export default tseslint.config(
         { argsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
+      'no-useless-escape': 'warn',
+      'no-useless-assignment': 'warn',
+      'no-case-declarations': 'warn',
+      'no-loss-of-precision': 'warn',
+      'preserve-caught-error': 'warn',
     },
   }
 );

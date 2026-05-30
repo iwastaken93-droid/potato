@@ -9,31 +9,33 @@ import { CFGVisualizer } from './cfgVisualizer.js';
 import { DependencyGraph } from './dependencyGraph.js';
 import { MemoryMapOverlay } from './memoryMap.js';
 import { StringsView } from './stringsView.js';
-import { SearchPanel } from './searchPanel.js';
+import type { SearchPanel } from './searchPanel.js';
 import { SignaturePanel } from './signaturePanel.js';
-import { EmulatorPanel } from './emulatorPanel.js';
-import { GDBPanel } from './gdbPanel.js';
-import { ReportPanel } from './reportPanel.js';
+import type { EmulatorPanel } from './emulatorPanel.js';
+import type { GDBPanel } from './gdbPanel.js';
+import type { ReportPanel } from './reportPanel.js';
 import { XRefsPanel } from './xrefsPanel.js';
 import { ImportsExportsPanel } from './importsExportsPanel.js';
-import { AIPanel } from './aiPanel.js';
+import type { AIPanel } from './aiPanel.js';
 import { BinaryPatcher, PatchRecord } from '../analyzer/patcher.js';
 import { PatcherPanel } from './patcherPanel.js';
 import { buildFCG } from '../analyzer/fcg.js';
 import { FCGVisualizer } from './fcgVisualizer.js';
-import { CollabPanel } from './collabPanel.js';
-import { YaraPanel } from './yaraPanel.js';
-import { TypeSystemPanel } from './typeSystemPanel.js';
-import { MetadataPanel } from './metadataPanel.js';
-import { DemanglerPanel } from './demanglerPanel.js';
-import { DiffPanel } from './diffPanel.js';
-import { PluginsPanel } from './pluginsPanel.js';
-import { MachoObjcPanel } from './machoObjcPanel.js';
+import type { CollabPanel } from './collabPanel.js';
+import type { YaraPanel } from './yaraPanel.js';
+import type { TypeSystemPanel } from './typeSystemPanel.js';
+import type { MetadataPanel } from './metadataPanel.js';
+import type { DemanglerPanel } from './demanglerPanel.js';
+import type { DiffPanel } from './diffPanel.js';
+import type { PluginsPanel } from './pluginsPanel.js';
+import type { MachoObjcPanel } from './machoObjcPanel.js';
 import { TabName } from './tabManager.js';
 import { Instruction, Section, Symbol } from '../disassembler/types.js';
 import { buildCFG, BasicBlock as CoreBasicBlock } from '../disassembler/cfg.js';
 import { Decompiler, BasicBlock as DecompilerBlock } from '../disassembler/decompiler.js';
 import { DisassemblerRouter } from '../disassembler/router.js';
+
+export const PANEL_REGISTRY: Record<string, any> = (globalThis as any).PANEL_REGISTRY || ((globalThis as any).PANEL_REGISTRY = {});
 
 export interface CoordinatorHost {
   state: any;
@@ -220,8 +222,9 @@ export class PanelCoordinator {
     }
   }
 
-  public initSearchPanel() {
+  public async initSearchPanel() {
     const container = document.getElementById('search-panel-container')!;
+    if (!container) return;
     if (this.searchPanel) {
       this.searchPanel.updateData(
         this.host.state.binaryData,
@@ -231,7 +234,11 @@ export class PanelCoordinator {
         this.host.state.extractedStrings
       );
     } else {
-      this.searchPanel = new SearchPanel(container, {
+      let SearchPanelClass = PANEL_REGISTRY['SearchPanel'];
+      if (!SearchPanelClass) {
+        SearchPanelClass = (await import('./searchPanel.js')).SearchPanel;
+      }
+      this.searchPanel = new SearchPanelClass(container, {
         onNavigate: (
           targetView: 'assembly' | 'hex' | 'decompiler',
           address: number
@@ -277,7 +284,7 @@ export class PanelCoordinator {
           }
         },
       });
-      this.searchPanel.updateData(
+      this.searchPanel?.updateData(
         this.host.state.binaryData,
         this.host.state.sections,
         this.host.state.symbols,
@@ -416,8 +423,9 @@ export class PanelCoordinator {
     }
   }
 
-  public initReportPanel() {
+  public async initReportPanel() {
     const container = document.getElementById('report-panel-container')!;
+    if (!container) return;
     if (this.reportPanel) {
       this.reportPanel.updateData(
         this.host.state.fileName,
@@ -430,8 +438,12 @@ export class PanelCoordinator {
         this.host.state.extractedStrings
       );
     } else {
-      this.reportPanel = new ReportPanel(container);
-      this.reportPanel.updateData(
+      let ReportPanelClass = PANEL_REGISTRY['ReportPanel'];
+      if (!ReportPanelClass) {
+        ReportPanelClass = (await import('./reportPanel.js')).ReportPanel;
+      }
+      this.reportPanel = new ReportPanelClass(container);
+      this.reportPanel?.updateData(
         this.host.state.fileName,
         this.host.state.fileSize,
         this.host.state.binaryData,
@@ -444,8 +456,9 @@ export class PanelCoordinator {
     }
   }
 
-  public initEmulatorPanel() {
+  public async initEmulatorPanel() {
     const container = document.getElementById('emulator-panel-container')!;
+    if (!container) return;
     if (this.emulatorPanel) {
       this.emulatorPanel.updateData(
         this.host.state.binaryData,
@@ -454,19 +467,23 @@ export class PanelCoordinator {
         this.host.state.instructions
       );
     } else {
-      this.emulatorPanel = new EmulatorPanel(container, {
-        onNavigate: (targetView, address) => {
+      let EmulatorPanelClass = PANEL_REGISTRY['EmulatorPanel'];
+      if (!EmulatorPanelClass) {
+        EmulatorPanelClass = (await import('./emulatorPanel.js')).EmulatorPanel;
+      }
+      this.emulatorPanel = new EmulatorPanelClass(container, {
+        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
           if (targetView === 'assembly' && this.assemblyView) {
             this.assemblyView.navigateToAddress(address);
           }
         },
-        onStep: (rip) => {
+        onStep: (rip: number) => {
           if (this.assemblyView) {
             this.assemblyView.navigateToAddress(rip);
           }
         },
       });
-      this.emulatorPanel.updateData(
+      this.emulatorPanel?.updateData(
         this.host.state.binaryData,
         this.host.state.sections,
         this.host.state.entryPoint,
@@ -475,8 +492,9 @@ export class PanelCoordinator {
     }
   }
 
-  public initGDBPanel() {
+  public async initGDBPanel() {
     const container = document.getElementById('gdb-panel-container')!;
+    if (!container) return;
     if (this.gdbPanel) {
       this.gdbPanel.updateData(
         this.host.state.binaryData,
@@ -485,19 +503,23 @@ export class PanelCoordinator {
         this.host.state.instructions
       );
     } else {
-      this.gdbPanel = new GDBPanel(container, {
-        onNavigate: (targetView, address) => {
+      let GDBPanelClass = PANEL_REGISTRY['GDBPanel'];
+      if (!GDBPanelClass) {
+        GDBPanelClass = (await import('./gdbPanel.js')).GDBPanel;
+      }
+      this.gdbPanel = new GDBPanelClass(container, {
+        onNavigate: (targetView: 'assembly' | 'hex' | 'decompiler', address: number) => {
           if (targetView === 'assembly' && this.assemblyView) {
             this.assemblyView.navigateToAddress(address);
           }
         },
-        onStep: (rip) => {
+        onStep: (rip: number) => {
           if (this.assemblyView) {
             this.assemblyView.navigateToAddress(rip);
           }
         },
       });
-      this.gdbPanel.updateData(
+      this.gdbPanel?.updateData(
         this.host.state.binaryData,
         this.host.state.sections,
         this.host.state.entryPoint,
@@ -729,17 +751,42 @@ export class PanelCoordinator {
       if (!this.aiPanel) {
         const aiContainer = document.getElementById('ai-panel-container')!;
         if (aiContainer) {
-          this.aiPanel = new AIPanel(aiContainer, {
-            onNavigateToAddress: (address: number) => {
-              if (this.assemblyView) {
-                this.assemblyView.navigateToAddress(address);
+          const AIPanelClass = PANEL_REGISTRY['AIPanel'];
+          if (AIPanelClass) {
+            this.aiPanel = new AIPanelClass(aiContainer, {
+              onNavigateToAddress: (address: number) => {
+                if (this.assemblyView) {
+                  this.assemblyView.navigateToAddress(address);
+                }
+                this.host.switchTab('assembly');
+              },
+            });
+            if (this.aiPanel) {
+              this.aiPanel.updateSymbolData(
+                this.host.state.selectedSymbol,
+                result.pseudocode
+              );
+            }
+          } else {
+            import('./aiPanel.js').then(({ AIPanel }) => {
+              this.aiPanel = new AIPanel(aiContainer, {
+                onNavigateToAddress: (address: number) => {
+                  if (this.assemblyView) {
+                    this.assemblyView.navigateToAddress(address);
+                  }
+                  this.host.switchTab('assembly');
+                },
+              });
+              if (this.aiPanel) {
+                this.aiPanel.updateSymbolData(
+                  this.host.state.selectedSymbol,
+                  result.pseudocode
+                );
               }
-              this.host.switchTab('assembly');
-            },
-          });
+            });
+          }
         }
-      }
-      if (this.aiPanel) {
+      } else {
         this.aiPanel.updateSymbolData(
           this.host.state.selectedSymbol,
           result.pseudocode
@@ -767,12 +814,17 @@ export class PanelCoordinator {
     });
   }
 
-  public initCollabPanel() {
+  public async initCollabPanel() {
     const container = document.getElementById('collab-panel-container')!;
+    if (!container) return;
     if (this.collabPanel) {
       this.collabPanel.destroy();
     }
-    this.collabPanel = new CollabPanel(container, {
+    let CollabPanelClass = PANEL_REGISTRY['CollabPanel'];
+    if (!CollabPanelClass) {
+      CollabPanelClass = (await import('./collabPanel.js')).CollabPanel;
+    }
+    this.collabPanel = new CollabPanelClass(container, {
       onNavigate: (
         targetView: 'assembly' | 'hex' | 'decompiler',
         address: number
@@ -825,12 +877,17 @@ export class PanelCoordinator {
     });
   }
 
-  public initYaraPanel() {
+  public async initYaraPanel() {
     const container = document.getElementById('yara-panel-container')!;
+    if (!container) return;
     if (this.yaraPanel) {
       this.yaraPanel.updateData(this.host.state.binaryData, this.host.state.sections);
     } else {
-      this.yaraPanel = new YaraPanel(container, {
+      let YaraPanelClass = PANEL_REGISTRY['YaraPanel'];
+      if (!YaraPanelClass) {
+        YaraPanelClass = (await import('./yaraPanel.js')).YaraPanel;
+      }
+      this.yaraPanel = new YaraPanelClass(container, {
         onNavigate: (
           targetView: 'assembly' | 'hex' | 'decompiler',
           address: number
@@ -868,12 +925,13 @@ export class PanelCoordinator {
           this.host.switchTab(targetView);
         },
       });
-      this.yaraPanel.updateData(this.host.state.binaryData, this.host.state.sections);
+      this.yaraPanel?.updateData(this.host.state.binaryData, this.host.state.sections);
     }
   }
 
-  public initPluginsPanel() {
+  public async initPluginsPanel() {
     const container = document.getElementById('plugins-panel-container')!;
+    if (!container) return;
     if (this.pluginsPanel) {
       this.pluginsPanel.updateData(
         this.host.state.binaryData,
@@ -882,7 +940,11 @@ export class PanelCoordinator {
         this.host.state.instructions
       );
     } else {
-      this.pluginsPanel = new PluginsPanel(container, {
+      let PluginsPanelClass = PANEL_REGISTRY['PluginsPanel'];
+      if (!PluginsPanelClass) {
+        PluginsPanelClass = (await import('./pluginsPanel.js')).PluginsPanel;
+      }
+      this.pluginsPanel = new PluginsPanelClass(container, {
         onNavigate: (
           targetView: 'assembly' | 'hex' | 'decompiler',
           address: number
@@ -893,7 +955,7 @@ export class PanelCoordinator {
           this.host.switchTab(targetView);
         },
       });
-      this.pluginsPanel.updateData(
+      this.pluginsPanel?.updateData(
         this.host.state.binaryData,
         this.host.state.sections,
         this.host.state.symbols,
@@ -902,7 +964,7 @@ export class PanelCoordinator {
     }
   }
 
-  public initMetadataPanel() {
+  public async initMetadataPanel() {
     const container = document.getElementById('metadata-panel-container')!;
     if (!container) return;
     if (this.metadataPanel) {
@@ -918,8 +980,12 @@ export class PanelCoordinator {
         objc: this.host.state.objc,
       });
     } else {
-      this.metadataPanel = new MetadataPanel(container);
-      this.metadataPanel.updateData({
+      let MetadataPanelClass = PANEL_REGISTRY['MetadataPanel'];
+      if (!MetadataPanelClass) {
+        MetadataPanelClass = (await import('./metadataPanel.js')).MetadataPanel;
+      }
+      this.metadataPanel = new MetadataPanelClass(container);
+      this.metadataPanel?.updateData({
         fileName: this.host.state.fileName,
         fileSize: this.host.state.fileSize,
         binaryData: this.host.state.binaryData,
@@ -933,13 +999,17 @@ export class PanelCoordinator {
     }
   }
 
-  public initTypeSystemPanel() {
+  public async initTypeSystemPanel() {
     const container = document.getElementById('type-system-container')!;
     if (container) {
       if (this.typeSystemPanel) {
         this.typeSystemPanel.updateArchitecture(this.host.state.architecture);
       } else {
-        this.typeSystemPanel = new TypeSystemPanel(container, {
+        let TypeSystemPanelClass = PANEL_REGISTRY['TypeSystemPanel'];
+        if (!TypeSystemPanelClass) {
+          TypeSystemPanelClass = (await import('./typeSystemPanel.js')).TypeSystemPanel;
+        }
+        this.typeSystemPanel = new TypeSystemPanelClass(container, {
           onNavigate: (
             targetView: 'assembly' | 'hex' | 'decompiler',
             address: number
@@ -977,12 +1047,12 @@ export class PanelCoordinator {
             this.host.switchTab(targetView);
           },
         });
-        this.typeSystemPanel.updateArchitecture(this.host.state.architecture);
+        this.typeSystemPanel?.updateArchitecture(this.host.state.architecture);
       }
     }
   }
 
-  public initDiffPanel() {
+  public async initDiffPanel() {
     const container = document.getElementById('diff-panel-container')!;
     if (container) {
       if (this.diffPanel) {
@@ -993,8 +1063,12 @@ export class PanelCoordinator {
           this.host.state.fileName
         );
       } else {
-        this.diffPanel = new DiffPanel(container);
-        this.diffPanel.updateData(
+        let DiffPanelClass = PANEL_REGISTRY['DiffPanel'];
+        if (!DiffPanelClass) {
+          DiffPanelClass = (await import('./diffPanel.js')).DiffPanel;
+        }
+        this.diffPanel = new DiffPanelClass(container);
+        this.diffPanel?.updateData(
           this.host.state.binaryData,
           this.host.state.sections,
           this.host.state.instructions,
@@ -1004,13 +1078,17 @@ export class PanelCoordinator {
     }
   }
 
-  public initMachoObjcPanel() {
+  public async initMachoObjcPanel() {
     const container = document.getElementById('macho-objc-container')!;
     if (!container) return;
     if (this.machoObjcPanel) {
       this.machoObjcPanel.updateData(this.host.state.objc || null);
     } else {
-      this.machoObjcPanel = new MachoObjcPanel(container, {
+      let MachoObjcPanelClass = PANEL_REGISTRY['MachoObjcPanel'];
+      if (!MachoObjcPanelClass) {
+        MachoObjcPanelClass = (await import('./machoObjcPanel.js')).MachoObjcPanel;
+      }
+      this.machoObjcPanel = new MachoObjcPanelClass(container, {
         onNavigate: (
           targetView: 'assembly' | 'hex' | 'decompiler',
           address: number
@@ -1052,16 +1130,21 @@ export class PanelCoordinator {
           }
         },
       });
-      this.machoObjcPanel.updateData(this.host.state.objc || null);
+      this.machoObjcPanel?.updateData(this.host.state.objc || null);
     }
   }
 
-  public initDemanglerPanel() {
+  public async initDemanglerPanel() {
     const container = document.getElementById('demangler-panel-container')!;
+    if (!container) return;
     if (this.demanglerPanel) {
       this.demanglerPanel.updateData(this.host.state.symbols);
     } else {
-      this.demanglerPanel = new DemanglerPanel(container, this.host.state.symbols, {
+      let DemanglerPanelClass = PANEL_REGISTRY['DemanglerPanel'];
+      if (!DemanglerPanelClass) {
+        DemanglerPanelClass = (await import('./demanglerPanel.js')).DemanglerPanel;
+      }
+      this.demanglerPanel = new DemanglerPanelClass(container, this.host.state.symbols, {
         onNavigate: (targetView: 'assembly' | 'hex', address: number) => {
           if (targetView === 'assembly' && this.assemblyView) {
             this.assemblyView.navigateToAddress(address);

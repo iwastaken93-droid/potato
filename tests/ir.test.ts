@@ -1028,4 +1028,213 @@ describe('IR/SSA Framework Unit Tests', () => {
     expect(l2h.instructions[0].dest?.name).toBe('rax');
     expect(l2h.instructions[0].dest?.version).toBe(4);
   });
+
+  it('should propagate and fold constants using ssaConstantFolding', () => {
+    const translator = new IRTranslator();
+    const optimizer = new IROptimizer();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        instructions: [
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1005,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1010,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // x_0 = 10
+    b1.instructions[0].op = IROp.MOV;
+    b1.instructions[0].dest = { type: 'var', name: 'x', version: 0 };
+    b1.instructions[0].args = [{ type: 'imm', value: 10 }];
+
+    // y_0 = 20
+    b1.instructions[1].op = IROp.MOV;
+    b1.instructions[1].dest = { type: 'var', name: 'y', version: 0 };
+    b1.instructions[1].args = [{ type: 'imm', value: 20 }];
+
+    // z_0 = x_0 + y_0
+    b1.instructions[2].op = IROp.ADD;
+    b1.instructions[2].dest = { type: 'var', name: 'z', version: 0 };
+    b1.instructions[2].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'var', name: 'y', version: 0 },
+    ];
+
+    const optimized = optimizer.ssaConstantFolding(irCfg);
+    const optB1 = optimized.blocks.get('block_1')!;
+
+    // z_0 should be folded to MOV 30
+    expect(optB1.instructions[2].op).toBe(IROp.MOV);
+    expect(optB1.instructions[2].args[0].type).toBe('imm');
+    expect(optB1.instructions[2].args[0].value).toBe(30);
+  });
+
+  it('should iteratively eliminate dead code using ssaDeadCodeElimination', () => {
+    const translator = new IRTranslator();
+    const optimizer = new IROptimizer();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        instructions: [
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1005,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1010,
+            bytes: new Uint8Array([]),
+            mnemonic: 'ret',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // x_0 = 5 (unused)
+    b1.instructions[0].op = IROp.MOV;
+    b1.instructions[0].dest = { type: 'var', name: 'x', version: 0 };
+    b1.instructions[0].args = [{ type: 'imm', value: 5 }];
+
+    // y_0 = x_0 + 2 (unused, but depends on x_0)
+    b1.instructions[1].op = IROp.ADD;
+    b1.instructions[1].dest = { type: 'var', name: 'y', version: 0 };
+    b1.instructions[1].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'imm', value: 2 },
+    ];
+
+    // ret
+    b1.instructions[2].op = IROp.RET;
+    b1.instructions[2].args = [];
+
+    const optimized = optimizer.ssaDeadCodeElimination(irCfg);
+    const optB1 = optimized.blocks.get('block_1')!;
+
+    // Both x_0 and y_0 assignments should be removed iteratively
+    expect(optB1.instructions.length).toBe(1);
+    expect(optB1.instructions[0].op).toBe(IROp.RET);
+  });
+
+  it('should allocate registers correctly using graph coloring', () => {
+    const translator = new IRTranslator();
+    const optimizer = new IROptimizer();
+
+    const blocks: BasicBlock[] = [
+      {
+        id: 'block_1',
+        startAddress: 0x1000,
+        instructions: [
+          {
+            address: 0x1000,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1005,
+            bytes: new Uint8Array([]),
+            mnemonic: 'add',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+          {
+            address: 0x1010,
+            bytes: new Uint8Array([]),
+            mnemonic: 'mov',
+            opStr: '',
+            operands: [],
+            size: 1,
+          },
+        ],
+        successors: [],
+      },
+    ];
+
+    const irCfg = translator.translateCFG(blocks);
+    const b1 = irCfg.blocks.get('block_1')!;
+
+    // x_0 = 10
+    b1.instructions[0].op = IROp.MOV;
+    b1.instructions[0].dest = { type: 'var', name: 'x', version: 0 };
+    b1.instructions[0].args = [{ type: 'imm', value: 10 }];
+
+    // y_0 = x_0 + 5
+    b1.instructions[1].op = IROp.ADD;
+    b1.instructions[1].dest = { type: 'var', name: 'y', version: 0 };
+    b1.instructions[1].args = [
+      { type: 'var', name: 'x', version: 0 },
+      { type: 'imm', value: 5 },
+    ];
+
+    // z_0 = y_0
+    b1.instructions[2].op = IROp.MOV;
+    b1.instructions[2].dest = { type: 'var', name: 'z', version: 0 };
+    b1.instructions[2].args = [{ type: 'var', name: 'y', version: 0 }];
+
+    const { mapping, spilled } = optimizer.allocateRegisters(irCfg, ['R0', 'R1']);
+
+    expect(spilled.size).toBe(0);
+    expect(mapping.has('x_0')).toBe(true);
+    expect(mapping.has('y_0')).toBe(true);
+    expect(mapping.has('z_0')).toBe(true);
+
+    // Apply allocation
+    const allocatedCfg = optimizer.applyRegisterAllocation(irCfg, mapping);
+    const allocB1 = allocatedCfg.blocks.get('block_1')!;
+
+    expect(allocB1.instructions[0].dest?.type).toBe('reg');
+    expect(allocB1.instructions[0].dest?.name).toBe(mapping.get('x_0'));
+  });
 });
+

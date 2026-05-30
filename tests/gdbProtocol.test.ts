@@ -192,5 +192,141 @@ describe('GDB/LLDB RSP Protocol Tests', () => {
       const emulator = new Emulator();
       expect(handleGDBCommand('unknownCommand', emulator)).toBe('');
     });
+
+    it('should handle edge cases in register read/write ("p", "P", "g", "G")', () => {
+      const emulator = new Emulator();
+      emulator.reset();
+
+      // Invalid register indices
+      expect(handleGDBCommand('p-1', emulator)).toBe('E01');
+      expect(handleGDBCommand('p99', emulator)).toBe('E01');
+      expect(handleGDBCommand('pXYZ', emulator)).toBe('E01');
+      expect(handleGDBCommand('P-1=123', emulator)).toBe('E01');
+      expect(handleGDBCommand('P99=123', emulator)).toBe('E01');
+      expect(handleGDBCommand('P0=', emulator)).toBe('OK');
+      expect(handleGDBCommand('P0', emulator)).toBe('E01');
+
+      // Writing/reading RAX (index 0) with boundary/large values
+      expect(handleGDBCommand('P0=ffffffffffffffff', emulator)).toBe('OK');
+      expect(emulator.cpu.read('rax')).toBe(0xffffffffffffffffn);
+      expect(handleGDBCommand('p0', emulator)).toBe('ffffffffffffffff');
+
+      // G command with short hexData
+      emulator.cpu.write('rax', 0n);
+      expect(handleGDBCommand('G112233', emulator)).toBe('OK');
+      // Should have parsed only what was available (rax has 8 bytes, so 112233 is 3 bytes, leaving rax partially modified or unwritten depending on implementation details)
+      // Actually writeGeneralRegisters loops through X86_64_REGISTERS:
+      // if (offset + charsNeeded > hexData.length) break;
+      // Since rax needs 16 hex characters and we passed '112233' (6 chars), it breaks immediately. RAX should remain unchanged.
+      expect(emulator.cpu.read('rax')).toBe(0n);
+    });
+
+    it('should handle edge cases in memory read/write ("m", "M")', () => {
+      const emulator = new Emulator();
+      emulator.reset();
+      emulator.memory.strictMode = true;
+      emulator.memory.map(0x1000n, 0x100);
+
+      // Malformed memory read commands
+      expect(handleGDBCommand('m1000', emulator)).toBe('E01');
+      expect(handleGDBCommand('m1000,', emulator)).toBe('E01');
+      expect(handleGDBCommand('m,4', emulator)).toBe('E01');
+      expect(handleGDBCommand('m-1000,4', emulator)).toBe('E03'); // parsing error or unmapped
+      expect(handleGDBCommand('m1000,-4', emulator)).toBe('E01');
+
+      // Map, write and verify boundaries
+      expect(handleGDBCommand('M1000,2:ff00', emulator)).toBe('OK');
+      expect(handleGDBCommand('m1000,2', emulator)).toBe('ff00');
+
+      // Mismatched length and payload on M command
+      // Length is 4, but only 2 bytes provided
+      expect(handleGDBCommand('M1000,4:aabb', emulator)).toBe('OK'); // parses what it can, might fill rest with NaN -> 0
+      expect(handleGDBCommand('m1000,4', emulator)).toBe('aabb0000');
+
+      // Writing/reading out of bounds memory
+      expect(handleGDBCommand('M0fff,2:1122', emulator)).toBe('E03');
+      expect(handleGDBCommand('m0fff,2', emulator)).toBe('E03');
+      expect(handleGDBCommand('M10ff,2:1122', emulator)).toBe('E03'); // overflows map
+      expect(handleGDBCommand('m10ff,2', emulator)).toBe('E03');
+    });
+
+    it('should handle breakpoints and control flow during continue ("c" and "s")', () => {
+      const emulator = new Emulator();
+
+      // Mock consecutive valid instructions
+      // Instruction 1: RIP 0x1000 (size 2)
+      emulator.instructions.set(0x1000, {
+        address: 0x1000,
+        mnemonic: 'nop',
+        opStr: '',
+        bytes: new Uint8Array([0x90, 0x90]),
+        size: 2,
+        operands: [],
+      });
+      // Instruction 2: RIP 0x1002 (size 2)
+      emulator.instructions.set(0x1002, {
+        address: 0x1002,
+        mnemonic: 'nop',
+        opStr: '',
+        bytes: new Uint8Array([0x90, 0x90]),
+        size: 2,
+        operands: [],
+      });
+      // Instruction 3: RIP 0x1004 (size 2)
+      emulator.instructions.set(0x1004, {
+        address: 0x1004,
+        mnemonic: 'nop',
+        opStr: '',
+        bytes: new Uint8Array([0x90, 0x90]),
+        size: 2,
+        operands: [],
+      });
+
+      // Call reset after instructions are registered so that they are mapped into memory
+      emulator.reset(0x1000);
+
+      // Step with address argument: s1002 should set RIP to 0x1002, step, and stop at 0x1004
+      expect(handleGDBCommand('s1002', emulator)).toBe('S05');
+      expect(emulator.cpu.read('rip')).toBe(0x1004n);
+
+      // Continue with address argument and breakpoint
+      emulator.cpu.write('rip', 0x1000n);
+      emulator.addBreakpoint(0x1002);
+
+      // c1000 should set RIP to 0x1000, step over, then hit breakpoint at 0x1002
+      expect(handleGDBCommand('c1000', emulator)).toBe('S05');
+      expect(emulator.cpu.read('rip')).toBe(0x1002n);
+
+      // If we continue again from 0x1002 (where breakpoint is), it should step past it first and then halt/run
+      expect(handleGDBCommand('c', emulator)).toBe('S05'); // hits next breakpoint or end of instruction list (halts at 0x1006 after max steps / unmapped)
+    });
+
+    it('should handle escaping/checksum edge cases', () => {
+      // Checksum wrapping (> 255)
+      // 'A' is 65. 5 * 65 = 325. 325 % 256 = 69.
+      expect(calculateChecksum('AAAAA')).toBe(69);
+
+      // Sequential escapes
+      const escaped = escapeData('$}#*');
+      expect(escaped).toBe('}\x04' + '}]' + '}\x03' + '}\x0a');
+      expect(unescapeData(escaped)).toBe('$}#*');
+    });
+
+    it('should handle parser streaming and corruption', () => {
+      const packets: GDBPacket[] = [];
+      const parser = new GDBProtocolParser((p) => packets.push(p));
+
+      // Junk before packet should be ignored
+      parser.feed('junk$OK#9a');
+      expect(packets).toEqual([{ type: 'packet', data: 'OK', raw: 'OK' }]);
+      packets.length = 0;
+
+      // Interrupted packet followed by valid packet
+      parser.feed('$OK#00$OK#9a');
+      expect(packets).toEqual([
+        { type: 'packet', data: undefined, raw: 'OK' },
+        { type: 'packet', data: 'OK', raw: 'OK' },
+      ]);
+    });
   });
 });

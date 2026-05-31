@@ -220,6 +220,7 @@ export class DebugSymbolsParser {
     debugInfo?: ArrayBuffer;
     debugStr?: ArrayBuffer;
     debugLineStr?: ArrayBuffer;
+    debugStrOffsets?: ArrayBuffer;
     pdbFile?: ArrayBuffer;
   }): ParseResult {
     if (options.pdbFile) {
@@ -240,9 +241,9 @@ export class DebugSymbolsParser {
       }
     } else if (options.debugLine) {
       this.format = 'DWARF';
-      this.lines = parseDwarfLine(options.debugLine, options.debugStr, options.debugLineStr);
+      this.lines = parseDwarfLine(options.debugLine, options.debugStr, options.debugLineStr, options.debugStrOffsets);
       if (options.debugInfo) {
-        this.symbols = parseDwarfInfo(options.debugInfo, options.debugStr, options.debugLineStr);
+        this.symbols = parseDwarfInfo(options.debugInfo, options.debugStr, options.debugLineStr, options.debugStrOffsets);
       }
     }
 

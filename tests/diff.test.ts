@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   diffBytes,
   diffInstructions,
+  diffSections,
   myersDiff,
 } from '../src/analyzer/diff.js';
-import { Instruction } from '../src/disassembler/types.js';
+import { Instruction, Section } from '../src/disassembler/types.js';
 
 describe('Binary Diffing Engine Tests', () => {
   // Test 1: Standard byte diffs
@@ -570,5 +571,58 @@ describe('Binary Diffing Engine Tests', () => {
     const result = myersDiff(a, b, (x, y) => x === y);
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('delete');
+  });
+
+  // Extra Test 43: diffSections
+  it('should compute section diffs correctly', () => {
+    const secA: Section[] = [
+      {
+        name: '.text',
+        virtualAddress: 0x1000,
+        virtualSize: 0x200,
+        fileOffset: 0x200,
+        fileSize: 0x200,
+        flags: { read: true, write: false, execute: true },
+      },
+      {
+        name: '.data',
+        virtualAddress: 0x2000,
+        virtualSize: 0x100,
+        fileOffset: 0x400,
+        fileSize: 0x100,
+        flags: { read: true, write: true, execute: false },
+      },
+    ];
+    const secB: Section[] = [
+      {
+        name: '.text',
+        virtualAddress: 0x1000,
+        virtualSize: 0x250,
+        fileOffset: 0x200,
+        fileSize: 0x250,
+        flags: { read: true, write: false, execute: true },
+      },
+      {
+        name: '.data',
+        virtualAddress: 0x2000,
+        virtualSize: 0x100,
+        fileOffset: 0x450,
+        fileSize: 0x100,
+        flags: { read: true, write: true, execute: false },
+      },
+      {
+        name: '.bss',
+        virtualAddress: 0x3000,
+        virtualSize: 0x50,
+        fileOffset: 0,
+        fileSize: 0,
+        flags: { read: true, write: true, execute: false },
+      },
+    ];
+
+    const result = diffSections(secA, secB);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0].type).toBe('replace'); // .text size modified
+    expect(result[result.length - 1].type).toBe('insert'); // .bss inserted
   });
 });

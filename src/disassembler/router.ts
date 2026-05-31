@@ -2,12 +2,16 @@ import { Instruction, Operand, OperandType, Section } from './types.js';
 import { CapstoneWasmEngine } from './capstoneWasm.js';
 import { disassembleX86 } from './x86.js';
 import { disassembleArm } from './arm.js';
+import { disassembleArm32, disassembleThumb } from './arm32.js';
 import { disassembleWasm } from './wasm.js';
 import { disassembleDalvik } from './dalvik.js';
 import { disassembleRiscv } from './riscv.js';
 import { disassembleMips } from './mips.js';
 import { disassemblePpc } from './ppc.js';
 import { disassembleSparc } from './sparc.js';
+import { disassembleZ80 } from './z80.js';
+import { disassemble6502 } from './m6502.js';
+
 
 /**
  * Supported architectures.
@@ -15,13 +19,17 @@ import { disassembleSparc } from './sparc.js';
 export type Architecture =
   | 'x86_64'
   | 'arm'
+  | 'arm32'
+  | 'thumb'
   | 'wasm'
   | 'dex'
   | 'riscv'
   | 'mips'
   | 'mipsel'
   | 'ppc'
-  | 'sparc';
+  | 'sparc'
+  | 'z80'
+  | 'm6502';
 
 /**
  * Metadata configuration for disassembly.
@@ -69,6 +77,17 @@ export class DisassemblerRouter {
       data[3] === 0x6d
     ) {
       return 'wasm';
+    }
+
+    // Detect NES ROM (6502) by magic: NES\x1a
+    if (
+      data.length >= 4 &&
+      data[0] === 0x4e &&
+      data[1] === 0x45 &&
+      data[2] === 0x53 &&
+      data[3] === 0x1a
+    ) {
+      return 'm6502';
     }
 
     // Detect Mach-O Architecture
@@ -277,8 +296,49 @@ export class DisassemblerRouter {
     switch (arch) {
       case 'wasm':
         return disassembleWasm(data);
-      case 'arm':
+      case 'arm32':
+        return disassembleArm32(data, baseAddress);
+      case 'thumb':
+        return disassembleThumb(data, baseAddress);
+      case 'arm': {
+        const isElf32 = data.length >= 20 &&
+          data[0] === 0x7f && data[1] === 0x45 && data[2] === 0x4c && data[3] === 0x46 &&
+          data[4] === 1 && (data[18] | (data[19] << 8)) === 40;
+        
+        let isPeThumb = false;
+        if (data.length >= 64 && data[0] === 0x5a && data[1] === 0x4d) {
+          const peOffset = data[0x3c] | (data[0x3d] << 8) | (data[0x3e] << 16) | (data[0x3f] << 24);
+          if (peOffset + 6 <= data.length && data[peOffset] === 0x50 && data[peOffset + 1] === 0x45) {
+            const machine = data[peOffset + 4] | (data[peOffset + 5] << 8);
+            if (machine === 0x01c4) {
+              isPeThumb = true;
+            }
+          }
+        }
+        
+        let isMacho32 = false;
+        if (data.length >= 8) {
+          const magic = (data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)) >>> 0;
+          const magicBE = ((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]) >>> 0;
+          if (magic === 0xfeedface || magicBE === 0xfeedface || magic === 0xcefaedfe) {
+            const isLE = magic === 0xfeedface || magic === 0xcefaedfe;
+            const cputype = isLE
+              ? (data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24))
+              : ((data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7]);
+            if (cputype === 12) {
+              isMacho32 = true;
+            }
+          }
+        }
+
+        if (isPeThumb) {
+          return disassembleThumb(data, baseAddress);
+        }
+        if (isElf32 || isMacho32) {
+          return disassembleArm32(data, baseAddress);
+        }
         return disassembleArm(data, baseAddress);
+      }
       case 'dex':
         return disassembleDalvik(data, baseAddress);
       case 'riscv':
@@ -291,6 +351,10 @@ export class DisassemblerRouter {
         return disassemblePpc(data, baseAddress);
       case 'sparc':
         return disassembleSparc(data, baseAddress);
+      case 'z80':
+        return disassembleZ80(data, baseAddress);
+      case 'm6502':
+        return disassemble6502(data, baseAddress);
       case 'x86_64':
       default:
         return disassembleX86(data, baseAddress);

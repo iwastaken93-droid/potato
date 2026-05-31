@@ -13,6 +13,7 @@ import { DisassemblerRouter, Architecture } from '../disassembler/router.js';
 import { buildCFG, BasicBlock as CoreBasicBlock } from '../disassembler/cfg.js';
 import { Instruction, Section, Symbol } from '../disassembler/types.js';
 import { extractStrings, ExtractedString } from './strings.js';
+import { detectFormat, parseIntelHex, parseSRecord } from '../parser/hexLoader.js';
 
 export interface ProcessedBinaryResult {
   architecture: Architecture;
@@ -36,6 +37,40 @@ export function processBinaryData(
   data: Uint8Array,
   arrayBuffer: ArrayBuffer
 ): ProcessedBinaryResult {
+  const hexFormat = detectFormat(data);
+  let parsedHex: any = null;
+  if (hexFormat === 'IntelHex') {
+    parsedHex = parseIntelHex(data);
+  } else if (hexFormat === 'SRecord') {
+    parsedHex = parseSRecord(data);
+  }
+  const isHexOrSrec = parsedHex !== null;
+
+  if (isHexOrSrec) {
+    const entryPointVal = parsedHex.entryPoint || (parsedHex.blocks[0]?.address ?? 0);
+    let totalSize = 0;
+    for (const block of parsedHex.blocks) {
+      totalSize += block.data.length;
+    }
+    const concatenatedData = new Uint8Array(totalSize);
+    let currentOffset = 0;
+    const hexSections = parsedHex.blocks.map((block: any, idx: number) => {
+      concatenatedData.set(block.data, currentOffset);
+      const sec = {
+        name: `.sec_${idx}`,
+        virtualAddress: block.address,
+        virtualSize: block.data.length,
+        fileOffset: currentOffset,
+        fileSize: block.data.length,
+        flags: { read: true, write: true, execute: true },
+      };
+      currentOffset += block.data.length;
+      return sec;
+    });
+    data = concatenatedData;
+    arrayBuffer = concatenatedData.buffer;
+  }
+
   const fileLength = data.length;
 
   // Auto-detect format & architecture using Router
@@ -51,7 +86,30 @@ export function processBinaryData(
 
   // Format & parser dispatches
   try {
-    if (arch === 'wasm') {
+    if (isHexOrSrec) {
+      entryPoint = parsedHex.entryPoint || (parsedHex.blocks[0]?.address ?? 0);
+      let currentOffset = 0;
+      sections = parsedHex.blocks.map((block: any, idx: number) => {
+        const sec = {
+          name: `.sec_${idx}`,
+          virtualAddress: block.address,
+          virtualSize: block.data.length,
+          fileOffset: currentOffset,
+          fileSize: block.data.length,
+          flags: { read: true, write: true, execute: true },
+        };
+        currentOffset += block.data.length;
+        return sec;
+      });
+      symbols = [
+        {
+          name: '_start',
+          address: entryPoint,
+          binding: 'global',
+          type: 'function',
+        },
+      ];
+    } else if (arch === 'wasm') {
       const wasm = parseWasm(arrayBuffer);
       entryPoint = wasm.version; // Use version/magic metadata
       sections = wasm.customSections.map((s: any) => ({
@@ -531,6 +589,40 @@ export async function processBinaryDataAsync(
   if (arrayBuffer instanceof Blob) {
     return processBinaryWithWorker(arrayBuffer, fileName, onProgress);
   }
+  const hexFormat = detectFormat(data);
+  let parsedHex: any = null;
+  if (hexFormat === 'IntelHex') {
+    parsedHex = parseIntelHex(data);
+  } else if (hexFormat === 'SRecord') {
+    parsedHex = parseSRecord(data);
+  }
+  const isHexOrSrec = parsedHex !== null;
+
+  if (isHexOrSrec) {
+    const entryPointVal = parsedHex.entryPoint || (parsedHex.blocks[0]?.address ?? 0);
+    let totalSize = 0;
+    for (const block of parsedHex.blocks) {
+      totalSize += block.data.length;
+    }
+    const concatenatedData = new Uint8Array(totalSize);
+    let currentOffset = 0;
+    const hexSections = parsedHex.blocks.map((block: any, idx: number) => {
+      concatenatedData.set(block.data, currentOffset);
+      const sec = {
+        name: `.sec_${idx}`,
+        virtualAddress: block.address,
+        virtualSize: block.data.length,
+        fileOffset: currentOffset,
+        fileSize: block.data.length,
+        flags: { read: true, write: true, execute: true },
+      };
+      currentOffset += block.data.length;
+      return sec;
+    });
+    data = concatenatedData;
+    arrayBuffer = concatenatedData.buffer;
+  }
+
   const fileLength = data.length;
 
   await onProgress(20, 'Detecting architecture...');
@@ -547,7 +639,30 @@ export async function processBinaryDataAsync(
   await new Promise(resolve => requestAnimationFrame(resolve));
 
   try {
-    if (arch === 'wasm') {
+    if (isHexOrSrec) {
+      entryPoint = parsedHex.entryPoint || (parsedHex.blocks[0]?.address ?? 0);
+      let currentOffset = 0;
+      sections = parsedHex.blocks.map((block: any, idx: number) => {
+        const sec = {
+          name: `.sec_${idx}`,
+          virtualAddress: block.address,
+          virtualSize: block.data.length,
+          fileOffset: currentOffset,
+          fileSize: block.data.length,
+          flags: { read: true, write: true, execute: true },
+        };
+        currentOffset += block.data.length;
+        return sec;
+      });
+      symbols = [
+        {
+          name: '_start',
+          address: entryPoint,
+          binding: 'global',
+          type: 'function',
+        },
+      ];
+    } else if (arch === 'wasm') {
       const wasm = parseWasm(arrayBuffer);
       entryPoint = wasm.version;
       sections = wasm.customSections.map((s: any) => ({
@@ -1036,6 +1151,18 @@ export async function processBinaryFileChunked(
   const firstBlob = file.slice(0, firstSize);
   let firstBuffer: ArrayBuffer | null = await firstBlob.arrayBuffer();
   let firstData: Uint8Array | null = new Uint8Array(firstBuffer);
+
+  // Check for HEX/SREC formats
+  const hexFormat = detectFormat(firstData);
+  if (hexFormat) {
+    const entireBuffer = await file.arrayBuffer();
+    const entireData = new Uint8Array(entireBuffer);
+    const result = processBinaryData(fileName, entireData, entireBuffer);
+    if (onProgress) {
+      await onProgress(100, 'Done!');
+    }
+    return result;
+  }
 
   // Auto-detect format & architecture
   const arch = DisassemblerRouter.detectArchitecture(firstData);

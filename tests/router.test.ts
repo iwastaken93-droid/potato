@@ -1093,5 +1093,143 @@ describe('DisassemblerRouter Unit Tests', () => {
       expect(insts[6].opStr).toBe('%g3, [%g1 + 0x10]');
       expect(insts[6].operands[1].mem).toEqual({ base: '%g1', index: undefined, disp: 16 });
     });
+
+    it('should decode SPARC branch conditions and float branches correctly', () => {
+      const router = new DisassemblerRouter();
+      const data = new Uint8Array([
+        0x10, 0x80, 0x00, 0x02, // ba 0x8
+        0x00, 0x80, 0x00, 0x02, // bn 0x8
+        0x12, 0x80, 0x00, 0x02, // bne 0x8
+        0x02, 0x80, 0x00, 0x02, // be 0x8
+        0x0a, 0x80, 0x00, 0x02, // bg 0x8
+        0x1a, 0x80, 0x00, 0x02, // bge 0x8
+        0x06, 0x80, 0x00, 0x02, // bl 0x8
+        0x04, 0x80, 0x00, 0x02, // ble 0x8
+        0x16, 0x80, 0x00, 0x02, // bgu 0x8
+        0x08, 0x80, 0x00, 0x02, // bleu 0x8
+        0x18, 0x80, 0x00, 0x02, // bcc 0x8
+        0x0c, 0x80, 0x00, 0x02, // bcs 0x8
+        0x1c, 0x80, 0x00, 0x02, // bpos 0x8
+        0x0e, 0x80, 0x00, 0x02, // bneg 0x8
+        0x1e, 0x80, 0x00, 0x02, // bvc 0x8
+        0x14, 0x80, 0x00, 0x02, // bvs 0x8
+        0x11, 0x80, 0x00, 0x02, // fb_8 0x8
+      ]);
+
+      const insts = router.disassemble(data, { arch: 'sparc', baseAddress: 0 });
+      expect(insts).toHaveLength(17);
+      expect(insts[0].mnemonic).toBe('ba');
+      expect(insts[1].mnemonic).toBe('bn');
+      expect(insts[2].mnemonic).toBe('bne');
+      expect(insts[3].mnemonic).toBe('be');
+      expect(insts[4].mnemonic).toBe('bg');
+      expect(insts[5].mnemonic).toBe('bge');
+      expect(insts[6].mnemonic).toBe('bl');
+      expect(insts[7].mnemonic).toBe('ble');
+      expect(insts[8].mnemonic).toBe('bgu');
+      expect(insts[9].mnemonic).toBe('bleu');
+      expect(insts[10].mnemonic).toBe('bcc');
+      expect(insts[11].mnemonic).toBe('bcs');
+      expect(insts[12].mnemonic).toBe('bpos');
+      expect(insts[13].mnemonic).toBe('bneg');
+      expect(insts[14].mnemonic).toBe('bvc');
+      expect(insts[15].mnemonic).toBe('bvs');
+      expect(insts[16].mnemonic).toBe('fb_8');
+    });
+
+    it('should decode SPARC arithmetic, load/store edge cases and negative immediates', () => {
+      const router = new DisassemblerRouter();
+      const data = new Uint8Array([
+        0x86, 0x00, 0x7f, 0xf6, // add %g1, -0xa, %g3 (simm13 = -10)
+        0x87, 0xc0, 0x40, 0x02, // jmpl %g1 + %g2, %g3
+        0x87, 0xc0, 0x60, 0x10, // jmpl %g1 + 0x10, %g3
+        0x87, 0xf0, 0x60, 0x0a, // op3_0x3e 0x87f0600a (unknown arithmetic)
+        0xc6, 0x28, 0x40, 0x02, // stb %g3, [%g1 + %g2] (store register index)
+        0xc6, 0x30, 0x7f, 0xf0, // sth %g3, [%g1 + -0x10] (store displacement)
+        0xc7, 0xf8, 0x60, 0x0a, // ldst_0x3f 0xc7f8600a (unknown load/store)
+        0xc6, 0x08, 0x60, 0x10, // ldub [%g1 + 0x10], %g3
+        0xc6, 0x10, 0x60, 0x10, // lduh [%g1 + 0x10], %g3
+        0xc6, 0x18, 0x60, 0x10, // ldd [%g1 + 0x10], %g3
+        0xc6, 0x38, 0x60, 0x10, // std %g3, [%g1 + 0x10]
+        0xc6, 0x48, 0x60, 0x10, // ldsb [%g1 + 0x10], %g3
+        0xc6, 0x50, 0x60, 0x10, // ldsh [%g1 + 0x10], %g3
+        0xaa, 0xbb, // remaining 2 bytes (db)
+      ]);
+
+      const insts = router.disassemble(data, { arch: 'sparc', baseAddress: 0x2000 });
+      expect(insts).toHaveLength(14);
+
+      expect(insts[0].mnemonic).toBe('add');
+      expect(insts[0].opStr).toBe('%g1, -0xa, %g3');
+      expect(insts[0].operands[1]).toEqual({ type: 'imm', imm: -10 });
+
+      expect(insts[1].mnemonic).toBe('jmpl');
+      expect(insts[1].opStr).toBe('%g1 + %g2, %g3');
+      expect(insts[1].operands[0]).toEqual({ type: 'mem', mem: { base: '%g1', index: '%g2', disp: undefined } });
+
+      expect(insts[2].mnemonic).toBe('jmpl');
+      expect(insts[2].opStr).toBe('%g1 + 0x10, %g3');
+      expect(insts[2].operands[0]).toEqual({ type: 'mem', mem: { base: '%g1', index: undefined, disp: 16 } });
+
+      expect(insts[3].mnemonic).toBe('op3_0x3e');
+
+      expect(insts[4].mnemonic).toBe('stb');
+      expect(insts[4].opStr).toBe('%g3, [%g1 + %g2]');
+      expect(insts[4].operands[1].mem).toEqual({ base: '%g1', index: '%g2', disp: undefined });
+
+      expect(insts[5].mnemonic).toBe('sth');
+      expect(insts[5].opStr).toBe('%g3, [%g1 + -0x10]');
+      expect(insts[5].operands[1].mem).toEqual({ base: '%g1', index: undefined, disp: -16 });
+
+      expect(insts[6].mnemonic).toBe('ldst_0x3f');
+
+      expect(insts[7].mnemonic).toBe('ldub');
+      expect(insts[8].mnemonic).toBe('lduh');
+      expect(insts[9].mnemonic).toBe('ldd');
+      expect(insts[10].mnemonic).toBe('std');
+      expect(insts[11].mnemonic).toBe('ldsb');
+      expect(insts[12].mnemonic).toBe('ldsh');
+
+      expect(insts[13].mnemonic).toBe('db');
+      expect(insts[13].opStr).toBe('0xaa, 0xbb');
+    });
+
+    it('should handle SPARC edge cases: unknown op2 formats, unknown op3/ldst, and odd byte counts', () => {
+      const router = new DisassemblerRouter();
+      const data = new Uint8Array([
+        // 1. op = 0 (Format 2), op2 = 0 (unknown) -> val = 0x00000000
+        0x00, 0x00, 0x00, 0x00,
+        // 2. op = 2, op3 = 0x3e (unknown arithmetic/misc), val = 0x81f00000
+        0x81, 0xf0, 0x00, 0x00,
+        // 3. op = 3, op3 = 0x3f (unknown load/store), val = 0xc1f80000
+        0xc1, 0xf8, 0x00, 0x00,
+        // 4. Remaining odd bytes: 3 bytes
+        0x11, 0x22, 0x33
+      ]);
+
+      const insts = router.disassemble(data, { arch: 'sparc', baseAddress: 0x5000 });
+      expect(insts).toHaveLength(4);
+
+      // 1. op2 = 0
+      expect(insts[0].mnemonic).toBe('db');
+      expect(insts[0].opStr).toBe('0x00000000');
+      expect(insts[0].operands).toHaveLength(0);
+
+      // 2. op3 = 0x3e
+      expect(insts[1].mnemonic).toBe('op3_0x3e');
+      expect(insts[1].opStr).toBe('0x81f00000');
+      expect(insts[1].operands).toHaveLength(0);
+
+      // 3. ldst = 0x3f
+      expect(insts[2].mnemonic).toBe('ldst_0x3f');
+      expect(insts[2].opStr).toBe('0xc1f80000');
+      expect(insts[2].operands).toHaveLength(0);
+
+      // 4. odd bytes
+      expect(insts[3].mnemonic).toBe('db');
+      expect(insts[3].opStr).toBe('0x11, 0x22, 0x33');
+      expect(insts[3].operands).toHaveLength(0);
+      expect(insts[3].size).toBe(3);
+    });
   });
 });

@@ -6,7 +6,7 @@
  * generating detailed side-by-side comparison markers.
  */
 
-import { Instruction } from '../disassembler/types.js';
+import { Instruction, Section } from '../disassembler/types.js';
 
 export type DiffType = 'equal' | 'delete' | 'insert' | 'replace';
 
@@ -411,4 +411,47 @@ export function diffInstructions(
     inst1: e.original,
     inst2: e.revised,
   }));
+}
+
+export interface SectionDiffResult {
+  type: DiffType;
+  section1: Section | null;
+  section2: Section | null;
+}
+
+/**
+ * Compare two section lists and return the diff result.
+ */
+export function diffSections(
+  a: Section[],
+  b: Section[]
+): SectionDiffResult[] {
+  const entries = myersDiff(a, b, (x, y) => {
+    return x.name === y.name;
+  });
+
+  return entries.map((e) => {
+    let type = e.type;
+    if (type === 'equal' && e.original && e.revised) {
+      const x = e.original;
+      const y = e.revised;
+      const modified =
+        x.virtualAddress !== y.virtualAddress ||
+        x.virtualSize !== y.virtualSize ||
+        x.fileOffset !== y.fileOffset ||
+        x.fileSize !== y.fileSize ||
+        x.flags.read !== y.flags.read ||
+        x.flags.write !== y.flags.write ||
+        x.flags.execute !== y.flags.execute;
+      if (modified) {
+        type = 'replace';
+      }
+    }
+
+    return {
+      type,
+      section1: e.original,
+      section2: e.revised,
+    };
+  });
 }

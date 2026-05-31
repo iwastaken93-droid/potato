@@ -60,13 +60,73 @@ export function readSLEB128(
 // DWARF Form Values Parser
 // ============================================================================
 
+export function getStringFromOffset(
+  debugStrView: DataView,
+  offset: number
+): string {
+  let str = '';
+  let i = offset;
+  while (i < debugStrView.byteLength) {
+    const char = debugStrView.getUint8(i);
+    if (char === 0) break;
+    str += String.fromCharCode(char);
+    i++;
+  }
+  return str;
+}
+
+export function resolveStrX(
+  index: number,
+  debugStrOffsetsView: DataView | null | undefined,
+  debugStrView: DataView | null | undefined,
+  strOffsetsBase: number = 0
+): string | null {
+  if (!debugStrOffsetsView || !debugStrView) {
+    return null;
+  }
+  try {
+    if (strOffsetsBase + 4 > debugStrOffsetsView.byteLength) {
+      return null;
+    }
+    let unitLength = debugStrOffsetsView.getUint32(strOffsetsBase, true);
+    let is64Bit = false;
+    let headerSize = 8;
+    if (unitLength === 0xffffffff) {
+      is64Bit = true;
+      headerSize = 16;
+      if (strOffsetsBase + 12 > debugStrOffsetsView.byteLength) {
+        return null;
+      }
+    }
+    const versionOffset = is64Bit ? 12 : 4;
+    if (strOffsetsBase + versionOffset + 2 > debugStrOffsetsView.byteLength) {
+      return null;
+    }
+    const offsetSize = is64Bit ? 8 : 4;
+    const entryOffset = strOffsetsBase + headerSize + index * offsetSize;
+    if (entryOffset + offsetSize > debugStrOffsetsView.byteLength) {
+      return null;
+    }
+    const strOffset = offsetSize === 8
+      ? Number(debugStrOffsetsView.getBigUint64(entryOffset, true))
+      : debugStrOffsetsView.getUint32(entryOffset, true);
+    if (strOffset < debugStrView.byteLength) {
+      return getStringFromOffset(debugStrView, strOffset);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
 export function parseFormValue(
   view: DataView,
   offset: number,
   form: number,
   is64Bit: boolean,
   debugStrView?: DataView | null,
-  debugLineStrView?: DataView | null
+  debugLineStrView?: DataView | null,
+  debugStrOffsetsView?: DataView | null
 ): { value: any; bytesRead: number } {
   let bytesRead = 0;
   let value: any = null;
@@ -184,31 +244,43 @@ export function parseFormValue(
       break;
     case 0x1a: { // DW_FORM_strx
       const res = readULEB128(view, offset + bytesRead);
-      value = `strx_${res.value}`;
       bytesRead += res.bytesRead;
+      const resolved = resolveStrX(res.value, debugStrOffsetsView, debugStrView);
+      value = resolved !== null ? resolved : `strx_${res.value}`;
       break;
     }
-    case 0x25: // DW_FORM_strx1
+    case 0x25: { // DW_FORM_strx1
       if (offset + bytesRead + 1 > view.byteLength) throw new Error('Out of bounds');
-      value = `strx_${view.getUint8(offset + bytesRead)}`;
+      const idx = view.getUint8(offset + bytesRead);
       bytesRead += 1;
+      const resolved = resolveStrX(idx, debugStrOffsetsView, debugStrView);
+      value = resolved !== null ? resolved : `strx_${idx}`;
       break;
-    case 0x26: // DW_FORM_strx2
+    }
+    case 0x26: { // DW_FORM_strx2
       if (offset + bytesRead + 2 > view.byteLength) throw new Error('Out of bounds');
-      value = `strx_${view.getUint16(offset + bytesRead, true)}`;
+      const idx = view.getUint16(offset + bytesRead, true);
       bytesRead += 2;
+      const resolved = resolveStrX(idx, debugStrOffsetsView, debugStrView);
+      value = resolved !== null ? resolved : `strx_${idx}`;
       break;
-    case 0x27: // DW_FORM_strx3
+    }
+    case 0x27: { // DW_FORM_strx3
       if (offset + bytesRead + 3 > view.byteLength) throw new Error('Out of bounds');
       const val3 = view.getUint8(offset + bytesRead) | (view.getUint16(offset + bytesRead + 1, true) << 8);
-      value = `strx_${val3}`;
       bytesRead += 3;
+      const resolved = resolveStrX(val3, debugStrOffsetsView, debugStrView);
+      value = resolved !== null ? resolved : `strx_${val3}`;
       break;
-    case 0x28: // DW_FORM_strx4
+    }
+    case 0x28: { // DW_FORM_strx4
       if (offset + bytesRead + 4 > view.byteLength) throw new Error('Out of bounds');
-      value = `strx_${view.getUint32(offset + bytesRead, true)}`;
+      const idx = view.getUint32(offset + bytesRead, true);
       bytesRead += 4;
+      const resolved = resolveStrX(idx, debugStrOffsetsView, debugStrView);
+      value = resolved !== null ? resolved : `strx_${idx}`;
       break;
+    }
     case 0x1e: { // DW_FORM_data16 (introduced in DWARF v5, e.g. for MD5 checksums)
       if (offset + bytesRead + 16 > view.byteLength) {
         throw new Error('Out of bounds reading DW_FORM_data16');
@@ -249,11 +321,13 @@ export function parseFormValue(
 export function parseDwarfLine(
   debugLineBuffer: ArrayBuffer,
   debugStrBuffer?: ArrayBuffer,
-  debugLineStrBuffer?: ArrayBuffer
+  debugLineStrBuffer?: ArrayBuffer,
+  debugStrOffsetsBuffer?: ArrayBuffer
 ): LineInfo[] {
   const view = new DataView(debugLineBuffer);
   const strView = debugStrBuffer ? new DataView(debugStrBuffer) : null;
   const lineStrView = debugLineStrBuffer ? new DataView(debugLineStrBuffer) : null;
+  const strOffsetsView = debugStrOffsetsBuffer ? new DataView(debugStrOffsetsBuffer) : null;
   const lines: LineInfo[] = [];
   let offset = 0;
 
@@ -381,7 +455,8 @@ export function parseDwarfLine(
             format.form,
             is64Bit,
             strView,
-            lineStrView
+            lineStrView,
+            strOffsetsView
           );
           offset += parsed.bytesRead;
           if (format.contentType === 1) { // DW_LNCT_path
@@ -422,7 +497,8 @@ export function parseDwarfLine(
             format.form,
             is64Bit,
             strView,
-            lineStrView
+            lineStrView,
+            strOffsetsView
           );
           offset += parsed.bytesRead;
           if (format.contentType === 1) { // DW_LNCT_path
@@ -702,11 +778,13 @@ export function parseDwarfLine(
 export function parseDwarfInfo(
   debugInfoBuffer: ArrayBuffer,
   debugStrBuffer?: ArrayBuffer,
-  debugLineStrBuffer?: ArrayBuffer
+  debugLineStrBuffer?: ArrayBuffer,
+  debugStrOffsetsBuffer?: ArrayBuffer
 ): DebugSymbol[] {
   const view = new DataView(debugInfoBuffer);
   const strView = debugStrBuffer ? new DataView(debugStrBuffer) : null;
   const lineStrView = debugLineStrBuffer ? new DataView(debugLineStrBuffer) : null;
+  const strOffsetsView = debugStrOffsetsBuffer ? new DataView(debugStrOffsetsBuffer) : null;
   const symbols: DebugSymbol[] = [];
   let offset = 0;
 
@@ -792,6 +870,18 @@ export function parseDwarfInfo(
               name = getString(strOffsetVal);
             }
           }
+        } else if (form === 0x1a || form === 0x25 || form === 0x26 || form === 0x27 || form === 0x28) {
+          const parsed = parseFormValue(
+            view,
+            offset,
+            form,
+            is64Bit,
+            strView,
+            lineStrView,
+            strOffsetsView
+          );
+          name = String(parsed.value);
+          offset += parsed.bytesRead;
         }
       }
 

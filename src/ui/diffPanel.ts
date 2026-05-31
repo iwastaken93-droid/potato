@@ -9,8 +9,10 @@ import { Instruction, Section } from '../disassembler/types.js';
 import {
   diffBytes,
   diffInstructions,
+  diffSections,
   ByteDiffResult,
   InstructionDiffResult,
+  SectionDiffResult,
 } from '../analyzer/diff.js';
 import { parseElf } from '../parser/elf.js';
 import { PEParser } from '../parser/pe.js';
@@ -44,7 +46,7 @@ export class DiffPanel {
   private entryPoint2: number = 0;
 
   // Mode state
-  private mode: 'byte' | 'instruction' | 'trace' = 'byte';
+  private mode: 'byte' | 'instruction' | 'trace' | 'section' = 'byte';
 
   // DOM Elements
   private rootEl!: HTMLDivElement;
@@ -419,9 +421,15 @@ export class DiffPanel {
     btnTrace.textContent = 'Trace Diff';
     btnTrace.onclick = () => this.switchMode('trace');
 
+    const btnSection = document.createElement('button');
+    btnSection.className = 'btn-mode-toggle';
+    btnSection.textContent = 'Section Diff';
+    btnSection.onclick = () => this.switchMode('section');
+
     toggleGroup.appendChild(btnByte);
     toggleGroup.appendChild(btnInst);
     toggleGroup.appendChild(btnTrace);
+    toggleGroup.appendChild(btnSection);
     actions.appendChild(toggleGroup);
     headerBar.appendChild(actions);
 
@@ -480,7 +488,7 @@ export class DiffPanel {
     this.container.appendChild(this.rootEl);
   }
 
-  private switchMode(mode: 'byte' | 'instruction' | 'trace') {
+  private switchMode(mode: 'byte' | 'instruction' | 'trace' | 'section') {
     this.mode = mode;
     const buttons =
       this.modeSelectorContainer.querySelectorAll('.btn-mode-toggle');
@@ -488,7 +496,8 @@ export class DiffPanel {
       if (
         (mode === 'byte' && idx === 0) ||
         (mode === 'instruction' && idx === 1) ||
-        (mode === 'trace' && idx === 2)
+        (mode === 'trace' && idx === 2) ||
+        (mode === 'section' && idx === 3)
       ) {
         btn.classList.add('active');
       } else {
@@ -877,6 +886,65 @@ export class DiffPanel {
           `;
         } else {
           rowR.innerHTML = `<div class="diff-offset" style="width: 80px; color: transparent;">-</div><div class="diff-inst-col"><span style="color: rgba(255,255,255,0.15)">--</span></div>`;
+        }
+
+        contentLeft.appendChild(rowL);
+        contentRight.appendChild(rowR);
+      });
+    } else if (this.mode === 'section') {
+      // Section Diff Mode
+      const diffs = diffSections(this.sections1, this.sections2);
+
+      diffs.forEach((d) => {
+        stats[d.type]++;
+      });
+
+      diffs.forEach((item) => {
+        const rowL = document.createElement('div');
+        rowL.className = 'diff-row';
+        const rowR = document.createElement('div');
+        rowR.className = 'diff-row';
+
+        let rowClass = '';
+        if (item.type === 'delete') rowClass = 'type-delete';
+        else if (item.type === 'insert') rowClass = 'type-insert';
+        else if (item.type === 'replace') rowClass = 'type-replace';
+
+        if (rowClass) {
+          rowL.classList.add(rowClass);
+          rowR.classList.add(rowClass);
+        }
+
+        // Left Pane Section
+        if (item.section1) {
+          const s = item.section1;
+          const flagsStr = `${s.flags.read ? 'R' : '-'}${s.flags.write ? 'W' : '-'}${s.flags.execute ? 'X' : '-'}`;
+          rowL.innerHTML = `
+            <div class="diff-offset" style="width: 100px;">0x${s.virtualAddress.toString(16).toUpperCase()}</div>
+            <div class="diff-inst-col">
+              <span class="diff-inst-bytes" style="width: 120px; font-weight: bold; color: var(--accent-start);">${s.name}</span>
+              <span class="diff-inst-mnemonic" style="width: 80px;">Size: 0x${s.virtualSize.toString(16)}</span>
+              <span class="diff-inst-ops">Flags: ${flagsStr}</span>
+            </div>
+          `;
+        } else {
+          rowL.innerHTML = `<div class="diff-offset" style="width: 100px; color: transparent;">-</div><div class="diff-inst-col"><span style="color: rgba(255,255,255,0.15)">--</span></div>`;
+        }
+
+        // Right Pane Section
+        if (item.section2) {
+          const s = item.section2;
+          const flagsStr = `${s.flags.read ? 'R' : '-'}${s.flags.write ? 'W' : '-'}${s.flags.execute ? 'X' : '-'}`;
+          rowR.innerHTML = `
+            <div class="diff-offset" style="width: 100px;">0x${s.virtualAddress.toString(16).toUpperCase()}</div>
+            <div class="diff-inst-col">
+              <span class="diff-inst-bytes" style="width: 120px; font-weight: bold; color: var(--accent-start);">${s.name}</span>
+              <span class="diff-inst-mnemonic" style="width: 80px;">Size: 0x${s.virtualSize.toString(16)}</span>
+              <span class="diff-inst-ops">Flags: ${flagsStr}</span>
+            </div>
+          `;
+        } else {
+          rowR.innerHTML = `<div class="diff-offset" style="width: 100px; color: transparent;">-</div><div class="diff-inst-col"><span style="color: rgba(255,255,255,0.15)">--</span></div>`;
         }
 
         contentLeft.appendChild(rowL);

@@ -17,11 +17,12 @@ describe('DiffPanel UI Tests', () => {
   it('should construct and initialize buttons', () => {
     const panel = new DiffPanel(container);
     const buttons = container.querySelectorAll('.btn-mode-toggle');
-    // byte, instruction, trace
-    expect(buttons.length).toBe(3);
+    // byte, instruction, trace, section
+    expect(buttons.length).toBe(4);
     expect(buttons[0].textContent).toBe('Byte Diff');
     expect(buttons[1].textContent).toBe('Instruction Diff');
     expect(buttons[2].textContent).toBe('Trace Diff');
+    expect(buttons[3].textContent).toBe('Section Diff');
   });
 
   it('should support switching modes', () => {
@@ -88,5 +89,56 @@ describe('DiffPanel UI Tests', () => {
     const rowR = paneRight?.querySelector('.diff-row');
     expect(rowL?.textContent).toContain('Step 0');
     expect(rowR?.textContent).toContain('Step 0');
+  });
+
+  it('should render section diff side-by-side', () => {
+    const panel = new DiffPanel(container);
+    const primaryData = new Uint8Array([0x90, 0x90]);
+    const secondaryData = new Uint8Array([0x90, 0x90]);
+
+    const secs1 = [
+      {
+        name: '.text',
+        virtualAddress: 0x1000,
+        virtualSize: 0x200,
+        fileOffset: 0x200,
+        fileSize: 0x200,
+        flags: { read: true, write: false, execute: true },
+      },
+    ];
+
+    const secs2 = [
+      {
+        name: '.text',
+        virtualAddress: 0x1000,
+        virtualSize: 0x200,
+        fileOffset: 0x200,
+        fileSize: 0x200,
+        flags: { read: true, write: false, execute: true },
+      },
+    ];
+
+    // Load data
+    panel.updateData(primaryData, secs1, [], 'Primary', 0x1000);
+
+    // Mock drop/file load internally
+    (panel as any).binaryData2 = secondaryData;
+    (panel as any).sections2 = secs2;
+    (panel as any).instructions2 = [];
+    (panel as any).entryPoint2 = 0x1000;
+    (panel as any).fileName2 = 'Secondary';
+
+    // Switch to section diff
+    (panel as any).switchMode('section');
+
+    // Verify side-by-side panels are rendered
+    const paneLeft = container.querySelector('#diff-pane-left');
+    const paneRight = container.querySelector('#diff-pane-right');
+    expect(paneLeft).not.toBeNull();
+    expect(paneRight).not.toBeNull();
+
+    // Verify section name is rendered
+    expect(paneLeft?.textContent).toContain('.text');
+    expect(paneRight?.textContent).toContain('.text');
   });
 });

@@ -1900,3 +1900,33 @@ Test Files   3 failed | 28 passed (31)
   - Roadmap for Session 17 with 15 prioritized tasks
 
 ## [2026-05-31T07:35:40+10:00] - Commit session 16 work and verify tests
+
+## [2026-05-31 07:42] - Implemented S-record and Intel HEX firmware loaders
+- Added Intel HEX firmware loader and parser supporting types 00 to 05.
+- Added Motorola S-record firmware loader and parser supporting S0, S1, S2, S3, S5, S6, S7, S8, S9.
+- Integrated both loaders/parsers directly into binary processor flow.
+- Created tests/hexLoader.test.ts to verify parser correctness and pipeline integration.
+
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+## [2026-05-31T07:47:00+10:00] - Implemented ARM32 Thumb decoder in src/disassembler/arm32.ts
+
+## [2026-05-31T07:48:00+10:00] - Implemented DWARF v5 string offset resolution and cross-file binary diff
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31T08:20:00+10:00] - Session 17 Handoff Document Written
+Wrote comprehensive [handoff.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/handoff.md) (Session 17 → Session 18).
+Session 17 completed: S-record/Intel HEX loader, Z80/6502 decoders, ARM32/Thumb decoder, DWARF v5 strx resolver, cross-file diff.
+Test count grew 690 → 777 (all passing), test files 57 → 61.
+New files: [hexLoader.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/hexLoader.ts), [z80.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/z80.ts), [m6502.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/m6502.ts), [arm32.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/arm32.ts), [dotnetIl.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/dotnetIl.ts) (untracked).
+New test files: [hexLoader.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/hexLoader.test.ts), [retro.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/retro.test.ts), [arm32.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/arm32.test.ts), [debug_dwarf.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/debug_dwarf.test.ts).
+Session 17 work staged but NOT committed — handoff instructs Session 18 to commit first.

@@ -515,6 +515,37 @@ export function disassembleThumb(data: Uint8Array, baseAddress: number): Instruc
           operands = [{ type: 'reg', reg: rmName, access: 'r' }];
         }
       }
+      // Format 6: PC-relative Load (LDR Rd, [PC, #imm])
+      else if (op5 === 9) {
+        const rd = (hw1 >>> 8) & 7;
+        const imm8 = hw1 & 0xff;
+        const offset = imm8 * 4;
+        mnemonic = 'ldr';
+        const rdName = getRegName(rd);
+        opStr = `${rdName}, [pc, #0x${offset.toString(16)}]`;
+        operands = [
+          { type: 'reg', reg: rdName, access: 'w' },
+          { type: 'mem', mem: { base: 'pc', disp: offset }, access: 'r' }
+        ];
+      }
+      // Format 7/8: Load/Store Register Offset
+      else if (op5 === 10 || op5 === 11) {
+        const op3 = (hw1 >>> 9) & 7;
+        const rm = (hw1 >>> 6) & 7;
+        const rn = (hw1 >>> 3) & 7;
+        const rd = hw1 & 7;
+        const opNames = ['str', 'strh', 'strb', 'ldrsb', 'ldr', 'ldrh', 'ldrb', 'ldrsh'];
+        mnemonic = opNames[op3];
+        const rdName = getRegName(rd);
+        const rnName = getRegName(rn);
+        const rmName = getRegName(rm);
+        opStr = `${rdName}, [${rnName}, ${rmName}]`;
+        const isLoad = mnemonic.startsWith('ldr');
+        operands = [
+          { type: 'reg', reg: rdName, access: isLoad ? 'w' : 'r' },
+          { type: 'mem', mem: { base: rnName, index: rmName }, access: isLoad ? 'r' : 'w' }
+        ];
+      }
       // 6. LDR / STR (imm offset) (Format 9/10/11/12)
       else if (op5 >= 0xc && op5 <= 0x11) {
         const imm5 = (hw1 >>> 6) & 0x1f;
@@ -567,6 +598,40 @@ export function disassembleThumb(data: Uint8Array, baseAddress: number): Instruc
             { type: 'mem', mem: { base: 'sp', disp: offset }, access: mnemonic === 'ldr' ? 'r' : 'w' }
           ];
         }
+      }
+      // Format 19: ADD PC/SP relative (ADD Rd, PC/SP, #imm)
+      else if (op5 === 0x14 || op5 === 0x15) {
+        const rd = (hw1 >>> 8) & 7;
+        const imm8 = hw1 & 0xff;
+        const offset = imm8 * 4;
+        const rdName = getRegName(rd);
+        const baseName = op5 === 0x15 ? 'sp' : 'pc';
+        mnemonic = 'add';
+        opStr = `${rdName}, ${baseName}, #0x${offset.toString(16)}`;
+        operands = [
+          { type: 'reg', reg: rdName, access: 'w' },
+          { type: 'reg', reg: baseName, access: 'r' },
+          { type: 'imm', imm: offset }
+        ];
+      }
+      // Format 20: ADD / SUB SP by immediate
+      else if ((hw1 & 0xff00) === 0xb000) {
+        const isSub = (hw1 & (1 << 7)) !== 0;
+        const imm7 = hw1 & 0x7f;
+        const offset = imm7 * 4;
+        mnemonic = isSub ? 'sub' : 'add';
+        opStr = `sp, #0x${offset.toString(16)}`;
+        operands = [
+          { type: 'reg', reg: 'sp', access: 'rw' },
+          { type: 'imm', imm: offset }
+        ];
+      }
+      // Format BKPT
+      else if ((hw1 & 0xff00) === 0xbe00) {
+        const imm8 = hw1 & 0xff;
+        mnemonic = 'bkpt';
+        opStr = `0x${imm8.toString(16)}`;
+        operands = [{ type: 'imm', imm: imm8 }];
       }
       // 8. PUSH / POP (Format 15)
       else if ((hw1 & 0xf600) === 0xb400) {

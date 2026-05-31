@@ -169,6 +169,14 @@ export class AssemblyView {
 
     this.statusText.textContent = `Address: 0x${address.toString(16).toUpperCase()}`;
     this.scheduleRedraw();
+
+    // Focus the newly active row
+    setTimeout(() => {
+      const activeEl = this.container.querySelector('.instruction-row.active') as HTMLElement;
+      if (activeEl && document.activeElement && (document.activeElement.classList.contains('instruction-row') || document.activeElement === this.listEl)) {
+        activeEl.focus();
+      }
+    }, 50);
   }
 
   /**
@@ -479,12 +487,15 @@ export class AssemblyView {
     // 1. Header
     this.headerEl = document.createElement('div');
     this.headerEl.className = 'assembly-header';
+    this.headerEl.setAttribute('role', 'toolbar');
+    this.headerEl.setAttribute('aria-label', 'Assembly controls');
 
     const leftControls = document.createElement('div');
     leftControls.className = 'assembly-nav-controls';
 
     this.backBtn = document.createElement('button');
     this.backBtn.className = 'assembly-btn';
+    this.backBtn.setAttribute('aria-label', 'Go back in history');
     this.backBtn.innerHTML = `
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
       Back
@@ -493,6 +504,7 @@ export class AssemblyView {
 
     this.forwardBtn = document.createElement('button');
     this.forwardBtn.className = 'assembly-btn';
+    this.forwardBtn.setAttribute('aria-label', 'Go forward in history');
     this.forwardBtn.innerHTML = `
       Forward
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
@@ -504,6 +516,7 @@ export class AssemblyView {
 
     this.statusText = document.createElement('span');
     this.statusText.className = 'assembly-status';
+    this.statusText.setAttribute('aria-live', 'polite');
     this.statusText.textContent = 'No selection';
 
     this.headerEl.appendChild(leftControls);
@@ -518,6 +531,8 @@ export class AssemblyView {
 
     this.canvasEl = document.createElement('canvas');
     this.canvasEl.className = 'jump-canvas';
+    this.canvasEl.setAttribute('role', 'img');
+    this.canvasEl.setAttribute('aria-label', 'Assembly branch lines visualizer');
     this.canvasContainerEl.appendChild(this.canvasEl);
 
     this.listViewportEl = document.createElement('div');
@@ -525,6 +540,8 @@ export class AssemblyView {
 
     this.listEl = document.createElement('div');
     this.listEl.className = 'instructions-list';
+    this.listEl.setAttribute('role', 'listbox');
+    this.listEl.setAttribute('aria-label', 'Assembly instructions list');
 
     this.listViewportEl.appendChild(this.listEl);
 
@@ -569,8 +586,14 @@ export class AssemblyView {
       const row = document.createElement('div');
       row.className = 'instruction-row';
       row.dataset.address = inst.address.toString();
+      row.setAttribute('role', 'option');
       if (this.activeAddress === inst.address) {
         row.classList.add('active');
+        row.setAttribute('aria-selected', 'true');
+        row.setAttribute('tabindex', '0');
+      } else {
+        row.setAttribute('aria-selected', 'false');
+        row.setAttribute('tabindex', '-1');
       }
 
       // Address Column
@@ -604,12 +627,16 @@ export class AssemblyView {
       const commCol = document.createElement('div');
       commCol.className = 'row-comment';
       commCol.dataset.address = inst.address.toString();
+      commCol.setAttribute('role', 'button');
+      commCol.setAttribute('tabindex', '0');
       const existingComment = this.comments.get(inst.address);
       if (existingComment) {
         commCol.textContent = existingComment;
         commCol.classList.add('has-comment');
+        commCol.setAttribute('aria-label', `Comment: ${existingComment}`);
       } else {
         commCol.textContent = '// ';
+        commCol.setAttribute('aria-label', 'Add comment');
       }
 
       row.appendChild(addrCol);
@@ -769,6 +796,46 @@ export class AssemblyView {
       if (row && row.dataset.address) {
         const addr = parseInt(row.dataset.address, 10);
         this.navigateToAddress(addr);
+      }
+    });
+
+    // Keyboard interaction on list elements
+    this.listEl.addEventListener('keydown', (e) => {
+      const target = e.target as HTMLElement;
+
+      const commentCol = target.closest('.row-comment') as HTMLElement;
+      if (commentCol && commentCol.dataset.address) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.stopPropagation();
+          e.preventDefault();
+          this.startEditingComment(commentCol);
+          return;
+        }
+      }
+
+      const row = target.closest('.instruction-row') as HTMLElement;
+      if (row && row.dataset.address) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const currentIndex = this.instructions.findIndex((inst) => inst.address === this.activeAddress);
+          if (currentIndex !== -1) {
+            const nextIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+            if (nextIndex >= 0 && nextIndex < this.instructions.length) {
+              const nextInst = this.instructions[nextIndex];
+              this.navigateToAddress(nextInst.address);
+              setTimeout(() => {
+                const newActiveEl = this.container.querySelector('.instruction-row.active') as HTMLElement;
+                if (newActiveEl) {
+                  newActiveEl.focus();
+                }
+              }, 50);
+            }
+          }
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const addr = parseInt(row.dataset.address, 10);
+          this.navigateToAddress(addr);
+        }
       }
     });
 
@@ -951,8 +1018,12 @@ export class AssemblyView {
     this.rowElements.forEach((el, addr) => {
       if (addr === this.activeAddress) {
         el.classList.add('active');
+        el.setAttribute('aria-selected', 'true');
+        el.setAttribute('tabindex', '0');
       } else {
         el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+        el.setAttribute('tabindex', '-1');
       }
     });
   }

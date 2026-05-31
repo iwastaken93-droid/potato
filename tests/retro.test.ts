@@ -109,6 +109,34 @@ describe('Retro Architecture Decoders', () => {
       expect(insts[0].opStr).toBe('0x107');
       expect(insts[0].operands).toEqual([{ type: 'imm', imm: 0x107 }]);
     });
+
+    it('should handle unfinished prefix or instructions', () => {
+      const insts1 = disassembleZ80(new Uint8Array([0xdd]), 0x1000);
+      expect(insts1[0].mnemonic).toBe('db');
+      expect(insts1[0].opStr).toBe('0xdd');
+
+      const insts2 = disassembleZ80(new Uint8Array([0xcb]), 0x1000);
+      expect(insts2[0].mnemonic).toBe('db');
+
+      const insts3 = disassembleZ80(new Uint8Array([0xdd, 0xcb]), 0x1000);
+      expect(insts3[0].mnemonic).toBe('db');
+    });
+
+    it('should ignore prefixes that do not apply to the following instruction', () => {
+      // 0xdd 0x00 -> 0xdd should be decoded as db, 0x00 as nop
+      const insts = disassembleZ80(new Uint8Array([0xdd, 0x00]), 0x1000);
+      expect(insts.length).toBe(2);
+      expect(insts[0].mnemonic).toBe('db');
+      expect(insts[1].mnemonic).toBe('nop');
+    });
+
+    it('should handle multiple DD/FD prefixes', () => {
+      const insts = disassembleZ80(new Uint8Array([0xdd, 0xfd, 0xdd, 0x00]), 0x1000);
+      expect(insts[0].mnemonic).toBe('db');
+      expect(insts[1].mnemonic).toBe('db');
+      expect(insts[2].mnemonic).toBe('db');
+      expect(insts[3].mnemonic).toBe('nop');
+    });
   });
 
   describe('6502 Decoder', () => {
@@ -161,6 +189,20 @@ describe('Retro Architecture Decoders', () => {
 
       expect(insts[0].mnemonic).toBe('db');
       expect(insts[0].opStr).toBe('0x02');
+    });
+
+    it('should handle truncated instructions', () => {
+      // 0xad is lda abs, expects 2 bytes address. We only give it 1 byte total.
+      const insts = disassemble6502(new Uint8Array([0xad]), 0x8000);
+      expect(insts[0].mnemonic).toBe('db');
+      expect(insts[0].opStr).toBe('0xad');
+    });
+
+    it('should decode indirect addressing mode', () => {
+      // 0x6c 0x34 0x12 -> jmp ($1234)
+      const insts = disassemble6502(new Uint8Array([0x6c, 0x34, 0x12]), 0x8000);
+      expect(insts[0].mnemonic).toBe('jmp');
+      expect(insts[0].opStr).toBe('(0x1234)');
     });
   });
 

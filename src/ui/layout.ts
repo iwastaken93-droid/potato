@@ -157,28 +157,28 @@ export function createLayout(): void {
   appEl.innerHTML = `
     <div class="app-container">
       <!-- Sidebar -->
-      <aside class="sidebar">
+      <aside class="sidebar" role="complementary" aria-label="Sidebar">
         <div class="sidebar-brand">
           🌌 Universal RE Tool
         </div>
         
         <!-- Dropzone -->
-        <div class="file-upload-zone" id="file-dropzone">
-          <input type="file" id="file-input" style="display: none;" />
-          <button class="btn btn-primary" id="upload-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Upload Binary</button>
+        <div class="file-upload-zone" id="file-dropzone" role="button" tabindex="0" aria-label="Upload Binary file">
+          <input type="file" id="file-input" style="display: none;" aria-hidden="true" />
+          <button class="btn btn-primary" id="upload-btn" tabindex="-1" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Upload Binary</button>
           <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.5rem; text-align: center;">Drag & drop or click</span>
         </div>
 
         <!-- Search Bar -->
-        <input type="text" class="search-input" id="sidebar-search" placeholder="Search functions/symbols..." />
+        <input type="text" class="search-input" id="sidebar-search" placeholder="Search functions/symbols..." aria-label="Search functions and symbols" />
 
         <!-- Symbols / Sections List -->
-        <div class="sidebar-list" id="sidebar-list"></div>
+        <div class="sidebar-list" id="sidebar-list" role="listbox" aria-label="Symbols and Sections"></div>
       </aside>
 
       <!-- Header -->
-      <header class="header">
-        <div class="metadata-container">
+      <header class="header" role="banner">
+        <div class="metadata-container" role="region" aria-label="Binary Metadata">
           <div class="metadata-item">
             <span class="metadata-label">File</span>
             <span class="metadata-value" id="status-filename">No file loaded</span>
@@ -199,30 +199,30 @@ export function createLayout(): void {
 
         <!-- Navigation Tab Selector -->
         <div style="display: flex; gap: 0.75rem; align-items: center;">
-          <div class="tab-selector-container">
-            <button class="tab-btn active" data-tab="hex">Hex Viewer</button>
-            <button class="tab-btn" data-tab="assembly">Assembly</button>
-            <button class="tab-btn" data-tab="cfg">CFG Graph</button>
-            <button class="tab-btn" data-tab="decompiler">Decompile / AI</button>
-            <button class="tab-btn" data-tab="strings">Strings</button>
-            <button class="tab-btn" data-tab="search">Search Panel</button>
-            <button class="tab-btn" data-tab="signatures">Signatures</button>
-            <button class="tab-btn" data-tab="dependencies">Dependency Graph</button>
-            <button class="tab-btn" data-tab="emulator">Emulator</button>
-            <button class="tab-btn" data-tab="gdb">GDB Debugger</button>
-            <button class="tab-btn" data-tab="report">Report</button>
-            <button class="tab-btn" data-tab="xrefs">XRefs</button>
-            <button class="tab-btn" data-tab="metadata">Metadata</button>
-            <button class="tab-btn" data-tab="fcg">FCG Graph</button>
-            <button class="tab-btn" data-tab="collab">Collab</button>
-            <button class="tab-btn" data-tab="yara">YARA</button>
-            <button class="tab-btn" data-tab="typeSystem">Type System</button>
-            <button class="tab-btn" data-tab="demangler">Demangler</button>
-            <button class="tab-btn" data-tab="diff">Diff Viewer</button>
-            <button class="tab-btn" data-tab="plugins">Plugins</button>
-            <button class="tab-btn" data-tab="machoObjc">Mach-O ObjC</button>
-            <button class="tab-btn" data-tab="importsExports">Imports/Exports</button>
-            <button class="tab-btn" data-tab="patcher">Patcher</button>
+          <div class="tab-selector-container" role="tablist" aria-label="Navigation tabs">
+            <button class="tab-btn active" data-tab="hex" role="tab" id="tab-hex" aria-selected="true" aria-controls="panel-hex" tabindex="0">Hex Viewer</button>
+            <button class="tab-btn" data-tab="assembly" role="tab" id="tab-assembly" aria-selected="false" aria-controls="panel-assembly" tabindex="-1">Assembly</button>
+            <button class="tab-btn" data-tab="cfg" role="tab" id="tab-cfg" aria-selected="false" aria-controls="panel-cfg" tabindex="-1">CFG Graph</button>
+            <button class="tab-btn" data-tab="decompiler" role="tab" id="tab-decompiler" aria-selected="false" aria-controls="panel-decompiler" tabindex="-1">Decompile / AI</button>
+            <button class="tab-btn" data-tab="strings" role="tab" id="tab-strings" aria-selected="false" aria-controls="panel-strings" tabindex="-1">Strings</button>
+            <button class="tab-btn" data-tab="search" role="tab" id="tab-search" aria-selected="false" aria-controls="panel-search" tabindex="-1">Search Panel</button>
+            <button class="tab-btn" data-tab="signatures" role="tab" id="tab-signatures" aria-selected="false" aria-controls="panel-signatures" tabindex="-1">Signatures</button>
+            <button class="tab-btn" data-tab="dependencies" role="tab" id="tab-dependencies" aria-selected="false" aria-controls="panel-dependencies" tabindex="-1">Dependency Graph</button>
+            <button class="tab-btn" data-tab="emulator" role="tab" id="tab-emulator" aria-selected="false" aria-controls="panel-emulator" tabindex="-1">Emulator</button>
+            <button class="tab-btn" data-tab="gdb" role="tab" id="tab-gdb" aria-selected="false" aria-controls="panel-gdb" tabindex="-1">GDB Debugger</button>
+            <button class="tab-btn" data-tab="report" role="tab" id="tab-report" aria-selected="false" aria-controls="panel-report" tabindex="-1">Report</button>
+            <button class="tab-btn" data-tab="xrefs" role="tab" id="tab-xrefs" aria-selected="false" aria-controls="panel-xrefs" tabindex="-1">XRefs</button>
+            <button class="tab-btn" data-tab="metadata" role="tab" id="tab-metadata" aria-selected="false" aria-controls="panel-metadata" tabindex="-1">Metadata</button>
+            <button class="tab-btn" data-tab="fcg" role="tab" id="tab-fcg" aria-selected="false" aria-controls="panel-fcg" tabindex="-1">FCG Graph</button>
+            <button class="tab-btn" data-tab="collab" role="tab" id="tab-collab" aria-selected="false" aria-controls="panel-collab" tabindex="-1">Collab</button>
+            <button class="tab-btn" data-tab="yara" role="tab" id="tab-yara" aria-selected="false" aria-controls="panel-yara" tabindex="-1">YARA</button>
+            <button class="tab-btn" data-tab="typeSystem" role="tab" id="tab-typeSystem" aria-selected="false" aria-controls="panel-typeSystem" tabindex="-1">Type System</button>
+            <button class="tab-btn" data-tab="demangler" role="tab" id="tab-demangler" aria-selected="false" aria-controls="panel-demangler" tabindex="-1">Demangler</button>
+            <button class="tab-btn" data-tab="diff" role="tab" id="tab-diff" aria-selected="false" aria-controls="panel-diff" tabindex="-1">Diff Viewer</button>
+            <button class="tab-btn" data-tab="plugins" role="tab" id="tab-plugins" aria-selected="false" aria-controls="panel-plugins" tabindex="-1">Plugins</button>
+            <button class="tab-btn" data-tab="machoObjc" role="tab" id="tab-machoObjc" aria-selected="false" aria-controls="panel-machoObjc" tabindex="-1">Mach-O ObjC</button>
+            <button class="tab-btn" data-tab="importsExports" role="tab" id="tab-importsExports" aria-selected="false" aria-controls="panel-importsExports" tabindex="-1">Imports/Exports</button>
+            <button class="tab-btn" data-tab="patcher" role="tab" id="tab-patcher" aria-selected="false" aria-controls="panel-patcher" tabindex="-1">Patcher</button>
           </div>
           <button class="btn btn-secondary" id="open-mem-map-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem; border-radius: var(--radius-md);">
             🗺️ Memory Map
@@ -231,24 +231,24 @@ export function createLayout(): void {
       </header>
 
       <!-- Main Workspace Contents -->
-      <main class="main-content">
+      <main class="main-content" role="main">
         <!-- Hex Viewer Tab Panel -->
-        <div class="tab-content" id="panel-hex" style="display: block;">
+        <div class="tab-content" id="panel-hex" role="tabpanel" aria-labelledby="tab-hex" tabindex="0" style="display: block;">
           <div id="hex-viewer-container" style="height: 100%;"></div>
         </div>
 
         <!-- Assembly Viewer Tab Panel -->
-        <div class="tab-content" id="panel-assembly" style="display: none;">
+        <div class="tab-content" id="panel-assembly" role="tabpanel" aria-labelledby="tab-assembly" tabindex="0" style="display: none;">
           <div id="assembly-viewer-container" style="height: 100%;"></div>
         </div>
 
         <!-- CFG Viewer Tab Panel -->
-        <div class="tab-content" id="panel-cfg" style="display: none;">
+        <div class="tab-content" id="panel-cfg" role="tabpanel" aria-labelledby="tab-cfg" tabindex="0" style="display: none;">
           <div id="cfg-viewer-container" style="height: 100%; width: 100%;"></div>
         </div>
 
         <!-- Decompile / AI Tab Panel -->
-        <div class="tab-content" id="panel-decompiler" style="display: none;">
+        <div class="tab-content" id="panel-decompiler" role="tabpanel" aria-labelledby="tab-decompiler" tabindex="0" style="display: none;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; height: 100%;">
             <div class="glass-panel" style="display: flex; flex-direction: column; height: 100%; padding: 1.5rem; box-sizing: border-box; overflow: hidden;">
               <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">⚙️ Decompiled C-like Code</h3>
@@ -259,100 +259,172 @@ export function createLayout(): void {
         </div>
 
         <!-- Strings Viewer Tab Panel -->
-        <div class="tab-content" id="panel-strings" style="display: none;">
+        <div class="tab-content" id="panel-strings" role="tabpanel" aria-labelledby="tab-strings" tabindex="0" style="display: none;">
           <div id="strings-viewer-container" style="height: 100%;"></div>
         </div>
 
         <!-- Search Panel Tab Panel -->
-        <div class="tab-content" id="panel-search" style="display: none;">
+        <div class="tab-content" id="panel-search" role="tabpanel" aria-labelledby="tab-search" tabindex="0" style="display: none;">
           <div id="search-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- Signatures Tab Panel -->
-        <div class="tab-content" id="panel-signatures" style="display: none;">
+        <div class="tab-content" id="panel-signatures" role="tabpanel" aria-labelledby="tab-signatures" tabindex="0" style="display: none;">
           <div id="signatures-viewer-container" style="height: 100%;"></div>
         </div>
 
         <!-- Dependency Graph Tab Panel -->
-        <div class="tab-content" id="panel-dependencies" style="display: none;">
+        <div class="tab-content" id="panel-dependencies" role="tabpanel" aria-labelledby="tab-dependencies" tabindex="0" style="display: none;">
           <div id="dependency-graph-container" style="height: 100%; width: 100%;"></div>
         </div>
 
         <!-- Emulator Tab Panel -->
-        <div class="tab-content" id="panel-emulator" style="display: none;">
+        <div class="tab-content" id="panel-emulator" role="tabpanel" aria-labelledby="tab-emulator" tabindex="0" style="display: none;">
           <div id="emulator-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- GDB Tab Panel -->
-        <div class="tab-content" id="panel-gdb" style="display: none;">
+        <div class="tab-content" id="panel-gdb" role="tabpanel" aria-labelledby="tab-gdb" tabindex="0" style="display: none;">
           <div id="gdb-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- Report Tab Panel -->
-        <div class="tab-content" id="panel-report" style="display: none;">
+        <div class="tab-content" id="panel-report" role="tabpanel" aria-labelledby="tab-report" tabindex="0" style="display: none;">
           <div id="report-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- XRefs Tab Panel -->
-        <div class="tab-content" id="panel-xrefs" style="display: none;">
+        <div class="tab-content" id="panel-xrefs" role="tabpanel" aria-labelledby="tab-xrefs" tabindex="0" style="display: none;">
           <div id="xrefs-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- Imports/Exports Tab Panel -->
-        <div class="tab-content" id="panel-importsExports" style="display: none;">
+        <div class="tab-content" id="panel-importsExports" role="tabpanel" aria-labelledby="tab-importsExports" tabindex="0" style="display: none;">
           <div id="imports-exports-container" style="height: 100%;"></div>
         </div>
 
         <!-- Patcher Tab Panel -->
-        <div class="tab-content" id="panel-patcher" style="display: none;">
+        <div class="tab-content" id="panel-patcher" role="tabpanel" aria-labelledby="tab-patcher" tabindex="0" style="display: none;">
           <div id="patcher-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- Metadata Tab Panel -->
-        <div class="tab-content" id="panel-metadata" style="display: none;">
+        <div class="tab-content" id="panel-metadata" role="tabpanel" aria-labelledby="tab-metadata" tabindex="0" style="display: none;">
           <div id="metadata-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- FCG Tab Panel -->
-        <div class="tab-content" id="panel-fcg" style="display: none;">
+        <div class="tab-content" id="panel-fcg" role="tabpanel" aria-labelledby="tab-fcg" tabindex="0" style="display: none;">
           <div id="fcg-viewer-container" style="height: 100%; width: 100%;"></div>
         </div>
 
         <!-- Collab Tab Panel -->
-        <div class="tab-content" id="panel-collab" style="display: none;">
+        <div class="tab-content" id="panel-collab" role="tabpanel" aria-labelledby="tab-collab" tabindex="0" style="display: none;">
           <div id="collab-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- YARA Tab Panel -->
-        <div class="tab-content" id="panel-yara" style="display: none;">
+        <div class="tab-content" id="panel-yara" role="tabpanel" aria-labelledby="tab-yara" tabindex="0" style="display: none;">
           <div id="yara-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- Type System Tab Panel -->
-        <div class="tab-content" id="panel-typeSystem" style="display: none;">
+        <div class="tab-content" id="panel-typeSystem" role="tabpanel" aria-labelledby="tab-typeSystem" tabindex="0" style="display: none;">
           <div id="type-system-container" style="height: 100%;"></div>
         </div>
 
          <!-- Demangler Tab Panel -->
-        <div class="tab-content" id="panel-demangler" style="display: none;">
+        <div class="tab-content" id="panel-demangler" role="tabpanel" aria-labelledby="tab-demangler" tabindex="0" style="display: none;">
           <div id="demangler-panel-container" style="height: 100%;"></div>
         </div>
 
          <!-- Diff Tab Panel -->
-        <div class="tab-content" id="panel-diff" style="display: none;">
+        <div class="tab-content" id="panel-diff" role="tabpanel" aria-labelledby="tab-diff" tabindex="0" style="display: none;">
           <div id="diff-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- Plugins Tab Panel -->
-        <div class="tab-content" id="panel-plugins" style="display: none;">
+        <div class="tab-content" id="panel-plugins" role="tabpanel" aria-labelledby="tab-plugins" tabindex="0" style="display: none;">
           <div id="plugins-panel-container" style="height: 100%;"></div>
         </div>
 
         <!-- Mach-O ObjC Tab Panel -->
-        <div class="tab-content" id="panel-machoObjc" style="display: none;">
+        <div class="tab-content" id="panel-machoObjc" role="tabpanel" aria-labelledby="tab-machoObjc" tabindex="0" style="display: none;">
           <div id="macho-objc-container" style="height: 100%;"></div>
         </div>
       </main>
     </div>
   `;
+
+  // Keyboard accessibility for file dropzone
+  const dropzone = document.getElementById('file-dropzone');
+  if (dropzone) {
+    dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const fileInput = document.getElementById('file-input') as HTMLInputElement;
+        if (fileInput) {
+          fileInput.click();
+        }
+      }
+    });
+  }
+
+  // Keyboard navigation & programmatic ARIA state synchronization for tabs
+  const tabSelector = appEl.querySelector('.tab-selector-container');
+  if (tabSelector) {
+    const getTabs = () => Array.from(tabSelector.querySelectorAll('.tab-btn')) as HTMLButtonElement[];
+
+    const updateTabAttrs = (activeBtn: HTMLButtonElement) => {
+      getTabs().forEach((btn) => {
+        const isSelected = btn === activeBtn;
+        btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        btn.setAttribute('tabindex', isSelected ? '0' : '-1');
+      });
+    };
+
+    tabSelector.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.tab-btn') as HTMLButtonElement;
+      if (btn) {
+        updateTabAttrs(btn);
+      }
+    });
+
+    tabSelector.addEventListener('keydown', (e: any) => {
+      const activeElement = document.activeElement as HTMLButtonElement;
+      if (!activeElement || !activeElement.classList.contains('tab-btn')) return;
+
+      const tabs = getTabs();
+      const index = tabs.indexOf(activeElement);
+      if (index === -1) return;
+
+      let nextIndex = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        nextIndex = (index + 1) % tabs.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        nextIndex = (index - 1 + tabs.length) % tabs.length;
+      } else if (e.key === 'Home') {
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        nextIndex = tabs.length - 1;
+      }
+
+      if (nextIndex !== -1) {
+        e.preventDefault();
+        const targetBtn = tabs[nextIndex];
+        targetBtn.focus();
+        targetBtn.click();
+        updateTabAttrs(targetBtn);
+      }
+    });
+
+    // Observer to watch TabManager changes on active class
+    const observer = new MutationObserver(() => {
+      const activeBtn = tabSelector.querySelector('.tab-btn.active') as HTMLButtonElement;
+      if (activeBtn) {
+        updateTabAttrs(activeBtn);
+      }
+    });
+    observer.observe(tabSelector, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
 }

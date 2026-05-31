@@ -78,6 +78,10 @@ export interface PluginMetadata {
   version: string;
   /** Name or handle of the author */
   author: string;
+  /** Plugin API compatibility version (e.g., '1.0.0', '2.0.0') */
+  apiVersion?: string;
+  /** List of plugin IDs that this plugin depends on */
+  dependencies?: string[];
 }
 
 /**
@@ -148,12 +152,63 @@ export interface AnalyzerPlugin {
 }
 
 /**
+ * Map of typed hooks and their data structures.
+ */
+export interface PluginHookMap {
+  'analyze:before': { context: AnalyzerContext; options?: Record<string, any> };
+  'analyze:after': { context: AnalyzerContext; result: AnalyzerResult };
+  'finding:detected': { finding: AnalysisFinding; pluginId: string };
+  'plugin:registered': { pluginId: string };
+  'plugin:unregistered': { pluginId: string };
+}
+
+/**
+ * Event-based registry for typed plugin hooks.
+ */
+export class HookRegistry {
+  private handlers = new Map<keyof PluginHookMap, Set<(data: any) => void | Promise<void>>>();
+
+  public on<K extends keyof PluginHookMap>(
+    event: K,
+    handler: (data: PluginHookMap[K]) => void | Promise<void>
+  ): void {
+    if (!this.handlers.has(event)) {
+      this.handlers.set(event, new Set());
+    }
+    this.handlers.get(event)!.add(handler);
+  }
+
+  public off<K extends keyof PluginHookMap>(
+    event: K,
+    handler: (data: PluginHookMap[K]) => void | Promise<void>
+  ): void {
+    const set = this.handlers.get(event);
+    if (set) {
+      set.delete(handler);
+    }
+  }
+
+  public async trigger<K extends keyof PluginHookMap>(
+    event: K,
+    data: PluginHookMap[K]
+  ): Promise<void> {
+    const set = this.handlers.get(event);
+    if (set) {
+      for (const handler of set) {
+        await handler(data);
+      }
+    }
+  }
+}
+
+/**
  * Registry and coordinator for managing and running custom analyzer plugins.
  */
 export class PluginManager {
   private static instance: PluginManager;
   private plugins = new Map<string, AnalyzerPlugin>();
   private discoverablePlugins: AnalyzerPlugin[] = [];
+  public readonly hooks = new HookRegistry();
 
   private constructor() {
     this.initDiscoverablePlugins();
@@ -611,6 +666,14 @@ export class PluginManager {
       );
     }
 
+    const apiVer = plugin.metadata.apiVersion || '1.0.0';
+    const major = apiVer.split('.')[0];
+    if (major !== '1' && major !== '2') {
+      throw new Error(
+        `Incompatible plugin API version: "${apiVer}". Supported versions: v1, v2.`
+      );
+    }
+
     if (plugin.enabled === undefined) {
       plugin.enabled = true;
     }
@@ -632,6 +695,8 @@ export class PluginManager {
         );
       }
     }
+
+    await this.hooks.trigger('plugin:registered', { pluginId: plugin.metadata.id });
   }
 
   /**
@@ -665,7 +730,11 @@ export class PluginManager {
       }
     }
 
-    return this.plugins.delete(id);
+    const removed = this.plugins.delete(id);
+    if (removed) {
+      await this.hooks.trigger('plugin:unregistered', { pluginId: id });
+    }
+    return removed;
   }
 
   /**
@@ -747,13 +816,60 @@ export class PluginManager {
    * @param options Optional configuration parameters for plugins, keyed by plugin ID.
    * @returns A promise resolving to an array of results from each executed plugin.
    */
+  /**
+   * Resolves execution order of plugins using topological sorting.
+   */
+  public resolveExecutionOrder(): AnalyzerPlugin[] {
+    const order: AnalyzerPlugin[] = [];
+    const visited = new Map<string, 'visiting' | 'visited'>();
+
+    const visit = (pluginId: string) => {
+      const state = visited.get(pluginId);
+      if (state === 'visiting') {
+        throw new Error(`Circular dependency detected involving plugin "${pluginId}".`);
+      }
+      if (state === 'visited') {
+        return;
+      }
+
+      visited.set(pluginId, 'visiting');
+
+      const plugin = this.plugins.get(pluginId);
+      if (plugin) {
+        const deps = plugin.metadata.dependencies || [];
+        for (const depId of deps) {
+          visit(depId);
+        }
+        order.push(plugin);
+      } else {
+        throw new Error(`Missing dependency "${pluginId}".`);
+      }
+
+      visited.set(pluginId, 'visited');
+    };
+
+    for (const pluginId of this.plugins.keys()) {
+      visit(pluginId);
+    }
+
+    return order;
+  }
+
+  /**
+   * Runs analysis using all registered and compatible plugins.
+   *
+   * @param context The binary and symbols context provided for analysis.
+   * @param options Optional configuration parameters for plugins, keyed by plugin ID.
+   * @returns A promise resolving to an array of results from each executed plugin.
+   */
   public async runAll(
     context: AnalyzerContext,
     options?: Record<string, any>
   ): Promise<AnalyzerResult[]> {
     const results: AnalyzerResult[] = [];
+    const orderedPlugins = this.resolveExecutionOrder();
 
-    for (const plugin of this.plugins.values()) {
+    for (const plugin of orderedPlugins) {
       if (plugin.enabled === false) {
         continue;
       }
@@ -774,10 +890,20 @@ export class PluginManager {
           );
         }
       }
+      await this.hooks.trigger('analyze:before', { context, options: pluginOptions });
 
       try {
         const result = await plugin.analyze(context, pluginOptions);
         results.push(result);
+
+        if (result.findings) {
+          for (const finding of result.findings) {
+            await this.hooks.trigger('finding:detected', {
+              finding,
+              pluginId: plugin.metadata.id,
+            });
+          }
+        }
 
         // Run onAfterAnalyze hook
         if (plugin.onAfterAnalyze) {
@@ -790,6 +916,7 @@ export class PluginManager {
             );
           }
         }
+        await this.hooks.trigger('analyze:after', { context, result });
       } catch (err: any) {
         const errResult: AnalyzerResult = {
           pluginId: plugin.metadata.id,
@@ -810,6 +937,7 @@ export class PluginManager {
             );
           }
         }
+        await this.hooks.trigger('analyze:after', { context, result: errResult });
       }
     }
 

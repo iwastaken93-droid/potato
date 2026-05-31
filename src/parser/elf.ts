@@ -180,7 +180,6 @@ const PT_TYPE: Record<number, string> = {
 };
 
 const SHT_SYMTAB = 2;
-const SHT_STRTAB = 3;
 const SHT_RELA = 4;
 const SHT_REL = 9;
 const SHT_DYNSYM = 11;
@@ -229,6 +228,7 @@ const REL_TYPES_X86_64: Record<number, string> = {
   16: 'R_X86_64_DTPMOD64',
   17: 'R_X86_64_DTPOFF64',
   18: 'R_X86_64_TPOFF64',
+  37: 'R_X86_64_IRELATIVE',
 };
 
 const REL_TYPES_I386: Record<number, string> = {
@@ -243,6 +243,7 @@ const REL_TYPES_I386: Record<number, string> = {
   8: 'R_386_RELATIVE',
   9: 'R_386_GOTOFF',
   10: 'R_386_GOTPC',
+  42: 'R_386_IRELATIVE',
 };
 
 const REL_TYPES_AARCH64: Record<number, string> = {
@@ -253,6 +254,7 @@ const REL_TYPES_AARCH64: Record<number, string> = {
   1025: 'R_AARCH64_GLOB_DAT',
   1026: 'R_AARCH64_JUMP_SLOT',
   1027: 'R_AARCH64_RELATIVE',
+  1032: 'R_AARCH64_IRELATIVE',
 };
 
 const REL_TYPES_ARM: Record<number, string> = {
@@ -262,6 +264,7 @@ const REL_TYPES_ARM: Record<number, string> = {
   21: 'R_ARM_GLOB_DAT',
   22: 'R_ARM_JUMP_SLOT',
   23: 'R_ARM_RELATIVE',
+  160: 'R_ARM_IRELATIVE',
 };
 
 function getRelocationTypeName(machine: string, type: number): string {
@@ -381,7 +384,7 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
     if (offset + phentSize > arrayBuffer.byteLength) break;
 
     let pType: number;
-    let pFlags = 0;
+    let pFlags: number;
     let pOffset: bigint | number;
     let pVaddr: bigint | number;
     let pPaddr: bigint | number;
@@ -526,12 +529,12 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
         const secSymbols: ElfSymbol[] = [];
         for (let off = 0; off + entSize <= secSize; off += entSize) {
           const symAddr = secOffset + off;
-          let nameOffset = 0;
-          let value: bigint | number = 0;
-          let size: bigint | number = 0;
-          let info = 0;
-          let other = 0;
-          let shndx = 0;
+          let nameOffset: number;
+          let value: bigint | number;
+          let size: bigint | number;
+          let info: number;
+          let other: number;
+          let shndx: number;
 
           if (is64) {
             nameOffset = view.getUint32(symAddr, littleEndian);
@@ -613,8 +616,8 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
 
         for (let off = 0; off + entSize <= secSize; off += entSize) {
           const relAddr = secOffset + off;
-          let offset: bigint | number = 0;
-          let info: bigint | number = 0;
+          let offset: bigint | number;
+          let info: bigint | number;
           let addend: bigint | number | undefined = undefined;
 
           if (is64) {
@@ -632,8 +635,8 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
           }
 
           // Unpack info
-          let symbolIndex = 0;
-          let relocType = 0;
+          let symbolIndex: number;
+          let relocType: number;
           if (is64) {
             const infoBig = BigInt(info);
             symbolIndex = Number(infoBig >> 32n);
@@ -661,14 +664,15 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
           relocations.push(relocation);
 
           // Identify GOT Relocations
-          // Usually relocations of type GLOB_DAT, JUMP_SLOT / JMP_SLOT, etc.
+          // Usually relocations of type GLOB_DAT, JUMP_SLOT / JMP_SLOT, IRELATIVE, etc.
           // or target offset falls into a section starting with `.got`
           let isGot = false;
           if (
             typeName.includes('GLOB_DAT') ||
             typeName.includes('JUMP_SLOT') ||
             typeName.includes('JMP_SLOT') ||
-            typeName.includes('RELATIVE')
+            typeName.includes('RELATIVE') ||
+            typeName.includes('IRELATIVE')
           ) {
             isGot = true;
           } else {
@@ -695,7 +699,7 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
             });
           }
 
-          if (typeName.includes('JUMP_SLOT') || typeName.includes('JMP_SLOT')) {
+          if (typeName.includes('JUMP_SLOT') || typeName.includes('JMP_SLOT') || typeName.includes('IRELATIVE')) {
             pltRelocs.push(relocation);
           }
         }
@@ -715,9 +719,10 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
 
       if (secOffset + secSize <= arrayBuffer.byteLength) {
         let instructionResolvedCount = 0;
+        const machineLower = header.machine.toLowerCase();
 
         // Try x86-64 Instruction decoding: search for jmp *disp(%rip) -> ff 25 displacement_32
-        const isX86_64 = header.machine.toLowerCase().includes('amd64') || header.machine.toLowerCase().includes('x86-64') || header.machine.toLowerCase().includes('62');
+        const isX86_64 = machineLower.includes('amd64') || machineLower.includes('x86-64') || machineLower.includes('62');
         if (isX86_64) {
           for (let i = 0; i <= secSize - 6; i++) {
             if (bytes[secOffset + i] === 0xff && bytes[secOffset + i + 1] === 0x25) {
@@ -739,11 +744,68 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
           }
         }
 
+        // Try i386 absolute PLT decoding: search for jmp *disp32 -> ff 25 absolute_address_32
+        const isI386 = machineLower.includes('x86') || machineLower.includes('386') || machineLower.includes('3');
+        if (isI386) {
+          for (let i = 0; i <= secSize - 6; i++) {
+            if (bytes[secOffset + i] === 0xff && bytes[secOffset + i + 1] === 0x25) {
+              const gotAddr = BigInt(view.getUint32(secOffset + i + 2, littleEndian));
+              const pltEntryAddr = secAddr + BigInt(i);
+
+              const gotEntry = gotEntries.find(g => BigInt(g.address) === gotAddr) ||
+                               relocations.find(r => BigInt(r.offset) === gotAddr);
+              if (gotEntry && gotEntry.symbolName) {
+                pltEntries.push({
+                  address: pltEntryAddr,
+                  symbolName: gotEntry.symbolName,
+                  gotAddress: gotAddr,
+                });
+                instructionResolvedCount++;
+              }
+            }
+          }
+        }
+
+        // Try AArch64 Instruction decoding: adrp x16, page; ldr x17, [x16, #offset]
+        const isAArch64 = machineLower.includes('aarch64') || machineLower.includes('arm 64') || machineLower.includes('183');
+        if (isAArch64) {
+          for (let i = 0; i <= secSize - 8; i += 4) {
+            const inst1 = view.getUint32(secOffset + i, littleEndian);
+            const inst2 = view.getUint32(secOffset + i + 4, littleEndian);
+
+            if ((inst1 & 0x9f00001f) === 0x90000010) {
+              const immlo = (inst1 >> 29) & 3;
+              const immhi = (inst1 >> 5) & 0x7ffff;
+              let imm = (immhi << 2) | immlo;
+              if (imm & 0x100000) {
+                imm -= 0x200000;
+              }
+              const pltEntryAddr = secAddr + BigInt(i);
+              const pageAddr = (pltEntryAddr & ~0xfffn) + BigInt(imm) * 4096n;
+
+              if ((inst2 & 0xffc003ff) === 0xf9400211 || (inst2 & 0xffc003ff) === 0xf9400210) {
+                const ldrImm = ((inst2 >> 10) & 0xfff) * 8;
+                const gotAddr = pageAddr + BigInt(ldrImm);
+
+                const gotEntry = gotEntries.find(g => BigInt(g.address) === gotAddr) ||
+                                 relocations.find(r => BigInt(r.offset) === gotAddr);
+                if (gotEntry && gotEntry.symbolName) {
+                  pltEntries.push({
+                    address: pltEntryAddr,
+                    symbolName: gotEntry.symbolName,
+                    gotAddress: gotAddr,
+                  });
+                  instructionResolvedCount++;
+                }
+              }
+            }
+          }
+        }
+
         // Fallback: 1-to-1 sequential layout mapping
         if (instructionResolvedCount === 0 && pltRelocs.length > 0 && pltSec.name === '.plt') {
           let headerSize = 16;
           let entrySize = 16;
-          const machineLower = header.machine.toLowerCase();
           if (machineLower.includes('aarch64') || machineLower.includes('183')) {
             headerSize = 32;
             entrySize = 16;

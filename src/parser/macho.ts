@@ -152,7 +152,7 @@ export interface MachoLoadCommand {
   cmd: number;
   cmdName: string;
   cmdsize: number;
-  payload: any;
+  payload: unknown;
 }
 
 export interface FatArch {
@@ -243,10 +243,12 @@ export class MachoParser {
     const magicLE = this.view.getUint32(0, true);
     const magicBE = this.view.getUint32(0, false);
 
-    // Check for Fat/Universal binary magic
-    if (magicBE === 0xcafebabe || magicBE === 0xbebafeca) {
-      const isFatLittleEndian = magicBE === 0xbebafeca;
-      const fatArches = this.parseFatHeader(isFatLittleEndian);
+    // Check for Fat/Universal binary magic (32-bit: 0xcafebabe/0xbebafeca, 64-bit: 0xcafebabf/0xbfbafeca)
+    const isFat32 = magicBE === 0xcafebabe || magicBE === 0xbebafeca;
+    const isFat64 = magicBE === 0xcafebabf || magicBE === 0xbfbafeca;
+    if (isFat32 || isFat64) {
+      const isFatLittleEndian = magicBE === 0xbebafeca || magicBE === 0xbfbafeca;
+      const fatArches = this.parseFatHeader(isFatLittleEndian, isFat64);
 
       const sliceIndex = options.fatIndex ?? 0;
       if (sliceIndex < 0 || sliceIndex >= fatArches.length) {
@@ -275,8 +277,8 @@ export class MachoParser {
     }
 
     // Determine 64-bit and Endianness
-    let is64Bit = false;
-    let isLittleEndian = true;
+    let is64Bit: boolean;
+    let isLittleEndian: boolean;
 
     if (magicLE === 0xfeedface) {
       is64Bit = false;
@@ -316,7 +318,7 @@ export class MachoParser {
       }
 
       const cmdName = LC_NAMES[cmd] || LC_NAMES[cmd | 0] || `LC_UNKNOWN_0x${cmd.toString(16)}`;
-      const payload: any = {};
+      const payload: Record<string, number> = {};
 
       if (cmd === 0x1 || cmd === 0x19) {
         // LC_SEGMENT (0x1) or LC_SEGMENT_64 (0x19)
@@ -355,7 +357,7 @@ export class MachoParser {
             payload.datasize,
             isLittleEndian
           );
-        } catch (e) {
+        } catch {
           // ignore or handle gracefully
         }
       }
@@ -417,9 +419,9 @@ export class MachoParser {
     if (importsCount > 0 && importsOffset > 0) {
       let currentOffset = dataoff + importsOffset;
       for (let i = 0; i < importsCount; i++) {
-        let libOrdinal = 0;
-        let weakImport = false;
-        let nameOffset = 0;
+        let libOrdinal: number;
+        let weakImport: boolean;
+        let nameOffset: number;
         let addend: bigint | number | undefined = undefined;
 
         if (importsFormat === 1) {
@@ -460,6 +462,10 @@ export class MachoParser {
               }
               name += String.fromCharCode(this.bytes[j]);
             }
+          } else {
+            libOrdinal = 0;
+            weakImport = false;
+            nameOffset = 0;
           }
         }
 
@@ -546,24 +552,36 @@ export class MachoParser {
     };
   }
 
-  private parseFatHeader(isLittleEndian: boolean): FatArch[] {
+  private parseFatHeader(isLittleEndian: boolean, is64Bit: boolean): FatArch[] {
     if (this.buffer.byteLength < 8) {
       throw new Error('File too small to contain Fat header');
     }
     const nfat_arch = this.view.getUint32(4, isLittleEndian);
     const arches: FatArch[] = [];
     let offset = 8;
+    const archSize = is64Bit ? 32 : 20;
 
     for (let i = 0; i < nfat_arch; i++) {
-      if (offset + 20 > this.buffer.byteLength) {
+      if (offset + archSize > this.buffer.byteLength) {
         break;
       }
 
       const cputype = this.view.getInt32(offset, isLittleEndian);
       const cpusubtype = this.view.getInt32(offset + 4, isLittleEndian);
-      const archOffset = this.view.getUint32(offset + 8, isLittleEndian);
-      const size = this.view.getUint32(offset + 12, isLittleEndian);
-      const align = this.view.getUint32(offset + 16, isLittleEndian);
+      
+      let archOffset: number;
+      let size: number;
+      let align: number;
+
+      if (is64Bit) {
+        archOffset = Number(this.view.getBigUint64(offset + 8, isLittleEndian));
+        size = Number(this.view.getBigUint64(offset + 16, isLittleEndian));
+        align = this.view.getUint32(offset + 24, isLittleEndian);
+      } else {
+        archOffset = this.view.getUint32(offset + 8, isLittleEndian);
+        size = this.view.getUint32(offset + 12, isLittleEndian);
+        align = this.view.getUint32(offset + 16, isLittleEndian);
+      }
 
       arches.push({
         cputype,
@@ -574,7 +592,7 @@ export class MachoParser {
         align,
       });
 
-      offset += 20;
+      offset += archSize;
     }
 
     return arches;

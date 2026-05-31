@@ -309,7 +309,7 @@ export class XRefEngine {
               });
             }
           }
-        } catch (e) {
+        } catch {
           // ignore out of bounds
         }
       }
@@ -346,7 +346,7 @@ export class XRefEngine {
               });
             }
           }
-        } catch (e) {
+        } catch {
           // ignore out of bounds
         }
       }

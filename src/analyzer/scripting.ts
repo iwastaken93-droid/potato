@@ -251,7 +251,7 @@ export class ScriptingEngine {
           },
           2
         );
-      } catch (e) {
+      } catch {
         return String(val);
       }
     }

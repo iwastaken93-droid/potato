@@ -38,12 +38,12 @@ export class AIExplanationEngine {
     const lowerCode = cleanCode.toLowerCase();
 
     // Default response state
-    let summary = `Analyzes a sub-routine '${funcName}' and coordinates register/memory structures.`;
+    let summary: string;
     const functionality: string[] = [];
     const patterns: AIPattern[] = [];
-    let pseudocode = '';
-    let timeComp = 'O(N)';
-    let spaceComp = 'O(1)';
+    let pseudocode: string;
+    let timeComp: string;
+    let spaceComp: string;
     const suggestions: string[] = [];
 
     // Analyze specific patterns

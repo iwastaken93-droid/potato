@@ -1,5 +1,6 @@
 import { Instruction, Operand } from './types.js';
 import { signExtend8 } from './helpers.js';
+import { DexDebugInfo } from '../parser/dex.js';
 
 /**
  * Lightweight mock Dalvik bytecode disassembler.
@@ -7,7 +8,8 @@ import { signExtend8 } from './helpers.js';
  */
 export function disassembleDalvik(
   data: Uint8Array,
-  baseAddress: number
+  baseAddress: number,
+  debugInfo?: DexDebugInfo | null
 ): Instruction[] {
   const instructions: Instruction[] = [];
   let i = 0;
@@ -225,14 +227,39 @@ export function disassembleDalvik(
         .join(', ');
     }
 
-    instructions.push({
+    const inst: Instruction = {
       address: addr,
       bytes: data.slice(i, i + size),
       mnemonic,
       opStr,
       operands,
       size,
-    });
+    };
+
+    if (debugInfo) {
+      const cuAddr = i / 2;
+      let currentLine = debugInfo.lineStart;
+      for (const entry of debugInfo.lineTable) {
+        if (entry.address <= cuAddr) {
+          currentLine = entry.line;
+        }
+      }
+      inst.line = currentLine;
+
+      const activeVars = debugInfo.localVariables.filter(
+        (v) => v.startAddress <= cuAddr && (v.endAddress === undefined || cuAddr < v.endAddress)
+      );
+      if (activeVars.length > 0) {
+        inst.localVariables = activeVars.map((v) => ({
+          name: v.name,
+          type: v.type,
+          signature: v.signature,
+          reg: `v${v.register}`,
+        }));
+      }
+    }
+
+    instructions.push(inst);
 
     i += size;
   }

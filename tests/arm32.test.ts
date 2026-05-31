@@ -79,6 +79,29 @@ describe('ARM32 Disassembler Unit Tests', () => {
     const insts = disassembleArm32(dataAddEq, 0x1000);
     expect(insts[0].mnemonic).toBe('addeq');
   });
+
+  it('should handle truncated arm32 instructions', () => {
+    const insts = disassembleArm32(new Uint8Array([0x02, 0x00, 0x81]), 0x1000);
+    expect(insts.length).toBe(3);
+    expect(insts[0].mnemonic).toBe('db');
+    expect(insts[1].mnemonic).toBe('db');
+    expect(insts[2].mnemonic).toBe('db');
+  });
+
+  it('should disassemble ARM32 branch with negative offset', () => {
+    // b -8 -> offset is -2 (imm24 = 0xfffffe) => 0xfe, 0xff, 0xff, 0xea
+    const data = new Uint8Array([0xfe, 0xff, 0xff, 0xea]);
+    const insts = disassembleArm32(data, 0x1008);
+    expect(insts[0].mnemonic).toBe('b');
+    expect(insts[0].opStr).toBe('0x1008'); // pc + 8 - 8 = 0x1008
+  });
+
+  it('should disassemble SVC instructions', () => {
+    const data = new Uint8Array([0x05, 0x00, 0x00, 0xef]); // svc #5
+    const insts = disassembleArm32(data, 0x1000);
+    expect(insts[0].mnemonic).toBe('svc');
+    expect(insts[0].opStr).toBe('0x5');
+  });
 });
 
 describe('Thumb Disassembler Unit Tests', () => {
@@ -159,6 +182,62 @@ describe('Thumb Disassembler Unit Tests', () => {
     const instsAdd = disassembleThumb(dataAdd, 0x1000);
     expect(instsAdd[0].mnemonic).toBe('add.w');
     expect(instsAdd[0].opStr).toBe('r0, r1, #0x5');
+  });
+
+  it('should handle truncated Thumb 16-bit instructions', () => {
+    const insts = disassembleThumb(new Uint8Array([0x48]), 0x1000);
+    expect(insts.length).toBe(1);
+    expect(insts[0].mnemonic).toBe('db');
+    expect(insts[0].size).toBe(1);
+  });
+
+  it('should handle truncated Thumb 32-bit instructions', () => {
+    // 0x00 0xf0 would be the start of a 32-bit BL instruction, but we only supply 2 bytes.
+    const insts = disassembleThumb(new Uint8Array([0x00, 0xf0]), 0x1000);
+    expect(insts.length).toBe(1);
+    expect(insts[0].mnemonic).toBe('db');
+    expect(insts[0].size).toBe(2);
+  });
+
+  it('should disassemble Format 6 LDR PC-relative', () => {
+    const data = new Uint8Array([0x04, 0x48]); // ldr r0, [pc, #0x10]
+    const insts = disassembleThumb(data, 0x1000);
+    expect(insts[0].mnemonic).toBe('ldr');
+    expect(insts[0].opStr).toBe('r0, [pc, #0x10]');
+  });
+
+  it('should disassemble Format 7/8 LDR reg offset', () => {
+    const data = new Uint8Array([0x88, 0x58]); // ldr r0, [r1, r2]
+    const insts = disassembleThumb(data, 0x1000);
+    expect(insts[0].mnemonic).toBe('ldr');
+    expect(insts[0].opStr).toBe('r0, [r1, r2]');
+  });
+
+  it('should disassemble Format 19 ADD PC-relative', () => {
+    const data = new Uint8Array([0x04, 0xa0]); // add r0, pc, #0x10
+    const insts = disassembleThumb(data, 0x1000);
+    expect(insts[0].mnemonic).toBe('add');
+    expect(insts[0].opStr).toBe('r0, pc, #0x10');
+  });
+
+  it('should disassemble Format 20 ADD SP imm', () => {
+    const data = new Uint8Array([0x04, 0xb0]); // add sp, #0x10
+    const insts = disassembleThumb(data, 0x1000);
+    expect(insts[0].mnemonic).toBe('add');
+    expect(insts[0].opStr).toBe('sp, #0x10');
+  });
+
+  it('should disassemble BKPT', () => {
+    const data = new Uint8Array([0x05, 0xbe]); // bkpt #0x5
+    const insts = disassembleThumb(data, 0x1000);
+    expect(insts[0].mnemonic).toBe('bkpt');
+    expect(insts[0].opStr).toBe('0x5');
+  });
+
+  it('should disassemble unknown 16-bit instructions as db', () => {
+    // 0x00 0xde is not matched by any 16-bit pattern (usually undefined or special)
+    const insts = disassembleThumb(new Uint8Array([0x00, 0xde]), 0x1000);
+    expect(insts[0].mnemonic).toBe('db');
   });
 });
 

@@ -67,10 +67,8 @@ export function parseMsfHeader(buffer: ArrayBuffer): PdbMsfHeader {
 
   const view = new DataView(buffer);
   const pageSize = view.getUint32(32, true);
-  const activeFpm = view.getUint32(36, true); // Active Free Page Map
   const numPages = view.getUint32(40, true);
   const directorySize = view.getUint32(44, true);
-  const reserved = view.getUint32(48, true);
   const blockMapAddress = view.getUint32(52, true);
 
   return {
@@ -145,9 +143,6 @@ export function parsePdbSymbols(dbiStreamBuffer: ArrayBuffer): {
     const type = view.getUint16(offset + 2, true);
     // S_PUB32 (0x110e) or S_GPROC32 (0x1110) or S_LPROC32 (0x110f)
     if (type === 0x110e || type === 0x1110 || type === 0x110f) {
-      // 0x1110 (GPROC32): flags(4), offset(4), segment(2), symtype(2), len(1), name(string)
-      // 0x110e (PUB32): flags(4), offset(4), segment(2), name(string)
-      const flags = view.getUint32(offset + 4, true);
       const addrOffset = view.getUint32(offset + 8, true);
       const segment = view.getUint16(offset + 12, true);
 
@@ -225,7 +220,7 @@ export class DebugSymbolsParser {
   }): ParseResult {
     if (options.pdbFile) {
       try {
-        const msfHeader = parseMsfHeader(options.pdbFile);
+        parseMsfHeader(options.pdbFile);
         this.format = 'PDB';
 
         // Mock directory reading: In MSF, we'd read the block map, and read the stream size & blocks.
@@ -237,7 +232,7 @@ export class DebugSymbolsParser {
         this.lines = dbiResult.lines;
       } catch (err) {
         // Fallback to simpler parser or throw
-        throw new Error(`Failed parsing PDB file: ${(err as Error).message}`);
+        throw new Error(`Failed parsing PDB file: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
       }
     } else if (options.debugLine) {
       this.format = 'DWARF';

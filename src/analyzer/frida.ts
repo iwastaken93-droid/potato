@@ -271,12 +271,13 @@ export class FridaGenerator {
           `  const ${varName} = Memory.readDouble(${opts.addressExpression});`
         );
         break;
-      case 'byteArray':
+      case 'byteArray': {
         const len = opts.length || 16;
         lines.push(
           `  const ${varName} = Memory.readByteArray(${opts.addressExpression}, ${len});`
         );
         break;
+      }
       default:
         lines.push(
           `  const ${varName} = Memory.readPointer(${opts.addressExpression});`

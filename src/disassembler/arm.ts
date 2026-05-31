@@ -46,6 +46,199 @@ export function disassembleArm(data: Uint8Array, baseAddress: number): Instructi
         { type: 'imm', imm: dest },
       ];
     }
+    // Vector SIMD Three-Same instructions (both Integer and Float)
+    else if ((val & 0x1e200400) === 0x0e200400) {
+      const q = (val >> 30) & 1;
+      const u = (val >> 29) & 1;
+      const size = (val >> 22) & 3;
+      const rm = (val >> 16) & 0x1f;
+      const opcode = (val >> 11) & 0x1f;
+      const rn = (val >> 5) & 0x1f;
+      const rd = val & 0x1f;
+
+      let valid = false;
+      let isFloat = false;
+
+      if (opcode === 0x10) {
+        mnemonic = u ? 'sub' : 'add';
+        valid = true;
+      } else if (opcode === 0x1a || opcode === 0x1b) {
+        isFloat = true;
+        if (u === 0) {
+          mnemonic = opcode === 0x1a ? 'fadd' : 'fsub';
+        } else {
+          mnemonic = opcode === 0x1a ? 'fmul' : 'fdiv';
+        }
+        valid = true;
+      }
+
+      if (valid) {
+        let suffix = '';
+        if (isFloat) {
+          const sz = (val >> 22) & 1;
+          suffix = sz === 0 ? (q ? '4s' : '2s') : (q ? '2d' : '2d');
+        } else {
+          if (size === 0) suffix = q ? '16b' : '8b';
+          else if (size === 1) suffix = q ? '8h' : '4h';
+          else if (size === 2) suffix = q ? '4s' : '2s';
+          else if (size === 3) suffix = q ? '2d' : '1d';
+        }
+
+        const rdName = `v${rd}.${suffix}`;
+        const rnName = `v${rn}.${suffix}`;
+        const rmName = `v${rm}.${suffix}`;
+        opStr = `${rdName}, ${rnName}, ${rmName}`;
+        operands = [
+          { type: 'reg', reg: rdName },
+          { type: 'reg', reg: rnName },
+          { type: 'reg', reg: rmName },
+        ];
+      }
+    }
+    // DUP (general-purpose register)
+    else if ((val & 0xbfc00c00) === 0x0e000c00) {
+      const q = (val >> 30) & 1;
+      const imm5 = (val >> 16) & 0x1f;
+      const rn = (val >> 5) & 0x1f;
+      const rd = val & 0x1f;
+
+      let suffix = '';
+      let srcReg = '';
+      if (imm5 & 1) {
+        suffix = q ? '16b' : '8b';
+        srcReg = 'w' + rn;
+      } else if (imm5 & 2) {
+        suffix = q ? '8h' : '4h';
+        srcReg = 'w' + rn;
+      } else if (imm5 & 4) {
+        suffix = q ? '4s' : '2s';
+        srcReg = 'w' + rn;
+      } else if (imm5 & 8) {
+        suffix = q ? '2d' : '2d';
+        srcReg = 'x' + rn;
+      }
+
+      if (suffix) {
+        mnemonic = 'dup';
+        const srcRegName = rn === 31 ? (srcReg.startsWith('x') ? 'xzr' : 'wzr') : srcReg;
+        const rdName = `v${rd}.${suffix}`;
+        opStr = `${rdName}, ${srcRegName}`;
+        operands = [
+          { type: 'reg', reg: rdName },
+          { type: 'reg', reg: srcRegName },
+        ];
+      }
+    }
+    // DUP (element)
+    else if ((val & 0xbfc00c00) === 0x0e000400) {
+      const q = (val >> 30) & 1;
+      const imm5 = (val >> 16) & 0x1f;
+      const rn = (val >> 5) & 0x1f;
+      const rd = val & 0x1f;
+
+      let suffix = '';
+      let elemSize = '';
+      let index = 0;
+      if (imm5 & 1) {
+        suffix = q ? '16b' : '8b';
+        elemSize = 'b';
+        index = imm5 >> 1;
+      } else if (imm5 & 2) {
+        suffix = q ? '8h' : '4h';
+        elemSize = 'h';
+        index = imm5 >> 2;
+      } else if (imm5 & 4) {
+        suffix = q ? '4s' : '2s';
+        elemSize = 's';
+        index = imm5 >> 3;
+      } else if (imm5 & 8) {
+        suffix = q ? '2d' : '2d';
+        elemSize = 'd';
+        index = imm5 >> 4;
+      }
+
+      if (suffix) {
+        mnemonic = 'dup';
+        const rdName = `v${rd}.${suffix}`;
+        const srcName = `v${rn}.${elemSize}[${index}]`;
+        opStr = `${rdName}, ${srcName}`;
+        operands = [
+          { type: 'reg', reg: rdName },
+          { type: 'reg', reg: srcName },
+        ];
+      }
+    }
+    // FMOV (immediate)
+    else if ((val & 0xffa0fc00) === 0x1e201000) {
+      mnemonic = 'fmov';
+      const sz = (val >> 22) & 1;
+      const rd = val & 0x1f;
+      const imm8 = (val >> 13) & 0xff;
+      const rdName = (sz ? 'd' : 's') + rd;
+
+      const a = (imm8 >> 7) & 1;
+      const b = (imm8 >> 6) & 1;
+      const c = (imm8 >> 5) & 1;
+      const d = (imm8 >> 4) & 1;
+      const e = (imm8 >> 3) & 1;
+      const f = (imm8 >> 2) & 1;
+      const g = (imm8 >> 1) & 1;
+      const h = imm8 & 1;
+      const signVal = a ? -1.0 : 1.0;
+      const expVal = ((b ^ 1) << 2) | (c << 1) | d;
+      const mantVal = (e << 3) | (f << 2) | (g << 1) | h;
+      const floatVal = signVal * ((16 + mantVal) / 16) * Math.pow(2, expVal - 3);
+
+      opStr = `${rdName}, #${floatVal.toFixed(1)}`;
+      operands = [
+        { type: 'reg', reg: rdName },
+        { type: 'imm', imm: floatVal as any },
+      ];
+    }
+    // FMOV (register to register)
+    else if ((val & 0xffa0fc00) === 0x1e204000) {
+      mnemonic = 'fmov';
+      const sz = (val >> 22) & 1;
+      const rd = val & 0x1f;
+      const rn = (val >> 5) & 0x1f;
+      const rdName = (sz ? 'd' : 's') + rd;
+      const rnName = (sz ? 'd' : 's') + rn;
+      opStr = `${rdName}, ${rnName}`;
+      operands = [
+        { type: 'reg', reg: rdName },
+        { type: 'reg', reg: rnName },
+      ];
+    }
+    // FMOV (GPR to FP register)
+    else if ((val & 0xfffffc00) === 0x1e270000) {
+      mnemonic = 'fmov';
+      const sf = (val >> 31) & 1;
+      const sz = (val >> 22) & 1;
+      const rd = val & 0x1f;
+      const rn = (val >> 5) & 0x1f;
+      const rdName = (sz ? 'd' : 's') + rd;
+      const rnName = (sf ? 'x' : 'w') + (rn === 31 ? 'zr' : rn);
+      opStr = `${rdName}, ${rnName}`;
+      operands = [
+        { type: 'reg', reg: rdName },
+        { type: 'reg', reg: rnName },
+      ];
+    }
+    // FMOV (FP register to GPR)
+    else if ((val & 0xfffffc00) === 0x1e260000) {
+      mnemonic = 'fmov';
+      const sf = (val >> 31) & 1;
+      const sz = (val >> 22) & 1;
+      const rd = val & 0x1f;
+      const rn = (val >> 5) & 0x1f;
+      const rdName = (sf ? 'x' : 'w') + (rd === 31 ? 'zr' : rd);
+      const rnName = (sz ? 'd' : 's') + rn;
+      opStr = `${rdName}, ${rnName}`;
+      operands = [
+        { type: 'reg', reg: rdName },
+        { type: 'reg', reg: rnName },
+      ];
+    }
     // FADD / FSUB / FMUL / FDIV / FCMP (scalar floating point)
     else if (
       (val & 0xffa0fc00) === 0x1e202800 ||

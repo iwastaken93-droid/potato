@@ -1,4 +1,4 @@
-import { ParsedMacho, MachoSegment, MachoSection } from './macho.js';
+import { ParsedMacho, MachoSegment } from './macho.js';
 
 export interface ObjcMethod {
   name: string;
@@ -257,8 +257,8 @@ export function parseObjcMetadata(
     for (let i = 0; i < count; i++) {
       if (propOffset + entsize > view.byteLength) break;
 
-      let name = '';
-      let attributes = '';
+      let name: string;
+      let attributes: string;
 
       if (is64Bit) {
         const nameVm = view.getBigUint64(propOffset, isLittleEndian);
@@ -294,10 +294,10 @@ export function parseObjcMetadata(
     for (let i = 0; i < count; i++) {
       if (ivarOffset + entsize > view.byteLength) break;
 
-      let name = '';
-      let type = '';
+      let name: string;
+      let type: string;
       let offset = 0;
-      let size = 0;
+      let size: number;
 
       if (is64Bit) {
         const offsetPtr = view.getBigUint64(ivarOffset, isLittleEndian);
@@ -391,14 +391,13 @@ export function parseObjcMetadata(
     // isa (8), name (8), protocols (8), instanceMethods (8), classMethods (8), optionalInstanceMethods (8), optionalClassMethods (8), instanceProperties (8)
     const pointerSize = BigInt(is64Bit ? 8 : 4);
 
-    const protocolsPtr =
-      readPointer(
-        view,
-        protoVm + 2n * pointerSize,
-        segments,
-        is64Bit,
-        isLittleEndian
-      ) || 0n;
+    readPointer(
+      view,
+      protoVm + 2n * pointerSize,
+      segments,
+      is64Bit,
+      isLittleEndian
+    );
     const instMethodsPtr =
       readPointer(
         view,
@@ -549,7 +548,7 @@ export function parseObjcMetadata(
       }
 
       // Read remaining class_ro_t fields
-      const pSize = BigInt(is64Bit ? 8 : 4);
+
       const methodsFieldOffset = cleanDataVm + BigInt(is64Bit ? 32 : 16);
       const protocolsFieldOffset = cleanDataVm + BigInt(is64Bit ? 40 : 20);
       const ivarsFieldOffset = cleanDataVm + BigInt(is64Bit ? 48 : 24);

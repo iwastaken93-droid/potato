@@ -99,7 +99,7 @@ export interface MachoSignatureBlob {
   length: number;
   magic: number;
   magicName: string;
-  payload: any;
+  payload: unknown;
 }
 
 export interface MachoSignatureInfo {
@@ -380,10 +380,10 @@ export function parseCertificate(certNode: ASN1Node): ParsedCertificate | null {
   }
 
   const serialNode = tbsNode.value[index++];
-  const sigAlgoNode = tbsNode.value[index++];
+  index++; // Skip sigAlgoNode
   const issuerNode = tbsNode.value[index++];
   const validityNode = tbsNode.value[index++];
-  const subjectNode = tbsNode.value[index++];
+  const subjectNode = tbsNode.value[index];
 
   if (!serialNode || !issuerNode || !validityNode || !subjectNode) {
     return null;
@@ -447,7 +447,7 @@ export function parseSignatureSlot(bytes: Uint8Array): {
       raw: bytes,
       certificates,
     };
-  } catch (e) {
+  } catch {
     return {
       raw: bytes,
       certificates: [],
@@ -465,7 +465,7 @@ export function parseCodeDirectory(bytes: Uint8Array): CodeDirectoryInfo {
     throw new Error(`Invalid CodeDirectory magic: 0x${magic.toString(16)}`);
   }
 
-  const length = view.getUint32(4, false);
+  view.getUint32(4, false);
   const version = view.getUint32(8, false);
   const flags = view.getUint32(12, false);
   const hashOffset = view.getUint32(16, false);
@@ -615,7 +615,7 @@ export function parseMachoSignature(
     if (offset + blobLength > datasize) continue;
 
     const blobBytes = signatureBytes.slice(offset, offset + blobLength);
-    let payload: any = null;
+    let payload: unknown = null;
 
     if (type === CSSLOT_CODEDIRECTORY) {
       try {

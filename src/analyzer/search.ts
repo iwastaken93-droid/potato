@@ -159,12 +159,9 @@ export function searchText(
     if (match) {
       // Decode the matched section to return the actual match text
       const matchedBytes = buffer.subarray(i, i + needleLen);
-      let matchStr = text;
-      if (encoding === 'utf16le') {
-        matchStr = new TextDecoder('utf-16le').decode(matchedBytes);
-      } else {
-        matchStr = new TextDecoder('utf-8').decode(matchedBytes);
-      }
+      const matchStr = encoding === 'utf16le'
+        ? new TextDecoder('utf-16le').decode(matchedBytes)
+        : new TextDecoder('utf-8').decode(matchedBytes);
 
       results.push({
         offset: i,

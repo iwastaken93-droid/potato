@@ -33,6 +33,12 @@ export interface Instruction {
 
   /** Register values written by this instruction (register IDs) */
   regsWrite?: number[];
+
+  /** Optional source code line number */
+  line?: number;
+
+  /** Optional active local variables at this instruction */
+  localVariables?: { name: string; type: string; signature?: string; reg: string }[];
 }
 
 export type OperandType = 'reg' | 'imm' | 'mem' | 'invalid';

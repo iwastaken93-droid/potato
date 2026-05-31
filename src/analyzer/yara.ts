@@ -265,7 +265,7 @@ export function matchPattern(
         if (matched) {
           const matchedBytes = buffer.subarray(i, i + needleBytes.length);
           const decoder = new TextDecoder(isWide ? 'utf-16le' : 'utf-8');
-          let matchedValue = '';
+          let matchedValue: string;
           try {
             matchedValue = decoder.decode(matchedBytes);
           } catch {
@@ -321,7 +321,7 @@ export function evaluateCondition(
     .sort((a, b) => b.length - a.length);
 
   for (const key of sortedKeys) {
-    const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedKey = key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
     const regex = new RegExp(escapedKey + '\\b', 'g');
     cond = cond.replace(regex, variableValues[key] ? 'true' : 'false');
   }

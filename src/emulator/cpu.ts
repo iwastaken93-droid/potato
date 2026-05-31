@@ -48,7 +48,7 @@ interface RegisterInfo {
 }
 
 // Map sub-register names to their GPR representation, size, shift, and behavior.
-const SUB_REG_MAP: Record<string, RegisterInfo> = {};
+export const SUB_REG_MAP: Record<string, RegisterInfo> = {};
 
 function registerSubReg(
   name: string,

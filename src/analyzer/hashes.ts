@@ -129,8 +129,8 @@ export function computeSHA1(data: Uint8Array): string {
     let e = h4;
 
     for (let t = 0; t < 80; t++) {
-      let f = 0;
-      let k = 0;
+      let f: number;
+      let k: number;
       if (t < 20) {
         f = (b & c) | (~b & d);
         k = 0x5a827999;

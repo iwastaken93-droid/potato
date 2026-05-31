@@ -204,7 +204,7 @@ export class CoffParser {
 
       // Read name (8 bytes)
       const nameBytes = new Uint8Array(this.buffer, offset, 8);
-      let name = '';
+      let name: string;
       
       // Check if it's a string table reference in standard COFF (starts with '/')
       if (nameBytes[0] === 0x2f) { // '/'
@@ -294,12 +294,12 @@ export class CoffParser {
         break;
       }
 
-      let name = '';
-      let value: bigint | number = 0;
-      let sectionNumber = 0;
-      let type = 0;
-      let storageClass = 0;
-      let numberOfAuxSymbols = 0;
+      let name: string;
+      let value: bigint | number;
+      let sectionNumber: number;
+      let type: number;
+      let storageClass: number;
+      let numberOfAuxSymbols: number;
 
       if (this.is64Bit) {
         value = this.view.getBigUint64(offset, !isBE);

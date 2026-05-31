@@ -257,4 +257,142 @@ describe('Plugin System Architecture Unit Tests', () => {
     manager.setPluginConfig('elf-hardening', { checkCanary: false });
     expect(installed.config?.checkCanary).toBe(false);
   });
+
+  it('should validate API version incompatibility', async () => {
+    const invalidPlugin: AnalyzerPlugin = {
+      metadata: {
+        id: 'invalid-version-plugin',
+        name: 'Invalid Version',
+        description: 'Testing API version validation',
+        version: '1.0.0',
+        author: 'Antigravity',
+        apiVersion: '3.0.0',
+      },
+      analyze: () => ({ pluginId: 'invalid-version-plugin', success: true, findings: [] }),
+    };
+
+    await expect(manager.register(invalidPlugin)).rejects.toThrow(
+      'Incompatible plugin API version: "3.0.0". Supported versions: v1, v2.'
+    );
+  });
+
+  it('should sort execution order topologically and detect cycles', async () => {
+    const pluginA: AnalyzerPlugin = {
+      metadata: {
+        id: 'plugin-a',
+        name: 'A',
+        description: 'Depends on B',
+        version: '1.0.0',
+        author: 'Antigravity',
+        dependencies: ['plugin-b'],
+      },
+      analyze: () => ({ pluginId: 'plugin-a', success: true, findings: [] }),
+    };
+
+    const pluginB: AnalyzerPlugin = {
+      metadata: {
+        id: 'plugin-b',
+        name: 'B',
+        description: 'No deps',
+        version: '1.0.0',
+        author: 'Antigravity',
+      },
+      analyze: () => ({ pluginId: 'plugin-b', success: true, findings: [] }),
+    };
+
+    await manager.register(pluginB);
+    await manager.register(pluginA);
+
+    const order = manager.resolveExecutionOrder();
+    expect(order.map(p => p.metadata.id)).toEqual(['plugin-b', 'plugin-a']);
+
+    // Now introduce circular dep
+    await manager.clear();
+
+    const cyclicA: AnalyzerPlugin = {
+      metadata: {
+        id: 'cyclic-a',
+        name: 'Cyclic A',
+        description: 'Depends on B',
+        version: '1.0.0',
+        author: 'Antigravity',
+        dependencies: ['cyclic-b'],
+      },
+      analyze: () => ({ pluginId: 'cyclic-a', success: true, findings: [] }),
+    };
+
+    const cyclicB: AnalyzerPlugin = {
+      metadata: {
+        id: 'cyclic-b',
+        name: 'Cyclic B',
+        description: 'Depends on A',
+        version: '1.0.0',
+        author: 'Antigravity',
+        dependencies: ['cyclic-a'],
+      },
+      analyze: () => ({ pluginId: 'cyclic-b', success: true, findings: [] }),
+    };
+
+    await manager.register(cyclicA);
+    await manager.register(cyclicB);
+
+    expect(() => manager.resolveExecutionOrder()).toThrow(
+      'Circular dependency detected'
+    );
+  });
+
+  it('should support dynamic typed hooks', async () => {
+    const registeredSpy = vi.fn();
+    const unregisteredSpy = vi.fn();
+    const beforeSpy = vi.fn();
+    const afterSpy = vi.fn();
+    const findingSpy = vi.fn();
+
+    manager.hooks.on('plugin:registered', registeredSpy);
+    manager.hooks.on('plugin:unregistered', unregisteredSpy);
+    manager.hooks.on('analyze:before', beforeSpy);
+    manager.hooks.on('analyze:after', afterSpy);
+    manager.hooks.on('finding:detected', findingSpy);
+
+    const testPlugin: AnalyzerPlugin = {
+      metadata: {
+        id: 'hook-test',
+        name: 'Hook Test',
+        description: 'Test typed hooks',
+        version: '1.0.0',
+        author: 'Antigravity',
+        apiVersion: '2.0.0',
+      },
+      analyze: () => ({
+        pluginId: 'hook-test',
+        success: true,
+        findings: [
+          {
+            category: 'test',
+            severity: 'low',
+            description: 'Test finding',
+          },
+        ],
+      }),
+    };
+
+    await manager.register(testPlugin);
+    expect(registeredSpy).toHaveBeenCalledWith({ pluginId: 'hook-test' });
+
+    await manager.runAll(mockContext);
+    expect(beforeSpy).toHaveBeenCalled();
+    expect(afterSpy).toHaveBeenCalled();
+    expect(findingSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pluginId: 'hook-test',
+        finding: expect.objectContaining({
+          category: 'test',
+          description: 'Test finding',
+        }),
+      })
+    );
+
+    await manager.unregister('hook-test');
+    expect(unregisteredSpy).toHaveBeenCalledWith({ pluginId: 'hook-test' });
+  });
 });

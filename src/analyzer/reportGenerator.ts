@@ -48,7 +48,7 @@ export class ReportGenerator {
             })),
           };
         }
-      } catch (e) {
+      } catch {
         // Ignore parsing errors
       }
     }
@@ -229,7 +229,7 @@ export class ReportGenerator {
             md += `\n`;
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore PE parsing errors
       }
     }
@@ -442,7 +442,7 @@ export class ReportGenerator {
             </section>
           `;
         }
-      } catch (e) {
+      } catch {
         // Ignore PE parsing errors
       }
     }
@@ -925,7 +925,7 @@ export class ReportGenerator {
             text += `\n`;
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore PE parsing errors
       }
     }

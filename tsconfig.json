@@ -5,6 +5,8 @@
     "moduleResolution": "NodeNext",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

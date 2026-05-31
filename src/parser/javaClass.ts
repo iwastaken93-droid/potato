@@ -21,7 +21,7 @@ export interface AttributeInfo {
   name: string;
   length: number;
   info: Uint8Array;
-  decoded?: any;
+  decoded?: unknown;
 }
 
 export interface ExceptionTableEntry {
@@ -450,7 +450,7 @@ export function parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass {
             attribute.decoded = entry ? entry.value : undefined;
           }
         }
-      } catch (err) {
+      } catch {
         // Fallback if decoding nested attributes fails (e.g. malformed or partial buffers in tests)
         attribute.decoded = null;
       }

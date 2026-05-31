@@ -211,6 +211,53 @@ describe('Mach-O Parser Unit Tests', () => {
     expect(parsed1.header.cputypeName).toBe('ARM64');
   });
 
+  it('should successfully parse a 64-bit fat/universal binary', () => {
+    // 64-bit Fat header (8 bytes) + 2 arches (64 bytes) = 72 bytes
+    // First arch at offset 72, second arch at offset 104
+    // Each arch is a mini Mach-O header (32 bytes)
+    const buffer = new ArrayBuffer(72 + 32 + 32);
+    const view = new DataView(buffer);
+
+    // Fat magic: 0xcafebabf (Big Endian)
+    view.setUint32(0, 0xcafebabf, false);
+    view.setUint32(4, 2, false); // nfat_arch = 2
+
+    // Arch 1: x86_64
+    view.setInt32(8, 0x01000007, false); // cputype
+    view.setInt32(12, -1, false); // cpusubtype
+    view.setBigUint64(16, 72n, false); // offset: 72
+    view.setBigUint64(24, 32n, false); // size: 32
+    view.setUint32(32, 3, false); // align: 8
+    view.setUint32(36, 0, false); // reserved: 0
+
+    // Arch 2: ARM64
+    view.setInt32(40, 0x0100000c, false); // cputype
+    view.setInt32(44, 0, false); // cpusubtype
+    view.setBigUint64(48, 104n, false); // offset: 104
+    view.setBigUint64(56, 32n, false); // size: 32
+    view.setUint32(64, 3, false); // align: 8
+    view.setUint32(68, 0, false); // reserved: 0
+
+    // Mach-O at offset 72: x86_64 LE magic
+    view.setUint32(72, 0xfeedfacf, true);
+    view.setInt32(76, 0x01000007, true); // cputype x86_64
+
+    // Mach-O at offset 104: ARM64 LE magic
+    view.setUint32(104, 0xfeedfacf, true);
+    view.setInt32(108, 0x0100000c, true); // cputype arm64
+
+    // Parse default (slice 0)
+    const parsed0 = parseMacho(buffer);
+    expect(parsed0.header.cputypeName).toBe('x86_64');
+    expect(parsed0.fatArches?.length).toBe(2);
+    expect(parsed0.fatArches?.[0].offset).toBe(72);
+    expect(parsed0.fatArches?.[0].size).toBe(32);
+
+    // Parse slice 1
+    const parsed1 = parseMacho(buffer, { fatIndex: 1 });
+    expect(parsed1.header.cputypeName).toBe('ARM64');
+  });
+
   it('should throw an error for invalid magic bytes', () => {
     const buffer = new ArrayBuffer(32);
     const view = new DataView(buffer);
@@ -245,6 +292,18 @@ describe('Mach-O Parser Unit Tests', () => {
       const data = new Uint8Array(28);
       const view = new DataView(data.buffer);
       view.setUint32(0, 0xcafebabe, false); // fat magic BE
+      view.setUint32(4, 1, false); // 1 arch
+      view.setInt32(8, 0x0100000c, false); // cputype arm64
+
+      const arch = DisassemblerRouter.detectArchitecture(data);
+      expect(arch).toBe('arm');
+    });
+
+    it('should detect arm architecture from 64-bit fat Mach-O binary', () => {
+      // Fat header (8 bytes) + 1 arch (32 bytes) = 40 bytes
+      const data = new Uint8Array(40);
+      const view = new DataView(data.buffer);
+      view.setUint32(0, 0xcafebabf, false); // fat magic BE 64
       view.setUint32(4, 1, false); // 1 arch
       view.setInt32(8, 0x0100000c, false); // cputype arm64
 

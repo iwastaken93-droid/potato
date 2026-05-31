@@ -65,13 +65,13 @@ export function demangle(mangled: string): DemangledSymbol {
   if (trimmed.startsWith('_Z')) {
     try {
       return parseItanium(trimmed);
-    } catch (e) {
+    } catch {
       // Fallback
     }
   } else if (trimmed.startsWith('?')) {
     try {
       return parseMsvc(trimmed);
-    } catch (e) {
+    } catch {
       // Fallback
     }
   }

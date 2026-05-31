@@ -562,5 +562,163 @@ describe('WASM Parser Unit Tests', () => {
     expect(customSection).toBeDefined();
     expect(customSection?.size).toBe(2);
   });
+
+  it('should parse Wasm component model binaries with new component model sections', () => {
+    // Section 2: core-instance
+    const coreInstPayload = [
+      ...encodeVarUint(1), // count = 1
+      0x00, // tag = instantiate
+      ...encodeVarUint(0), // moduleIdx = 0
+      ...encodeVarUint(0), // args count = 0
+    ];
+
+    // Section 3: core-type
+    const coreTypePayload = [
+      ...encodeVarUint(1), // count = 1
+      0x60, // tag = func type
+      ...encodeVarUint(0), // params = 0
+      ...encodeVarUint(0), // results = 0
+    ];
+
+    // Section 4: nested component (empty header)
+    const compPayload = [
+      0x00, 0x61, 0x73, 0x6d,
+      0x0d, 0x00, 0x01, 0x00,
+    ];
+
+    // Section 5: instance
+    const instPayload = [
+      ...encodeVarUint(1), // count = 1
+      0x00, // tag = instantiate
+      ...encodeVarUint(0), // componentIdx = 0
+      ...encodeVarUint(0), // args count = 0
+    ];
+
+    // Section 6: alias
+    const aliasPayload = [
+      ...encodeVarUint(1), // count = 1
+      0x00, // tag = export
+      ...encodeVarUint(0), // instanceIdx = 0
+      0x00, // tag = 0x00 (simple string)
+      ...encodeString('foo'),
+      0x00, // sort = 0
+    ];
+
+    // Section 7: type
+    const typePayload = [
+      ...encodeVarUint(1), // count = 1
+      0x72, // tag = record
+    ];
+
+    // Section 8: canon
+    const canonPayload = [
+      ...encodeVarUint(1), // count = 1
+      0x00, // tag = lift
+      ...encodeVarUint(0), // coreFuncIdx = 0
+      ...encodeVarUint(0), // options = 0
+    ];
+
+    // Section 9: start
+    const startPayload = [
+      ...encodeVarUint(0), // funcIdx = 0
+      ...encodeVarUint(0), // args = 0
+      ...encodeVarUint(0), // results = 0
+    ];
+
+    // Section 12: value
+    const valuePayload = [
+      ...encodeVarUint(1), // count = 1
+      0x7f, // valType = 0x7f
+    ];
+
+    const wasmBytes = new Uint8Array([
+      0x00, 0x61, 0x73, 0x6d, // magic
+      0x0d, 0x00, 0x01, 0x00, // version = 13, layer = 1 (component)
+
+      2, // Section 2
+      ...encodeVarUint(coreInstPayload.length),
+      ...coreInstPayload,
+
+      3, // Section 3
+      ...encodeVarUint(coreTypePayload.length),
+      ...coreTypePayload,
+
+      4, // Section 4
+      ...encodeVarUint(compPayload.length),
+      ...compPayload,
+
+      5, // Section 5
+      ...encodeVarUint(instPayload.length),
+      ...instPayload,
+
+      6, // Section 6
+      ...encodeVarUint(aliasPayload.length),
+      ...aliasPayload,
+
+      7, // Section 7
+      ...encodeVarUint(typePayload.length),
+      ...typePayload,
+
+      8, // Section 8
+      ...encodeVarUint(canonPayload.length),
+      ...canonPayload,
+
+      9, // Section 9
+      ...encodeVarUint(startPayload.length),
+      ...startPayload,
+
+      12, // Section 12
+      ...encodeVarUint(valuePayload.length),
+      ...valuePayload,
+    ]);
+
+    const module = parseWasm(wasmBytes);
+    expect(module.isComponent).toBe(true);
+
+    const s2 = module.componentSections?.find(s => s.id === 2);
+    expect(s2).toBeDefined();
+    expect(s2?.coreInstances).toHaveLength(1);
+    expect(s2?.coreInstances?.[0].type).toBe('instantiate');
+
+    const s3 = module.componentSections?.find(s => s.id === 3);
+    expect(s3).toBeDefined();
+    expect(s3?.coreTypes).toHaveLength(1);
+    expect(s3?.coreTypes?.[0].type).toBe('func');
+
+    const s4 = module.componentSections?.find(s => s.id === 4);
+    expect(s4).toBeDefined();
+    expect(s4?.modules).toHaveLength(1);
+    expect(s4?.modules?.[0].isComponent).toBe(true);
+
+    const s5 = module.componentSections?.find(s => s.id === 5);
+    expect(s5).toBeDefined();
+    expect(s5?.instances).toHaveLength(1);
+    expect(s5?.instances?.[0].type).toBe('instantiate');
+
+    const s6 = module.componentSections?.find(s => s.id === 6);
+    expect(s6).toBeDefined();
+    expect(s6?.aliases).toHaveLength(1);
+    expect(s6?.aliases?.[0].name).toBe('foo');
+
+    const s7 = module.componentSections?.find(s => s.id === 7);
+    expect(s7).toBeDefined();
+    expect(s7?.types).toHaveLength(1);
+    expect(s7?.types?.[0].tag).toBe(0x72);
+
+    const s8 = module.componentSections?.find(s => s.id === 8);
+    expect(s8).toBeDefined();
+    expect(s8?.canons).toHaveLength(1);
+    expect(s8?.canons?.[0].type).toBe('lift');
+
+    const s9 = module.componentSections?.find(s => s.id === 9);
+    expect(s9).toBeDefined();
+    expect(s9?.starts).toHaveLength(1);
+    expect(s9?.starts?.[0].funcIdx).toBe(0);
+
+    const s12 = module.componentSections?.find(s => s.id === 12);
+    expect(s12).toBeDefined();
+    expect(s12?.values).toHaveLength(1);
+    expect(s12?.values?.[0].valType).toBe(0x7f);
+  });
 });
 

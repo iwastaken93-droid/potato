@@ -63,7 +63,6 @@ export class ArchiveUnpacker {
       );
 
       const cdEntriesCount = view.getUint16(eocdOffset + 10, true);
-      const cdSize = view.getUint32(eocdOffset + 12, true);
       const cdOffset = view.getUint32(eocdOffset + 16, true);
 
       const entries: RawCentralDirectoryEntry[] = [];
@@ -117,7 +116,7 @@ export class ArchiveUnpacker {
       }
 
       return entries;
-    } catch (e) {
+    } catch {
       // If parsing central directory fails, return empty
       return [];
     }
@@ -171,9 +170,10 @@ export class ArchiveUnpacker {
     } else if (entry.compressionMethod === 8) {
       try {
         return new Uint8Array(inflateRawSync(compressedData));
-      } catch (err: any) {
+      } catch (err) {
         throw new Error(
-          `Decompression failed for ${entry.path}: ${err.message}`
+          `Decompression failed for ${entry.path}: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err }
         );
       }
     } else {
@@ -268,7 +268,7 @@ export class ArchiveUnpacker {
       let data: Uint8Array | null = null;
       try {
         data = this.extractLocalEntry(entry);
-      } catch (e) {
+      } catch {
         // Skip or append with unknown if extraction fails
       }
 
@@ -300,7 +300,7 @@ export class ArchiveUnpacker {
               executableType: subEntry.executableType,
             });
           }
-        } catch (e) {
+        } catch {
           // If sub-parsing fails, just continue
         }
       }

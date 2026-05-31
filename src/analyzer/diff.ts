@@ -56,8 +56,6 @@ export function myersDiff<T>(
   const v: { [key: number]: number } = { 1: 0 };
   const trace: { [key: number]: number }[] = [];
 
-  let x = 0;
-  let y = 0;
   let found = false;
 
   for (let d = 0; d <= max; d++) {
@@ -65,13 +63,14 @@ export function myersDiff<T>(
     trace.push(vCopy);
 
     for (let k = -d; k <= d; k += 2) {
+      let x = 0;
       if (k === -d || (k !== d && (v[k - 1] ?? -1) < (v[k + 1] ?? -1))) {
         x = v[k + 1] ?? 0;
       } else {
         x = (v[k - 1] ?? 0) + 1;
       }
 
-      y = x - k;
+      let y = x - k;
 
       while (x < n && y < m && equals(a[x], b[y])) {
         x++;
@@ -90,19 +89,16 @@ export function myersDiff<T>(
 
   // Backtrack to find path
   const path: [number, number][] = [];
-  x = n;
-  y = m;
+  let x = n;
+  let y = m;
 
   for (let d = trace.length - 1; d >= 0; d--) {
     const v = trace[d];
     const k = x - y;
 
-    let prevK = 0;
-    if (k === -d || (k !== d && (v[k - 1] ?? -1) < (v[k + 1] ?? -1))) {
-      prevK = k + 1;
-    } else {
-      prevK = k - 1;
-    }
+    const prevK = (k === -d || (k !== d && (v[k - 1] ?? -1) < (v[k + 1] ?? -1)))
+      ? k + 1
+      : k - 1;
 
     const prevX = v[prevK] ?? 0;
     const prevY = prevX - prevK;

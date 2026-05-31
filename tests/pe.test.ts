@@ -462,10 +462,17 @@ describe('PE Parser Unit Tests', () => {
     // Verify imports
     expect(parsed.imports.length).toBe(1);
     expect(parsed.imports[0].dllName).toBe('kernel32.dll');
+    expect(parsed.imports[0].importAddressTableRva).toBe(0x4040);
+    expect(parsed.imports[0].importLookupTableRva).toBe(0x4030);
     expect(parsed.imports[0].imports.length).toBe(2);
     expect(parsed.imports[0].imports[0].name).toBe('CreateFileA');
     expect(parsed.imports[0].imports[0].hint).toBe(12);
+    expect(parsed.imports[0].imports[0].hintNameTableRva).toBe(0x4060);
+    expect(parsed.imports[0].imports[0].iltRva).toBe(0x4030);
+    expect(parsed.imports[0].imports[0].iatRva).toBe(0x4040);
     expect(parsed.imports[0].imports[1].ordinal).toBe(5);
+    expect(parsed.imports[0].imports[1].iltRva).toBe(0x4034);
+    expect(parsed.imports[0].imports[1].iatRva).toBe(0x4044);
   });
 
   it('should parse 64-bit imports', () => {
@@ -567,10 +574,17 @@ describe('PE Parser Unit Tests', () => {
     // Verify imports
     expect(parsed.imports.length).toBe(1);
     expect(parsed.imports[0].dllName).toBe('kernel32.dll');
+    expect(parsed.imports[0].importAddressTableRva).toBe(0x4040);
+    expect(parsed.imports[0].importLookupTableRva).toBe(0x4030);
     expect(parsed.imports[0].imports.length).toBe(2);
     expect(parsed.imports[0].imports[0].name).toBe('CreateFileA');
     expect(parsed.imports[0].imports[0].hint).toBe(12);
+    expect(parsed.imports[0].imports[0].hintNameTableRva).toBe(0x4060);
+    expect(parsed.imports[0].imports[0].iltRva).toBe(0x4030);
+    expect(parsed.imports[0].imports[0].iatRva).toBe(0x4040);
     expect(parsed.imports[0].imports[1].ordinal).toBe(5);
+    expect(parsed.imports[0].imports[1].iltRva).toBe(0x4038);
+    expect(parsed.imports[0].imports[1].iatRva).toBe(0x4048);
   });
 
   it('should throw an error if COFF file header points outside of file limits', () => {

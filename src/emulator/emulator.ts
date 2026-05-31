@@ -3,10 +3,12 @@
  * Part of the Universal Reverse Engineering Tool.
  */
 
-import { CPU, RFlag } from './cpu.js';
+import { CPU, RFlag, SUB_REG_MAP } from './cpu.js';
 import { Memory } from './memory.js';
 import { Instruction, Operand, MemoryOperand } from '../disassembler/types.js';
 import { SyscallHandler } from './syscall.js';
+import { SymbolicExecutor, SymbolicState, SymbolicExpr } from '../analyzer/symbolic.js';
+import { IRTranslator, IROperand } from '../disassembler/ir.js';
 
 export interface ExecutionResult {
   success: boolean;
@@ -22,6 +24,7 @@ export class Emulator {
   public breakpoints: Set<number> = new Set();
   public isRunning: boolean = false;
   public syscallHandler?: SyscallHandler;
+  public symbolicState: SymbolicState = new SymbolicState();
   private maxInstructions: number = 100000;
   private pcWritten: boolean = false;
 
@@ -70,6 +73,7 @@ export class Emulator {
     this.cpu.reset();
     this.memory.clear();
     this.cpu.write('rip', BigInt(entryPoint));
+    this.symbolicState = new SymbolicState();
 
     // Setup a default stack segment (e.g. 1MB size at 0x70000000)
     const stackStart = 0x70000000n;
@@ -130,6 +134,8 @@ export class Emulator {
       if (!this.pcWritten) {
         this.cpu.write('rip', savedRip + BigInt(inst.size || 1));
       }
+
+      this.stepSymbolic(inst);
 
       const halted = this.syscallHandler
         ? this.syscallHandler.context.exitCode !== null
@@ -660,6 +666,141 @@ export class Emulator {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  public symbolicateRegister(reg: string, varName?: string): void {
+    const rootReg = this.getRootRegister(reg);
+    const name = varName || rootReg;
+    this.symbolicState.registers.set(rootReg, { type: 'variable', name });
+  }
+
+  public symbolicateMemory(address: bigint, varName: string): void {
+    this.symbolicState.memory.set(address.toString(), { type: 'variable', name: varName });
+  }
+
+  private getRootRegister(reg: string): string {
+    const r = reg.toLowerCase();
+    const info = SUB_REG_MAP[r];
+    return info ? info.gpr : r;
+  }
+
+  private stepSymbolic(inst: Instruction): void {
+    // Sync concrete register values to symbolic state (only if they aren't already symbolicated)
+    const gprs = ['rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'rsp', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15', 'rip'];
+    for (const reg of gprs) {
+      if (!this.symbolicState.registers.has(reg)) {
+        this.symbolicState.registers.set(reg, { type: 'constant', value: this.cpu.read(reg) });
+      }
+    }
+
+    const mnemonic = inst.mnemonic.toLowerCase();
+
+    // 1. Handle conditional branches
+    if (mnemonic.startsWith('j') && mnemonic !== 'jmp') {
+      const cond = this.getSymbolicBranchCond(mnemonic, this.symbolicState);
+      const ops = inst.operands && inst.operands.length > 0 ? inst.operands : this.parseOpStr(inst.opStr);
+      if (ops.length > 0) {
+        const targetAddr = this.readOperand(ops[0], 64);
+        const branchTaken = this.cpu.read('rip') === targetAddr;
+        if (branchTaken) {
+          this.symbolicState.constraints.push(cond);
+        } else {
+          this.symbolicState.constraints.push({ type: 'unary', op: 'NOT', operand: cond });
+        }
+      }
+      return;
+    }
+
+    // 2. Normal instruction execution
+    const ops = inst.operands && inst.operands.length > 0 ? inst.operands : this.parseOpStr(inst.opStr);
+    const instWithOps = { ...inst, operands: ops };
+    const translator = new IRTranslator();
+    const irInsts = translator.translateInstructions([instWithOps]);
+
+    const normalizeIROperand = (op: IROperand): IROperand => {
+      if (op.type === 'reg' && op.name) {
+        return { ...op, name: this.getRootRegister(op.name) };
+      }
+      if (op.type === 'mem' && op.name) {
+        return { ...op, name: this.getRootRegister(op.name) };
+      }
+      return op;
+    };
+
+    for (const irInst of irInsts) {
+      if (irInst.dest) {
+        irInst.dest = normalizeIROperand(irInst.dest);
+      }
+      irInst.args = irInst.args.map(normalizeIROperand);
+    }
+
+    const executor = new SymbolicExecutor();
+    for (const irInst of irInsts) {
+      const nextStates = executor.executeInstruction(irInst, this.symbolicState);
+      if (nextStates.length > 0) {
+        this.symbolicState = nextStates[0];
+      }
+    }
+  }
+
+  private getSymbolicBranchCond(mnemonic: string, state: SymbolicState): SymbolicExpr {
+    const getFlag = (f: string) => state.flags.get(f) || { type: 'variable' as const, name: f };
+    const zf = getFlag('ZF');
+    const sf = getFlag('SF');
+    const cf = getFlag('CF');
+    const of = getFlag('OF');
+
+    const not = (expr: SymbolicExpr): SymbolicExpr => ({ type: 'unary', op: 'NOT', operand: expr });
+    const and = (l: SymbolicExpr, r: SymbolicExpr): SymbolicExpr => ({ type: 'binary', op: 'AND', left: l, right: r });
+    const or = (l: SymbolicExpr, r: SymbolicExpr): SymbolicExpr => ({ type: 'binary', op: 'OR', left: l, right: r });
+    const eq = (l: SymbolicExpr, r: SymbolicExpr): SymbolicExpr => ({ type: 'binary', op: '==', left: l, right: r });
+    const neq = (l: SymbolicExpr, r: SymbolicExpr): SymbolicExpr => not(eq(l, r));
+
+    switch (mnemonic) {
+      case 'je':
+      case 'jz':
+        return zf;
+      case 'jne':
+      case 'jnz':
+        return not(zf);
+      case 'js':
+        return sf;
+      case 'jns':
+        return not(sf);
+      case 'jg':
+      case 'jnle':
+        return and(not(zf), eq(sf, of));
+      case 'jge':
+      case 'jnl':
+        return eq(sf, of);
+      case 'jl':
+      case 'jnge':
+        return neq(sf, of);
+      case 'jle':
+      case 'jng':
+        return or(zf, neq(sf, of));
+      case 'ja':
+      case 'jnbe':
+        return and(not(cf), not(zf));
+      case 'jae':
+      case 'jnb':
+        return not(cf);
+      case 'jb':
+      case 'jnae':
+      case 'jc':
+        return cf;
+      case 'jbe':
+      case 'jna':
+        return or(cf, zf);
+      case 'jnc':
+        return not(cf);
+      case 'jo':
+        return of;
+      case 'jno':
+        return not(of);
+      default:
+        return { type: 'variable', name: `cond_${mnemonic}` };
     }
   }
 }

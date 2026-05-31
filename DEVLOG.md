@@ -1907,21 +1907,11 @@ Test Files   3 failed | 28 passed (31)
 - Integrated both loaders/parsers directly into binary processor flow.
 - Created tests/hexLoader.test.ts to verify parser correctness and pipeline integration.
 
-
 ## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
 ## [2026-05-31T07:47:00+10:00] - Implemented ARM32 Thumb decoder in src/disassembler/arm32.ts
 
 ## [2026-05-31T07:48:00+10:00] - Implemented DWARF v5 string offset resolution and cross-file binary diff
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
 
 ## [2026-05-31T08:20:00+10:00] - Session 17 Handoff Document Written
 Wrote comprehensive [handoff.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/handoff.md) (Session 17 → Session 18).
@@ -1930,3 +1920,102 @@ Test count grew 690 → 777 (all passing), test files 57 → 61.
 New files: [hexLoader.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/hexLoader.ts), [z80.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/z80.ts), [m6502.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/m6502.ts), [arm32.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/arm32.ts), [dotnetIl.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/dotnetIl.ts) (untracked).
 New test files: [hexLoader.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/hexLoader.test.ts), [retro.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/retro.test.ts), [arm32.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/arm32.test.ts), [debug_dwarf.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/debug_dwarf.test.ts).
 Session 17 work staged but NOT committed — handoff instructs Session 18 to commit first.
+
+## [2026-05-31 14:55:00] - Expanded test coverage for hexLoader, z80, m6502, and arm32 decoders, adding edge cases
+- Added edge case tests for Intel HEX records 02, 03, 04, 05 and Motorola S-record S0, unsupported record types, byte count mismatches, and empty lines
+- Added edge case tests for Z80 disassembler with multiple/unused DD/FD prefixes and unfinished instructions
+- Added edge cases for 6502 disassembler covering truncated instructions and indirect addressing mode
+- Added edge cases for ARM32 and Thumb disassemblers covering branch negative offsets, SVC instructions, and truncated 16/32-bit instructions
+
+## [2026-05-31T14:55:00+10:00] Plugin API v2
+- Implemented Plugin API v2 with typed hooks, dependency graph, and versioned API in [src/analyzer/plugins.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/plugins.ts).
+- Added tests in [tests/plugins.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/plugins.test.ts).
+- Verified all 449 unit tests pass.
+
+## 2026-05-31 14:56
+- Implement Thumb 16-bit instruction support in [arm32.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/arm32.ts)
+- Add unit tests in [arm32.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/arm32.test.ts)
+- Verified all tests pass successfully
+
+- ?????????
+- ?????
+
+## [2026-05-31T14:56:20+10:00]
+- Incremental ESLint cleanup in src/analyzer/
+- Fixed async promise executor error in binaryProcessor.ts
+- Fixed unused variables, useless assignments, and regex escapes across analyzer files
+
+## [2026-05-31 14:56] - .NET IL Wiring
+- Wired dotnetIl.ts into router.ts and tested.
+
+## Session 18 - 2026-05-31T04:58:58.341Z
+- Implemented symbolic execution engine under [symbolic.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/symbolic.ts) with path tracking and constraint generation.
+- Added comprehensive tests under [symbolic.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/symbolic.test.ts) verifying correctness of operations, paths, memory and constraint modeling.
+- All test suites successfully verified and passing.
+
+## [2026-05-31 14:59] RISC-V Compressed Support
+- Implemented 16-bit compressed instruction decoding for RISC-V in src/disassembler/riscv.ts
+- Added unit tests in tests/riscv.test.ts to verify decoding correctness
+
+## [2026-05-31T14:56:57+10:00] - Resolve import hint/name table details
+
+- Enhanced [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts) to parse:
+  - hintNameTableRva in ImportEntry
+  - iltRva and iatRva in ImportEntry
+  - importAddressTableRva and importLookupTableRva in ImportTable
+- Modified [pe.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/pe.test.ts) to assert correctness of resolved properties.
+
+## [2026-05-31T14:59:50+10:00]
+- ? layout.ts [src/ui/layout.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/layout.ts) ?? tabs ????? ARIA ???
+- ? assemblyView.ts [src/ui/assemblyView.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/ui/assemblyView.ts) ????? ARIA ???
+
+## [2026-05-31 15:01] 效能評測
+- 創 [profile.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/profile.test.ts)。
+- 測 PE、ELF 析，RISC-V、.NET 譯。
+- 出時耗、瓶頸。
+
+## [2026-05-31T15:01:00+10:00]
+- Added AI-agent-friendly query bridge in [aiBridge.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/aiBridge.ts) with complete schemas.
+- Created test suite in [aiBridge.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/aiBridge.test.ts) covering multiple subsystems.
+- Verified all 12 bridge tests pass successfully.
+
+## [2026-05-31T14:59:00+10:00] ESLint Cleanup in src/parser/
+- Reduced ESLint warnings from 98 to 28.
+- Fixed unused variables, catch error parameters, and replaced any types with unknown.
+- Verified clean status of modified files.
+
+## [2026-05-31 15:02] GDB Integration Test
+Added [tests/gdbIntegration.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/gdbIntegration.test.ts) with GDBLiveConnectionSimulator and 6 unit tests passing.
+
+## [2026-05-31T15:03:30+10:00] - Integrate Symbolic Executor with Emulator
+
+### Completed:
+- Added dynamic symbolic execution concolic tracing to [emulator.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/emulator.ts).
+- Implemented register and memory symbolication functions on [Emulator](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/emulator/emulator.ts) class.
+- Unified and simplified constant base address lookups in [symbolic.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/symbolic.ts).
+- Created integration test suite in [symbolicEmulator.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/symbolicEmulator.test.ts).
+- Verified all 40 tests pass successfully.
+
+## Session 18
+
+- [2026-05-31 15:03:30] Optimized PEParser in [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts) by avoiding DataView overhead and using fast Uint8Array views for integer reads.
+- Cached TextDecoder instances to improve string decoding efficiency.
+- Verified test suite and performance profile benchmarks pass correctly.
+
+## [2026-05-31T15:07:00+10:00] DEX Debug Info and Local Variables Resolution
+- Parse debug_info_item in DexParser.
+- Resolve lines and local variables in disassembleDalvik.
+- Verify via unit tests in dex.test.ts.
+
+## [2026-05-31T15:12:00+10:00] Session 18 Handoff Document
+Wrote comprehensive Handoff.md covering:
+- 16 completed tasks with file links
+- 861/863 test status, 2 ELF PLT/GOT failures
+- Full architecture: 107 source files, 70 test files
+- Known bugs, operational rules, Session 19 roadmap
+- Quota-hit items carried forward: WASM Component Model, ARM64 NEON, UI ESLint, Java debug
+
+## [2026-05-31 21:12:14]
+- Session 18 changes committed: AI bridge symbolic executor ARM32/Thumb RISC-V C ext Mach-O fat plugin v2 GDB integration DEX debug PE optimization.
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders

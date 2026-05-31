@@ -3,7 +3,7 @@
  * Wrapper for ONNX Runtime Web and WebNN to enable offline AI explanation of decompiled functions.
  */
 
-import { AIExplanationResult, AIPattern, AIComplexity } from './ai.js';
+import { AIExplanationResult, AIPattern } from './ai.js';
 
 // --- ONNX Runtime Web Type Definitions ---
 export interface ORTTensor {
@@ -517,12 +517,12 @@ export class OnDeviceLLMManager {
     const cleanCode = code.trim();
     const lowerCode = cleanCode.toLowerCase();
 
-    let summary = `Analyzes sub-routine '${functionName}' and coordinates register/memory structures.`;
+    let summary: string;
     const functionality: string[] = [];
     const patterns: AIPattern[] = [];
-    let pseudocode = '';
-    let timeComp = 'O(N)';
-    let spaceComp = 'O(1)';
+    let pseudocode: string;
+    let timeComp: string = 'O(N)';
+    let spaceComp: string = 'O(1)';
     const suggestions: string[] = [];
 
     // Analyze specific patterns
@@ -726,7 +726,7 @@ export class OnDeviceLLMManager {
    */
   private createMockWebNN(): ML {
     return {
-      createContext: async (options?: MLContextOptions) => {
+      createContext: async (_options?: MLContextOptions) => {
         return {
           createGraphBuilder: () => {
             const createOperand = (
@@ -739,13 +739,13 @@ export class OnDeviceLLMManager {
             return {
               input: (name: string, desc: any) =>
                 createOperand(name, desc.dimensions),
-              constant: (desc: any, buffer: any) =>
+              constant: (desc: any, _buffer: any) =>
                 createOperand('constant', desc.dimensions),
               matmul: (a: any, b: any) =>
                 createOperand('matmul', [a.dimensions[0], b.dimensions[1]]),
-              add: (a: any, b: any) => createOperand('add', a.dimensions),
+              add: (a: any, _b: any) => createOperand('add', a.dimensions),
               relu: (input: any) => createOperand('relu', input.dimensions),
-              build: async (outputs: any) => {
+              build: async (_outputs: any) => {
                 return {
                   compute: async (inputs: any, outputsBuffer: any) => {
                     // Populate outputs with mock data to simulate inference completion
@@ -770,8 +770,8 @@ export class OnDeviceLLMManager {
     return {
       InferenceSession: {
         create: async (
-          modelBuffer: ArrayBuffer,
-          options?: ORTSessionOptions
+          _modelBuffer: ArrayBuffer,
+          _options?: ORTSessionOptions
         ): Promise<ORTInferenceSession> => {
           return {
             run: async (feeds: Record<string, ORTTensor>) => {

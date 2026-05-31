@@ -337,6 +337,7 @@ describe('DEX Parser Core', () => {
 });
 
 import { DisassemblerRouter } from '../src/disassembler/router.js';
+import { disassembleDalvik } from '../src/disassembler/dalvik.js';
 
 describe('DEX Router Integration', () => {
   it('should detect DEX magic bytes correctly', () => {
@@ -353,7 +354,237 @@ describe('DEX Router Integration', () => {
     const insts = router.disassemble(bytes);
     expect(insts).toBeDefined();
     expect(insts.length).toBeGreaterThan(0);
-    // Address 0,1,2,3 are the magic bytes, 4 is 0x0e (return-void)
     expect(insts.some((i) => i.mnemonic === 'return-void')).toBe(true);
   });
 });
+
+describe('DEX Debug Info and Disassembler Resolution', () => {
+  it('should parse debug info and resolve line numbers and local variables', () => {
+    const buffer = new ArrayBuffer(1024);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    // --- Header Setup ---
+    bytes.set([0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x35, 0x00], 0);
+    view.setUint32(40, 0x12345678, true); // Little Endian
+    view.setUint32(32, 1024, true);
+    view.setUint32(36, 112, true);
+
+    let currentOffset = 112;
+    const stringsData = ['LMyClass;', 'Ljava/lang/Object;', 'myMethod', 'V', 'myParam', 'myVar', 'mySignature'];
+
+    const stringIdsOff = currentOffset;
+    const stringIdsSize = stringsData.length;
+    view.setUint32(56, stringIdsSize, true);
+    view.setUint32(60, stringIdsOff, true);
+    currentOffset += stringIdsSize * 4;
+
+    const typeIdsSize = 3;
+    const typeIdsOff = currentOffset;
+    view.setUint32(64, typeIdsSize, true);
+    view.setUint32(68, typeIdsOff, true);
+    view.setUint32(typeIdsOff, 0, true);
+    view.setUint32(typeIdsOff + 4, 1, true);
+    view.setUint32(typeIdsOff + 8, 3, true);
+    currentOffset += typeIdsSize * 4;
+
+    const protoIdsSize = 1;
+    const protoIdsOff = currentOffset;
+    view.setUint32(72, protoIdsSize, true);
+    view.setUint32(76, protoIdsOff, true);
+    view.setUint32(protoIdsOff, 3, true);
+    view.setUint32(protoIdsOff + 4, 2, true);
+    view.setUint32(protoIdsOff + 8, 0, true);
+    currentOffset += 12;
+
+    view.setUint32(80, 0, true);
+    view.setUint32(84, 0, true);
+
+    const methodIdsSize = 1;
+    const methodIdsOff = currentOffset;
+    view.setUint32(88, methodIdsSize, true);
+    view.setUint32(92, methodIdsOff, true);
+    view.setUint16(methodIdsOff, 0, true);
+    view.setUint16(methodIdsOff + 2, 0, true);
+    view.setUint32(methodIdsOff + 4, 2, true);
+    currentOffset += 8;
+
+    const classDefsSize = 1;
+    const classDefsOff = currentOffset;
+    view.setUint32(96, classDefsSize, true);
+    view.setUint32(100, classDefsOff, true);
+
+    const classDataOff = 600;
+    view.setUint32(classDefsOff, 0, true);
+    view.setUint32(classDefsOff + 4, 1, true);
+    view.setUint32(classDefsOff + 8, 1, true);
+    view.setUint32(classDefsOff + 12, 0, true);
+    view.setUint32(classDefsOff + 16, 0xffffffff, true);
+    view.setUint32(classDefsOff + 20, 0, true);
+    view.setUint32(classDefsOff + 24, classDataOff, true);
+    view.setUint32(classDefsOff + 28, 0, true);
+    currentOffset += 32;
+
+    const stringDataOffsets: number[] = [];
+    stringsData.forEach((str) => {
+      stringDataOffsets.push(currentOffset);
+      const lenBytes: number[] = [];
+      let tempLen = str.length;
+      do {
+        let b = tempLen & 0x7f;
+        tempLen >>= 7;
+        if (tempLen > 0) b |= 0x80;
+        lenBytes.push(b);
+      } while (tempLen > 0);
+
+      bytes.set(lenBytes, currentOffset);
+      currentOffset += lenBytes.length;
+
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(str);
+      bytes.set(encoded, currentOffset);
+      currentOffset += encoded.length;
+
+      bytes[currentOffset] = 0;
+      currentOffset++;
+    });
+
+    stringDataOffsets.forEach((off, idx) => {
+      view.setUint32(stringIdsOff + idx * 4, off, true);
+    });
+
+    // Write class data
+    let dataOffset = classDataOff;
+    bytes[dataOffset++] = 0;
+    bytes[dataOffset++] = 0;
+    bytes[dataOffset++] = 1;
+    bytes[dataOffset++] = 0;
+
+    const codeOff = 700;
+    bytes[dataOffset++] = 0;
+    bytes[dataOffset++] = 1;
+    bytes[dataOffset++] = 0xbc;
+    bytes[dataOffset++] = 0x05;
+
+    // Code Item at 700
+    // registers_size: 4
+    // ins_size: 1
+    // outs_size: 0
+    // tries_size: 0
+    // debug_info_off: 800
+    // insns_size: 4 (8 bytes of instructions)
+    // insns: 0x000e (return-void), 0x0001 (move), 0x0000, 0x0000
+    view.setUint16(codeOff, 4, true);
+    view.setUint16(codeOff + 2, 1, true);
+    view.setUint16(codeOff + 4, 0, true);
+    view.setUint16(codeOff + 6, 0, true);
+    view.setUint32(codeOff + 8, 800, true); // debug_info_off = 800
+    view.setUint32(codeOff + 12, 4, true);
+
+    view.setUint16(codeOff + 16, 0x000e, true);
+    view.setUint16(codeOff + 18, 0x0112, true); // move v2, v1
+    view.setUint16(codeOff + 20, 0x0000, true);
+    view.setUint16(codeOff + 22, 0x0000, true);
+
+    // Debug Info at 800
+    let debugOffset = 800;
+    // line_start = 100
+    bytes[debugOffset++] = 100;
+    // parameters_size = 1
+    bytes[debugOffset++] = 1;
+    // parameter name index + 1 = 5 (strings[4] = "myParam")
+    bytes[debugOffset++] = 5;
+
+    // Bytecode sequence:
+    // 1. DBG_START_LOCAL (0x03)
+    //    register_num = 2
+    //    name_idx + 1 = 6 ("myVar")
+    //    type_idx + 1 = 1 ("LMyClass;")
+    bytes[debugOffset++] = 0x03;
+    bytes[debugOffset++] = 2;
+    bytes[debugOffset++] = 6;
+    bytes[debugOffset++] = 1;
+
+    // 2. DBG_ADVANCE_PC (0x01)
+    //    addr_diff = 1 (cuAddr becomes 1)
+    bytes[debugOffset++] = 0x01;
+    bytes[debugOffset++] = 1;
+
+    // 3. Special opcode (0x0a + 1)
+    //    adjusted_opcode = 1
+    //    addr_diff = 0
+    //    line_diff = -4 + 1 = -3
+    //    address = 1, line = 100 - 3 = 97
+    bytes[debugOffset++] = 0x0b;
+
+    // 4. DBG_START_LOCAL_EXTENDED (0x04)
+    //    register_num = 3
+    //    name_idx + 1 = 6 ("myVar")
+    //    type_idx + 1 = 1 ("LMyClass;")
+    //    sig_idx + 1 = 7 ("mySignature")
+    bytes[debugOffset++] = 0x04;
+    bytes[debugOffset++] = 3;
+    bytes[debugOffset++] = 6;
+    bytes[debugOffset++] = 1;
+    bytes[debugOffset++] = 7;
+
+    // 5. DBG_END_LOCAL (0x05)
+    //    register_num = 2
+    bytes[debugOffset++] = 0x05;
+    bytes[debugOffset++] = 2;
+
+    // 6. DBG_END_SEQUENCE (0x00)
+    bytes[debugOffset++] = 0x00;
+
+    const parsed = parseDex(buffer);
+    const method = parsed.classDefs[0].classData!.directMethods[0];
+    const debugInfo = method.codeItem!.debugInfo;
+
+    expect(debugInfo).toBeDefined();
+    expect(debugInfo!.lineStart).toBe(100);
+    expect(debugInfo!.parameterNames).toEqual(['myParam']);
+    expect(debugInfo!.lineTable).toHaveLength(1);
+    expect(debugInfo!.lineTable[0]).toEqual({ address: 1, line: 97 });
+
+    // Local variable checks
+    expect(debugInfo!.localVariables).toHaveLength(2);
+    
+    // myVar on register 2 started at address 0 and ended at address 1 (due to DBG_END_LOCAL or pc advance)
+    const var2 = debugInfo!.localVariables.find(v => v.register === 2);
+    expect(var2).toBeDefined();
+    expect(var2!.name).toBe('myVar');
+    expect(var2!.type).toBe('LMyClass;');
+    expect(var2!.startAddress).toBe(0);
+    expect(var2!.endAddress).toBe(1);
+
+    // myVar on register 3 started at address 1 and is active till the end
+    const var3 = debugInfo!.localVariables.find(v => v.register === 3);
+    expect(var3).toBeDefined();
+    expect(var3!.name).toBe('myVar');
+    expect(var3!.type).toBe('LMyClass;');
+    expect(var3!.signature).toBe('mySignature');
+    expect(var3!.startAddress).toBe(1);
+    expect(var3!.endAddress).toBeUndefined();
+
+    // Verify disassembleDalvik resolution
+    const instructions = disassembleDalvik(new Uint8Array(buffer.slice(codeOff + 16, codeOff + 20)), 0, debugInfo);
+    expect(instructions).toHaveLength(3);
+
+    // Inst 0: address 0, line should be line_start = 100
+    expect(instructions[0].line).toBe(100);
+    // register 2 is active at address 0
+    expect(instructions[0].localVariables).toHaveLength(1);
+    expect(instructions[0].localVariables![0].reg).toBe('v2');
+    expect(instructions[0].localVariables![0].name).toBe('myVar');
+
+    // Inst 2: address 2 (const/4 is size 2, starts at byte 2 => cuAddr = 1)
+    expect(instructions[2].address).toBe(2);
+    expect(instructions[2].line).toBe(97);
+    // register 2 is NOT active at address 1, register 3 is active at address 1
+    expect(instructions[2].localVariables).toHaveLength(1);
+    expect(instructions[2].localVariables![0].reg).toBe('v3');
+    expect(instructions[2].localVariables![0].name).toBe('myVar');
+    expect(instructions[2].localVariables![0].signature).toBe('mySignature');
+  });
+});
+

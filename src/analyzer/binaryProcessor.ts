@@ -1709,7 +1709,7 @@ export async function processBinaryWithWorker(
   fileName: string,
   onProgress: (percent: number, status: string) => void | Promise<void>
 ): Promise<ProcessedBinaryResult> {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
     try {
       if (typeof Worker === 'undefined') {
         throw new Error('Worker is not supported in this environment.');
@@ -1738,12 +1738,9 @@ export async function processBinaryWithWorker(
       worker.postMessage({ file, fileName });
     } catch (err) {
       console.warn('Failed to start Web Worker, falling back to main-thread processing:', err);
-      try {
-        const result = await processBinaryFileChunked(file, fileName, onProgress);
-        resolve(result);
-      } catch (fallbackErr) {
-        reject(fallbackErr);
-      }
+      processBinaryFileChunked(file, fileName, onProgress)
+        .then(resolve)
+        .catch(reject);
     }
   });
 }

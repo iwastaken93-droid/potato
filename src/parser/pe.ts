@@ -94,11 +94,16 @@ export interface ImportEntry {
   name?: string;
   ordinal?: number;
   hint?: number;
+  hintNameTableRva?: number;
+  iltRva?: number;
+  iatRva?: number;
 }
 
 export interface ImportTable {
   dllName: string;
   imports: ImportEntry[];
+  importAddressTableRva?: number;
+  importLookupTableRva?: number;
 }
 
 export interface ParsedResource {
@@ -136,35 +141,63 @@ export interface ParsedPE {
 export class PEParser {
   private view: DataView;
   private buffer: ArrayBuffer;
+  private bytes: Uint8Array;
+  private decoder = new TextDecoder();
+  private utf16Decoder = new TextDecoder('utf-16le');
 
   constructor(buffer: ArrayBuffer) {
     this.buffer = buffer;
     this.view = new DataView(buffer);
+    this.bytes = new Uint8Array(buffer);
   }
 
   public parse(): ParsedPE {
+    const bytes = this.bytes;
+    const len = bytes.length;
+
+    // Fast helper functions for reading little-endian values
+    const readU8 = (offset: number): number => bytes[offset];
+    const readU16 = (offset: number): number => bytes[offset] | (bytes[offset + 1] << 8);
+    const readU32 = (offset: number): number =>
+      (bytes[offset] |
+        (bytes[offset + 1] << 8) |
+        (bytes[offset + 2] << 16) |
+        (bytes[offset + 3] << 24)) >>>
+      0;
+    const readU64 = (offset: number): bigint => {
+      const low =
+        (bytes[offset] |
+          (bytes[offset + 1] << 8) |
+          (bytes[offset + 2] << 16) |
+          (bytes[offset + 3] << 24)) >>>
+        0;
+      const high =
+        (bytes[offset + 4] |
+          (bytes[offset + 5] << 8) |
+          (bytes[offset + 6] << 16) |
+          (bytes[offset + 7] << 24)) >>>
+        0;
+      return BigInt(low) | (BigInt(high) << 32n);
+    };
+
     // 1. DOS Header
-    if (this.view.byteLength < 64) {
+    if (len < 64) {
       throw new Error('File too small to contain a valid DOS header');
     }
 
-    const mzMagic = String.fromCharCode(
-      this.view.getUint8(0),
-      this.view.getUint8(1)
-    );
-    if (mzMagic !== 'MZ') {
+    if (bytes[0] !== 0x4d || bytes[1] !== 0x5a) { // 'M', 'Z'
       throw new Error('Invalid DOS MZ header signature');
     }
 
-    const e_lfanew = this.view.getUint32(60, true);
-    const dosHeader: DosHeader = { magic: mzMagic, e_lfanew };
+    const e_lfanew = readU32(60);
+    const dosHeader: DosHeader = { magic: 'MZ', e_lfanew };
 
     // 2. PE Signature
-    if (e_lfanew + 4 > this.view.byteLength) {
+    if (e_lfanew + 4 > len) {
       throw new Error('PE header offset points outside of file limits');
     }
 
-    const peSig = this.view.getUint32(e_lfanew, true);
+    const peSig = readU32(e_lfanew);
     if (peSig !== 0x00004550) {
       // "PE\0\0"
       throw new Error('Invalid PE signature');
@@ -172,27 +205,27 @@ export class PEParser {
 
     // 3. COFF File Header
     const coffOffset = e_lfanew + 4;
-    if (coffOffset + 20 > this.view.byteLength) {
+    if (coffOffset + 20 > len) {
       throw new Error('COFF file header points outside of file limits');
     }
 
     const coffHeader: CoffHeader = {
-      machine: this.view.getUint16(coffOffset, true),
-      numberOfSections: this.view.getUint16(coffOffset + 2, true),
-      timeDateStamp: this.view.getUint32(coffOffset + 4, true),
-      pointerToSymbolTable: this.view.getUint32(coffOffset + 8, true),
-      numberOfSymbols: this.view.getUint32(coffOffset + 12, true),
-      sizeOfOptionalHeader: this.view.getUint16(coffOffset + 16, true),
-      characteristics: this.view.getUint16(coffOffset + 18, true),
+      machine: readU16(coffOffset),
+      numberOfSections: readU16(coffOffset + 2),
+      timeDateStamp: readU32(coffOffset + 4),
+      pointerToSymbolTable: readU32(coffOffset + 8),
+      numberOfSymbols: readU32(coffOffset + 12),
+      sizeOfOptionalHeader: readU16(coffOffset + 16),
+      characteristics: readU16(coffOffset + 18),
     };
 
     // 4. Optional Header
     const optionalOffset = coffOffset + 20;
-    if (optionalOffset + 2 > this.view.byteLength) {
+    if (optionalOffset + 2 > len) {
       throw new Error('Optional header magic points outside of file limits');
     }
 
-    const magic = this.view.getUint16(optionalOffset, true);
+    const magic = readU16(optionalOffset);
     const is32Bit = magic === 0x10b; // PE32: 0x10b, PE32+: 0x20b
     if (magic !== 0x10b && magic !== 0x20b) {
       throw new Error(
@@ -201,55 +234,46 @@ export class PEParser {
     }
 
     // Parse Standard Fields
-    const majorLinkerVersion = this.view.getUint8(optionalOffset + 2);
-    const minorLinkerVersion = this.view.getUint8(optionalOffset + 3);
-    const sizeOfCode = this.view.getUint32(optionalOffset + 4, true);
-    const sizeOfInitializedData = this.view.getUint32(optionalOffset + 8, true);
-    const sizeOfUninitializedData = this.view.getUint32(
-      optionalOffset + 12,
-      true
-    );
-    const addressOfEntryPoint = this.view.getUint32(optionalOffset + 16, true);
-    const baseOfCode = this.view.getUint32(optionalOffset + 20, true);
+    const majorLinkerVersion = readU8(optionalOffset + 2);
+    const minorLinkerVersion = readU8(optionalOffset + 3);
+    const sizeOfCode = readU32(optionalOffset + 4);
+    const sizeOfInitializedData = readU32(optionalOffset + 8);
+    const sizeOfUninitializedData = readU32(optionalOffset + 12);
+    const addressOfEntryPoint = readU32(optionalOffset + 16);
+    const baseOfCode = readU32(optionalOffset + 20);
 
     let baseOfData: number | undefined;
     let nextOffset = optionalOffset + 24;
 
     if (is32Bit) {
-      baseOfData = this.view.getUint32(optionalOffset + 24, true);
+      baseOfData = readU32(optionalOffset + 24);
       nextOffset = optionalOffset + 28;
     }
 
     // Parse Windows-Specific Fields
     let imageBase: bigint | number;
     if (is32Bit) {
-      imageBase = this.view.getUint32(nextOffset, true);
+      imageBase = readU32(nextOffset);
       nextOffset += 4;
     } else {
-      imageBase = this.view.getBigUint64(nextOffset, true);
+      imageBase = readU64(nextOffset);
       nextOffset += 8;
     }
 
-    const sectionAlignment = this.view.getUint32(nextOffset, true);
-    const fileAlignment = this.view.getUint32(nextOffset + 4, true);
-    const majorOperatingSystemVersion = this.view.getUint16(
-      nextOffset + 8,
-      true
-    );
-    const minorOperatingSystemVersion = this.view.getUint16(
-      nextOffset + 10,
-      true
-    );
-    const majorImageVersion = this.view.getUint16(nextOffset + 12, true);
-    const minorImageVersion = this.view.getUint16(nextOffset + 14, true);
-    const majorSubsystemVersion = this.view.getUint16(nextOffset + 16, true);
-    const minorSubsystemVersion = this.view.getUint16(nextOffset + 18, true);
-    const win32VersionValue = this.view.getUint32(nextOffset + 20, true);
-    const sizeOfImage = this.view.getUint32(nextOffset + 24, true);
-    const sizeOfHeaders = this.view.getUint32(nextOffset + 28, true);
-    const checkSum = this.view.getUint32(nextOffset + 32, true);
-    const subsystem = this.view.getUint16(nextOffset + 36, true);
-    const dllCharacteristics = this.view.getUint16(nextOffset + 38, true);
+    const sectionAlignment = readU32(nextOffset);
+    const fileAlignment = readU32(nextOffset + 4);
+    const majorOperatingSystemVersion = readU16(nextOffset + 8);
+    const minorOperatingSystemVersion = readU16(nextOffset + 10);
+    const majorImageVersion = readU16(nextOffset + 12);
+    const minorImageVersion = readU16(nextOffset + 14);
+    const majorSubsystemVersion = readU16(nextOffset + 16);
+    const minorSubsystemVersion = readU16(nextOffset + 18);
+    const win32VersionValue = readU32(nextOffset + 20);
+    const sizeOfImage = readU32(nextOffset + 24);
+    const sizeOfHeaders = readU32(nextOffset + 28);
+    const checkSum = readU32(nextOffset + 32);
+    const subsystem = readU16(nextOffset + 36);
+    const dllCharacteristics = readU16(nextOffset + 38);
     nextOffset += 40;
 
     let sizeOfStackReserve: bigint | number;
@@ -258,32 +282,33 @@ export class PEParser {
     let sizeOfHeapCommit: bigint | number;
 
     if (is32Bit) {
-      sizeOfStackReserve = this.view.getUint32(nextOffset, true);
-      sizeOfStackCommit = this.view.getUint32(nextOffset + 4, true);
-      sizeOfHeapReserve = this.view.getUint32(nextOffset + 8, true);
-      sizeOfHeapCommit = this.view.getUint32(nextOffset + 12, true);
+      sizeOfStackReserve = readU32(nextOffset);
+      sizeOfStackCommit = readU32(nextOffset + 4);
+      sizeOfHeapReserve = readU32(nextOffset + 8);
+      sizeOfHeapCommit = readU32(nextOffset + 12);
       nextOffset += 16;
     } else {
-      sizeOfStackReserve = this.view.getBigUint64(nextOffset, true);
-      sizeOfStackCommit = this.view.getBigUint64(nextOffset + 8, true);
-      sizeOfHeapReserve = this.view.getBigUint64(nextOffset + 16, true);
-      sizeOfHeapCommit = this.view.getBigUint64(nextOffset + 24, true);
+      sizeOfStackReserve = readU64(nextOffset);
+      sizeOfStackCommit = readU64(nextOffset + 8);
+      sizeOfHeapReserve = readU64(nextOffset + 16);
+      sizeOfHeapCommit = readU64(nextOffset + 24);
       nextOffset += 32;
     }
 
-    const loaderFlags = this.view.getUint32(nextOffset, true);
-    const numberOfRvaAndSizes = this.view.getUint32(nextOffset + 4, true);
+    const loaderFlags = readU32(nextOffset);
+    const numberOfRvaAndSizes = readU32(nextOffset + 4);
     nextOffset += 8;
 
     // Parse Data Directories
     const dataDirectories: DataDirectory[] = [];
+    const maxOptionalOffset = optionalOffset + coffHeader.sizeOfOptionalHeader;
     for (let i = 0; i < numberOfRvaAndSizes; i++) {
-      if (nextOffset + 8 > optionalOffset + coffHeader.sizeOfOptionalHeader) {
+      if (nextOffset + 8 > maxOptionalOffset) {
         break;
       }
       dataDirectories.push({
-        virtualAddress: this.view.getUint32(nextOffset, true),
-        size: this.view.getUint32(nextOffset + 4, true),
+        virtualAddress: readU32(nextOffset),
+        size: readU32(nextOffset + 4),
       });
       nextOffset += 8;
     }
@@ -323,63 +348,61 @@ export class PEParser {
     };
 
     // 5. Section Headers
-    // Offset of section headers starts immediately after the optional header
-    const sectionHeadersOffset =
-      optionalOffset + coffHeader.sizeOfOptionalHeader;
+    const sectionHeadersOffset = optionalOffset + coffHeader.sizeOfOptionalHeader;
     const sections: SectionHeader[] = [];
+    const numSections = coffHeader.numberOfSections;
 
-    for (let i = 0; i < coffHeader.numberOfSections; i++) {
+    for (let i = 0; i < numSections; i++) {
       const offset = sectionHeadersOffset + i * 40;
-      if (offset + 40 > this.view.byteLength) {
+      if (offset + 40 > len) {
         break;
       }
 
       // Parse 8-byte name
-      const nameBytes: number[] = [];
+      let name = '';
       for (let j = 0; j < 8; j++) {
-        const b = this.view.getUint8(offset + j);
-        if (b !== 0) nameBytes.push(b);
+        const b = bytes[offset + j];
+        if (b === 0) break;
+        name += String.fromCharCode(b);
       }
-      const name = String.fromCharCode(...nameBytes);
 
       sections.push({
         name,
-        virtualSize: this.view.getUint32(offset + 8, true),
-        virtualAddress: this.view.getUint32(offset + 12, true),
-        sizeOfRawData: this.view.getUint32(offset + 16, true),
-        pointerToRawData: this.view.getUint32(offset + 20, true),
-        pointerToRelocations: this.view.getUint32(offset + 24, true),
-        pointerToLinenumbers: this.view.getUint32(offset + 28, true),
-        numberOfRelocations: this.view.getUint16(offset + 32, true),
-        numberOfLinenumbers: this.view.getUint16(offset + 34, true),
-        characteristics: this.view.getUint32(offset + 36, true),
+        virtualSize: readU32(offset + 8),
+        virtualAddress: readU32(offset + 12),
+        sizeOfRawData: readU32(offset + 16),
+        pointerToRawData: readU32(offset + 20),
+        pointerToRelocations: readU32(offset + 24),
+        pointerToLinenumbers: readU32(offset + 28),
+        numberOfRelocations: readU16(offset + 32),
+        numberOfLinenumbers: readU16(offset + 34),
+        characteristics: readU32(offset + 36),
       });
     }
 
     // Helpers for RVA to Offset translation
     const rvaToOffset = (rva: number): number => {
-      for (const section of sections) {
-        if (
-          rva >= section.virtualAddress &&
-          rva <
-            section.virtualAddress +
-              Math.max(section.virtualSize, section.sizeOfRawData)
-        ) {
-          return rva - section.virtualAddress + section.pointerToRawData;
+      const sectLen = sections.length;
+      for (let i = 0; i < sectLen; i++) {
+        const section = sections[i];
+        const va = section.virtualAddress;
+        const vs = section.virtualSize;
+        const sd = section.sizeOfRawData;
+        const limit = va + (vs > sd ? vs : sd);
+        if (rva >= va && rva < limit) {
+          return rva - va + section.pointerToRawData;
         }
       }
       return 0;
     };
 
     const readString = (offset: number): string => {
-      const bytes: number[] = [];
-      let currentOffset = offset;
-      while (currentOffset < this.view.byteLength) {
-        const b = this.view.getUint8(currentOffset++);
-        if (b === 0) break;
-        bytes.push(b);
+      let end = offset;
+      while (end < len && bytes[end] !== 0) {
+        end++;
       }
-      return String.fromCharCode(...bytes);
+      if (end === offset) return '';
+      return this.decoder.decode(bytes.subarray(offset, end));
     };
 
     // 6. Parse Exports (Directory 0)
@@ -390,28 +413,19 @@ export class PEParser {
 
       if (
         exportDirOffset !== 0 &&
-        exportDirOffset + 40 <= this.view.byteLength
+        exportDirOffset + 40 <= len
       ) {
-        const characteristics = this.view.getUint32(exportDirOffset, true);
-        const timeDateStamp = this.view.getUint32(exportDirOffset + 4, true);
-        const majorVersion = this.view.getUint16(exportDirOffset + 8, true);
-        const minorVersion = this.view.getUint16(exportDirOffset + 10, true);
-        const nameRva = this.view.getUint32(exportDirOffset + 12, true);
-        const ordinalBase = this.view.getUint32(exportDirOffset + 16, true);
-        const numberOfFunctions = this.view.getUint32(
-          exportDirOffset + 20,
-          true
-        );
-        const numberOfNames = this.view.getUint32(exportDirOffset + 24, true);
-        const addressOfFunctions = this.view.getUint32(
-          exportDirOffset + 28,
-          true
-        );
-        const addressOfNames = this.view.getUint32(exportDirOffset + 32, true);
-        const addressOfNameOrdinals = this.view.getUint32(
-          exportDirOffset + 36,
-          true
-        );
+        const characteristics = readU32(exportDirOffset);
+        const timeDateStamp = readU32(exportDirOffset + 4);
+        const majorVersion = readU16(exportDirOffset + 8);
+        const minorVersion = readU16(exportDirOffset + 10);
+        const nameRva = readU32(exportDirOffset + 12);
+        const ordinalBase = readU32(exportDirOffset + 16);
+        const numberOfFunctions = readU32(exportDirOffset + 20);
+        const numberOfNames = readU32(exportDirOffset + 24);
+        const addressOfFunctions = readU32(exportDirOffset + 28);
+        const addressOfNames = readU32(exportDirOffset + 32);
+        const addressOfNameOrdinals = readU32(exportDirOffset + 36);
 
         const dllName = nameRva ? readString(rvaToOffset(nameRva)) : '';
 
@@ -424,7 +438,7 @@ export class PEParser {
         // Parse functions first
         if (funcOffset !== 0) {
           for (let i = 0; i < numberOfFunctions; i++) {
-            const funcRva = this.view.getUint32(funcOffset + i * 4, true);
+            const funcRva = readU32(funcOffset + i * 4);
             if (funcRva === 0) continue; // Unused / gap in ordinals
 
             const ordinal = ordinalBase + i;
@@ -450,14 +464,8 @@ export class PEParser {
         // Map names to ordinals/functions
         if (nameTableOffset !== 0 && ordinalTableOffset !== 0) {
           for (let i = 0; i < numberOfNames; i++) {
-            const nameStringRva = this.view.getUint32(
-              nameTableOffset + i * 4,
-              true
-            );
-            const ordinalIdx = this.view.getUint16(
-              ordinalTableOffset + i * 2,
-              true
-            );
+            const nameStringRva = readU32(nameTableOffset + i * 4);
+            const ordinalIdx = readU16(ordinalTableOffset + i * 2);
 
             const nameStr = nameStringRva
               ? readString(rvaToOffset(nameStringRva))
@@ -489,12 +497,10 @@ export class PEParser {
       let importDirOffset = rvaToOffset(dataDirectories[1].virtualAddress);
 
       if (importDirOffset !== 0) {
-        while (importDirOffset + 20 <= this.view.byteLength) {
-          const originalFirstThunk = this.view.getUint32(importDirOffset, true);
-          const timeDateStamp = this.view.getUint32(importDirOffset + 4, true);
-          const forwarderChain = this.view.getUint32(importDirOffset + 8, true);
-          const nameRva = this.view.getUint32(importDirOffset + 12, true);
-          const firstThunk = this.view.getUint32(importDirOffset + 16, true);
+        while (importDirOffset + 20 <= len) {
+          const originalFirstThunk = readU32(importDirOffset);
+          const nameRva = readU32(importDirOffset + 12);
+          const firstThunk = readU32(importDirOffset + 16);
 
           if (originalFirstThunk === 0 && firstThunk === 0 && nameRva === 0) {
             break; // Null descriptor indicates end of import table
@@ -510,44 +516,72 @@ export class PEParser {
 
           if (thunkOffset !== 0) {
             if (is32Bit) {
-              while (thunkOffset + 4 <= this.view.byteLength) {
-                const val = this.view.getUint32(thunkOffset, true);
+              let idx = 0;
+              while (thunkOffset + 4 <= len) {
+                const val = readU32(thunkOffset);
                 if (val === 0) break;
+
+                const iltRva = originalFirstThunk !== 0 ? originalFirstThunk + idx * 4 : undefined;
+                const iatRva = firstThunk !== 0 ? firstThunk + idx * 4 : undefined;
 
                 const isOrdinal = (val & 0x80000000) !== 0;
                 if (isOrdinal) {
                   importEntries.push({
                     ordinal: val & 0xffff,
+                    iltRva,
+                    iatRva,
                   });
                 } else {
-                  const nameOffset = rvaToOffset(val & 0x7fffffff);
+                  const hntRva = val & 0x7fffffff;
+                  const nameOffset = rvaToOffset(hntRva);
                   if (nameOffset !== 0) {
-                    const hint = this.view.getUint16(nameOffset, true);
+                    const hint = readU16(nameOffset);
                     const name = readString(nameOffset + 2);
-                    importEntries.push({ hint, name });
+                    importEntries.push({
+                      hint,
+                      name,
+                      hintNameTableRva: hntRva,
+                      iltRva,
+                      iatRva,
+                    });
                   }
                 }
                 thunkOffset += 4;
+                idx++;
               }
             } else {
-              while (thunkOffset + 8 <= this.view.byteLength) {
-                const val = this.view.getBigUint64(thunkOffset, true);
+              let idx = 0;
+              while (thunkOffset + 8 <= len) {
+                const val = readU64(thunkOffset);
                 if (val === 0n) break;
+
+                const iltRva = originalFirstThunk !== 0 ? originalFirstThunk + idx * 8 : undefined;
+                const iatRva = firstThunk !== 0 ? firstThunk + idx * 8 : undefined;
 
                 const isOrdinal = (val & 0x8000000000000000n) !== 0n;
                 if (isOrdinal) {
                   importEntries.push({
                     ordinal: Number(val & 0xffffn),
+                    iltRva,
+                    iatRva,
                   });
                 } else {
-                  const nameOffset = rvaToOffset(Number(val & 0x7fffffffn));
+                  const hntRva = Number(val & 0x7fffffffn);
+                  const nameOffset = rvaToOffset(hntRva);
                   if (nameOffset !== 0) {
-                    const hint = this.view.getUint16(nameOffset, true);
+                    const hint = readU16(nameOffset);
                     const name = readString(nameOffset + 2);
-                    importEntries.push({ hint, name });
+                    importEntries.push({
+                      hint,
+                      name,
+                      hintNameTableRva: hntRva,
+                      iltRva,
+                      iatRva,
+                    });
                   }
                 }
                 thunkOffset += 8;
+                idx++;
               }
             }
           }
@@ -555,6 +589,8 @@ export class PEParser {
           imports.push({
             dllName,
             imports: importEntries,
+            importAddressTableRva: firstThunk !== 0 ? firstThunk : undefined,
+            importLookupTableRva: originalFirstThunk !== 0 ? originalFirstThunk : undefined,
           });
 
           importDirOffset += 20;
@@ -606,18 +642,12 @@ export class PEParser {
           path: (string | number)[]
         ): ParsedResource[] => {
           const absoluteDirOffset = resourceStartOffset + dirOffset;
-          if (absoluteDirOffset + 16 > this.view.byteLength) {
+          if (absoluteDirOffset + 16 > len) {
             return [];
           }
 
-          const numberOfNamedEntries = this.view.getUint16(
-            absoluteDirOffset + 12,
-            true
-          );
-          const numberOfIdEntries = this.view.getUint16(
-            absoluteDirOffset + 14,
-            true
-          );
+          const numberOfNamedEntries = readU16(absoluteDirOffset + 12);
+          const numberOfIdEntries = readU16(absoluteDirOffset + 14);
           const totalEntries = numberOfNamedEntries + numberOfIdEntries;
 
           const results: ParsedResource[] = [];
@@ -625,36 +655,34 @@ export class PEParser {
 
           for (let i = 0; i < totalEntries; i++) {
             const absoluteEntryOffset = resourceStartOffset + entryOffset;
-            if (absoluteEntryOffset + 8 > this.view.byteLength) {
+            if (absoluteEntryOffset + 8 > len) {
               break;
             }
 
-            const nameOffsetOrId = this.view.getUint32(
-              absoluteEntryOffset,
-              true
-            );
-            const offsetToDataOrDirectory = this.view.getUint32(
-              absoluteEntryOffset + 4,
-              true
-            );
+            const nameOffsetOrId = readU32(absoluteEntryOffset);
+            const offsetToDataOrDirectory = readU32(absoluteEntryOffset + 4);
 
             // Parse Name/ID
             let nameOrId: string | number;
             if ((nameOffsetOrId & 0x80000000) !== 0) {
               const stringOffset = nameOffsetOrId & 0x7fffffff;
               const absoluteStrOffset = resourceStartOffset + stringOffset;
-              if (absoluteStrOffset + 2 <= this.view.byteLength) {
-                const length = this.view.getUint16(absoluteStrOffset, true);
-                const chars: string[] = [];
-                for (let j = 0; j < length; j++) {
-                  const charOffset = absoluteStrOffset + 2 + j * 2;
-                  if (charOffset + 2 <= this.view.byteLength) {
-                    chars.push(
-                      String.fromCharCode(this.view.getUint16(charOffset, true))
-                    );
+              if (absoluteStrOffset + 2 <= len) {
+                const length = readU16(absoluteStrOffset);
+                const charOffset = absoluteStrOffset + 2;
+                if (charOffset + length * 2 <= len) {
+                  try {
+                    nameOrId = this.utf16Decoder.decode(bytes.subarray(charOffset, charOffset + length * 2));
+                  } catch {
+                    const tempChars: string[] = [];
+                    for (let j = 0; j < length; j++) {
+                      tempChars.push(String.fromCharCode(readU16(charOffset + j * 2)));
+                    }
+                    nameOrId = tempChars.join('');
                   }
+                } else {
+                  nameOrId = `Offset_0x${stringOffset.toString(16)}`;
                 }
-                nameOrId = chars.join('');
               } else {
                 nameOrId = `Offset_0x${stringOffset.toString(16)}`;
               }
@@ -671,20 +699,14 @@ export class PEParser {
               );
             } else {
               const absoluteDataEntryOffset = resourceStartOffset + subOffset;
-              if (absoluteDataEntryOffset + 16 <= this.view.byteLength) {
-                const dataRva = this.view.getUint32(
-                  absoluteDataEntryOffset,
-                  true
-                );
-                const size = this.view.getUint32(
-                  absoluteDataEntryOffset + 4,
-                  true
-                );
+              if (absoluteDataEntryOffset + 16 <= len) {
+                const dataRva = readU32(absoluteDataEntryOffset);
+                const size = readU32(absoluteDataEntryOffset + 4);
 
                 const fileOffset = rvaToOffset(dataRva);
                 if (
                   fileOffset !== 0 &&
-                  fileOffset + size <= this.view.byteLength
+                  fileOffset + size <= len
                 ) {
                   const dataBytes = new Uint8Array(
                     this.buffer,
@@ -720,11 +742,14 @@ export class PEParser {
         const manifestResources = allResources.filter((r) => r.type === 24);
         for (const r of manifestResources) {
           try {
-            const text = new TextDecoder('utf-8').decode(r.data);
-            manifests.push(text);
-          } catch (e) {
-            const text = String.fromCharCode(...Array.from(r.data));
-            manifests.push(text);
+            manifests.push(this.decoder.decode(r.data));
+          } catch {
+            const tempChars: string[] = [];
+            const rDataLen = r.data.length;
+            for (let k = 0; k < rDataLen; k++) {
+              tempChars.push(String.fromCharCode(r.data[k]));
+            }
+            manifests.push(tempChars.join(''));
           }
         }
 
@@ -736,20 +761,15 @@ export class PEParser {
             const blockId = r.name;
             const stringIdBase = (blockId - 1) * 16;
             let offset = 0;
+            const rDataLen = r.data.length;
             for (let i = 0; i < 16; i++) {
-              if (offset + 2 > r.data.length) break;
-              const len = r.data[offset] | (r.data[offset + 1] << 8);
+              if (offset + 2 > rDataLen) break;
+              const lenStr = r.data[offset] | (r.data[offset + 1] << 8);
               offset += 2;
-              if (len > 0) {
-                if (offset + len * 2 > r.data.length) break;
-                const chars: string[] = [];
-                for (let j = 0; j < len; j++) {
-                  const charVal =
-                    r.data[offset + j * 2] | (r.data[offset + j * 2 + 1] << 8);
-                  chars.push(String.fromCharCode(charVal));
-                }
-                strings[stringIdBase + i] = chars.join('');
-                offset += len * 2;
+              if (lenStr > 0) {
+                if (offset + lenStr * 2 > rDataLen) break;
+                strings[stringIdBase + i] = this.utf16Decoder.decode(r.data.subarray(offset, offset + lenStr * 2));
+                offset += lenStr * 2;
               }
             }
           }
@@ -786,13 +806,13 @@ export class PEParser {
 
       if (
         tlsDirOffset !== 0 &&
-        tlsDirOffset + (is32Bit ? 24 : 40) <= this.view.byteLength
+        tlsDirOffset + (is32Bit ? 24 : 40) <= len
       ) {
         let rawAddressOfCallbacks: bigint | number;
         if (is32Bit) {
-          rawAddressOfCallbacks = this.view.getUint32(tlsDirOffset + 12, true);
+          rawAddressOfCallbacks = readU32(tlsDirOffset + 12);
         } else {
-          rawAddressOfCallbacks = this.view.getBigUint64(tlsDirOffset + 24, true);
+          rawAddressOfCallbacks = readU64(tlsDirOffset + 24);
         }
 
         const callbacks: number[] = [];
@@ -805,8 +825,8 @@ export class PEParser {
           let thunkOffset = rvaToOffset(callbacksRva);
           if (thunkOffset !== 0) {
             if (is32Bit) {
-              while (thunkOffset + 4 <= this.view.byteLength) {
-                const val = this.view.getUint32(thunkOffset, true);
+              while (thunkOffset + 4 <= len) {
+                const val = readU32(thunkOffset);
                 if (val === 0) break;
                 const callbackRva =
                   typeof imageBase === 'bigint'
@@ -816,8 +836,8 @@ export class PEParser {
                 thunkOffset += 4;
               }
             } else {
-              while (thunkOffset + 8 <= this.view.byteLength) {
-                const val = this.view.getBigUint64(thunkOffset, true);
+              while (thunkOffset + 8 <= len) {
+                const val = readU64(thunkOffset);
                 if (val === 0n) break;
                 const callbackRva =
                   typeof imageBase === 'bigint'

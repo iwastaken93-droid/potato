@@ -11,6 +11,8 @@ import { disassemblePpc } from './ppc.js';
 import { disassembleSparc } from './sparc.js';
 import { disassembleZ80 } from './z80.js';
 import { disassemble6502 } from './m6502.js';
+import { disassembleCil } from './dotnetIl.js';
+import { DexDebugInfo } from '../parser/dex.js';
 
 
 /**
@@ -29,7 +31,9 @@ export type Architecture =
   | 'ppc'
   | 'sparc'
   | 'z80'
-  | 'm6502';
+  | 'm6502'
+  | 'cil'
+  | 'dotnetIl';
 
 /**
  * Metadata configuration for disassembly.
@@ -39,6 +43,7 @@ export interface DisassemblyMetadata {
   baseAddress?: number;
   entryPoint?: number;
   useCapstoneWasm?: boolean;
+  debugInfo?: DexDebugInfo | null;
 }
 
 /**
@@ -97,9 +102,11 @@ export class DisassemblerRouter {
       const magicBE =
         ((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]) >>> 0;
 
-      if (magicBE === 0xcafebabe || magicBE === 0xbebafeca) {
+      const isFat32 = magicBE === 0xcafebabe || magicBE === 0xbebafeca;
+      const isFat64 = magicBE === 0xcafebabf || magicBE === 0xbfbafeca;
+      if (isFat32 || isFat64) {
         // Fat/Universal binary
-        const isFatBE = magicBE === 0xcafebabe;
+        const isFatBE = magicBE === 0xcafebabe || magicBE === 0xcafebabf;
         if (data.length >= 8) {
           const nfat =
             (isFatBE
@@ -110,8 +117,9 @@ export class DisassemblerRouter {
                 (data[7] << 24)) >>> 0;
 
           let offset = 8;
+          const archSize = isFat64 ? 32 : 20;
           for (let i = 0; i < nfat; i++) {
-            if (offset + 20 <= data.length) {
+            if (offset + archSize <= data.length) {
               const cputype =
                 (isFatBE
                   ? (data[offset] << 24) |
@@ -125,7 +133,7 @@ export class DisassemblerRouter {
 
               if (cputype === 0x01000007 || cputype === 7) return 'x86_64';
               if (cputype === 0x0100000c || cputype === 12) return 'arm';
-              offset += 20;
+              offset += archSize;
             }
           }
         }
@@ -227,7 +235,7 @@ export class DisassemblerRouter {
     }
 
     // Detect Mach-O Fat/Universal Architecture
-    const isFat =
+    const isFat32 =
       (data[0] === 0xca &&
         data[1] === 0xfe &&
         data[2] === 0xba &&
@@ -236,8 +244,18 @@ export class DisassemblerRouter {
         data[1] === 0xba &&
         data[2] === 0xfe &&
         data[3] === 0xca);
+    const isFat64 =
+      (data[0] === 0xca &&
+        data[1] === 0xfe &&
+        data[2] === 0xba &&
+        data[3] === 0xbf) ||
+      (data[0] === 0xbf &&
+        data[1] === 0xba &&
+        data[2] === 0xfe &&
+        data[3] === 0xca);
+    const isFat = isFat32 || isFat64;
     if (isFat) {
-      const isLittleEndian = data[0] === 0xbe;
+      const isLittleEndian = data[0] === 0xbe || data[0] === 0xbf;
       let cputype = 0;
       if (isLittleEndian) {
         cputype =
@@ -340,7 +358,7 @@ export class DisassemblerRouter {
         return disassembleArm(data, baseAddress);
       }
       case 'dex':
-        return disassembleDalvik(data, baseAddress);
+        return disassembleDalvik(data, baseAddress, metadata?.debugInfo);
       case 'riscv':
         return disassembleRiscv(data, baseAddress);
       case 'mips':
@@ -355,6 +373,9 @@ export class DisassemblerRouter {
         return disassembleZ80(data, baseAddress);
       case 'm6502':
         return disassemble6502(data, baseAddress);
+      case 'cil':
+      case 'dotnetIl':
+        return disassembleCil(data, baseAddress);
       case 'x86_64':
       default:
         return disassembleX86(data, baseAddress);

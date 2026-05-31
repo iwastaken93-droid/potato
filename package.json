@@ -1,14 +1,47 @@
 {
-  "name": "universal-reverse-engineering-tool",
-  "version": "0.1.0",
-  "description": "A universal reverse engineering tool",
+  "name": "dissect-re",
+  "version": "1.0.0",
+  "description": "DISSECT — Universal Reverse Engineering Toolkit. Disassembly, decompilation, binary parsing, vulnerability scanning, YARA, patching, symbolic execution, and AI bridge.",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./bridge": {
+      "import": "./dist/analyzer/aiBridge.js",
+      "types": "./dist/analyzer/aiBridge.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "dev": "vite src",
-    "build": "vite build",
-    "test": "vitest run"
+    "build": "tsc && vite build",
+    "build:lib": "tsc",
+    "test": "vitest run",
+    "pack:local": "pnpm build:lib && pnpm pack"
   },
+  "keywords": [
+    "reverse-engineering",
+    "disassembler",
+    "decompiler",
+    "binary-analysis",
+    "elf",
+    "pe",
+    "mach-o",
+    "wasm",
+    "x86",
+    "arm",
+    "risc-v",
+    "yara",
+    "vulnerability-scanner"
+  ],
+  "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.1",

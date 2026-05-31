@@ -37,7 +37,7 @@ export function readSLEB128(
   let value = 0;
   let shift = 0;
   let bytesRead = 0;
-  let byte = 0;
+  let byte: number;
   while (true) {
     if (offset + bytesRead >= view.byteLength) {
       throw new Error('Out of bounds reading SLEB128');
@@ -88,7 +88,7 @@ export function resolveStrX(
     if (strOffsetsBase + 4 > debugStrOffsetsView.byteLength) {
       return null;
     }
-    let unitLength = debugStrOffsetsView.getUint32(strOffsetsBase, true);
+    const unitLength = debugStrOffsetsView.getUint32(strOffsetsBase, true);
     let is64Bit = false;
     let headerSize = 8;
     if (unitLength === 0xffffffff) {
@@ -113,7 +113,7 @@ export function resolveStrX(
     if (strOffset < debugStrView.byteLength) {
       return getStringFromOffset(debugStrView, strOffset);
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
   return null;
@@ -127,9 +127,9 @@ export function parseFormValue(
   debugStrView?: DataView | null,
   debugLineStrView?: DataView | null,
   debugStrOffsetsView?: DataView | null
-): { value: any; bytesRead: number } {
+): { value: unknown; bytesRead: number } {
   let bytesRead = 0;
-  let value: any = null;
+  let value: unknown = null;
 
   switch (form) {
     case 0x08: { // DW_FORM_string
@@ -332,7 +332,6 @@ export function parseDwarfLine(
   let offset = 0;
 
   while (offset < view.byteLength) {
-    const startOffset = offset;
     if (offset + 4 > view.byteLength) break;
 
     let unitLength = view.getUint32(offset, true);
@@ -343,7 +342,7 @@ export function parseDwarfLine(
       if (offset + 8 > view.byteLength) break;
       // DWARF64
       const low = view.getUint32(offset, true);
-      const high = view.getUint32(offset + 4, true);
+      view.getUint32(offset + 4, true);
       unitLength = low; // Simplified for 32-bit JS numbers
       offset += 8;
       is64Bit = true;
@@ -358,13 +357,11 @@ export function parseDwarfLine(
     const version = view.getUint16(offset, true);
     offset += 2;
 
-    let addressSize = 4;
-    let segmentSelectorSize = 0;
     if (version >= 5) {
       if (offset + 2 > view.byteLength) break;
-      addressSize = view.getUint8(offset);
+      view.getUint8(offset);
       offset += 1;
-      segmentSelectorSize = view.getUint8(offset);
+      view.getUint8(offset);
       offset += 1;
     }
 
@@ -381,10 +378,9 @@ export function parseDwarfLine(
     const minInstructionLength = view.getUint8(offset);
     offset += 1;
 
-    let maxOpsPerInstruction = 1;
     if (version >= 4) {
       if (offset + 1 > view.byteLength) break;
-      maxOpsPerInstruction = view.getUint8(offset);
+      view.getUint8(offset);
       offset += 1;
     }
 
@@ -538,7 +534,6 @@ export function parseDwarfLine(
       while (offset < headerEndOffset) {
         if (offset + 1 > view.byteLength) break;
         if (view.getUint8(offset) === 0) {
-          offset++;
           break; // End of files
         }
         let fileName = '';
@@ -572,16 +567,13 @@ export function parseDwarfLine(
 
     // DWARF Line Program State Machine Registers
     let address = 0;
-    let opIndex = 0;
     let file = version >= 5 ? 0 : 1;
     let line = 1;
     let column = 0;
     let isStmt = defaultIsStmt;
     let basicBlock = false;
-    let endSequence = false;
     let prologueEnd = false;
     let epilogueBegin = false;
-    let isa = 0;
     let discriminator = 0;
 
     const appendRow = () => {
@@ -615,10 +607,7 @@ export function parseDwarfLine(
         address += addressAdvance;
         line += lineAdvance;
         appendRow();
-        basicBlock = false;
-        prologueEnd = false;
-        epilogueBegin = false;
-        discriminator = 0;
+
       } else if (opcode === 0) {
         // Extended Opcode
         const lenRes = readULEB128(view, offset);
@@ -630,21 +619,13 @@ export function parseDwarfLine(
 
         if (subOpcode === 1) {
           // DW_LNE_end_sequence
-          endSequence = true;
           appendRow();
           // Reset registers
           address = 0;
-          opIndex = 0;
           file = version >= 5 ? 0 : 1;
           line = 1;
           column = 0;
           isStmt = defaultIsStmt;
-          basicBlock = false;
-          endSequence = false;
-          prologueEnd = false;
-          epilogueBegin = false;
-          isa = 0;
-          discriminator = 0;
         } else if (subOpcode === 2) {
           // DW_LNE_set_address
           const addrSize = extEndOffset - offset;
@@ -680,7 +661,6 @@ export function parseDwarfLine(
           // DW_LNE_set_discriminator
           const discRes = readULEB128(view, offset);
           offset += discRes.bytesRead;
-          discriminator = discRes.value;
         } else {
           // Skip unknown extended opcode
           offset = extEndOffset;
@@ -690,10 +670,6 @@ export function parseDwarfLine(
         switch (opcode) {
           case 1: // DW_LNS_copy
             appendRow();
-            basicBlock = false;
-            prologueEnd = false;
-            epilogueBegin = false;
-            discriminator = 0;
             break;
           case 2: {
             // DW_LNS_advance_pc
@@ -727,7 +703,6 @@ export function parseDwarfLine(
             isStmt = !isStmt;
             break;
           case 7: // DW_LNS_set_basic_block
-            basicBlock = true;
             break;
           case 8: // DW_LNS_const_add_pc
             address +=
@@ -742,16 +717,13 @@ export function parseDwarfLine(
             break;
           }
           case 10: // DW_LNS_set_prologue_end
-            prologueEnd = true;
             break;
           case 11: // DW_LNS_set_epilogue_begin
-            epilogueBegin = true;
             break;
           case 12: {
             // DW_LNS_set_isa
             const setIsa = readULEB128(view, offset);
             offset += setIsa.bytesRead;
-            isa = setIsa.value;
             break;
           }
           default: {
@@ -818,7 +790,7 @@ export function parseDwarfInfo(
     const unitEndOffset = offset + unitLength;
 
     if (offset + 2 > view.byteLength) break;
-    const version = view.getUint16(offset, true);
+    view.getUint16(offset, true);
     offset += 2;
 
     const debugAbbrevOffsetSize = is64Bit ? 8 : 4;

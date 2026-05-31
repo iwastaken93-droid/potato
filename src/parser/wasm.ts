@@ -85,7 +85,7 @@ export interface Instruction {
   offset: number;
   opcode: number;
   mnemonic: string;
-  args?: any;
+  args?: unknown;
 }
 
 export interface FunctionBody {
@@ -113,6 +113,14 @@ export interface ComponentSection {
   size: number;
   payload: Uint8Array;
   modules?: WasmModule[];
+  coreInstances?: any[];
+  coreTypes?: any[];
+  instances?: any[];
+  aliases?: any[];
+  types?: any[];
+  canons?: any[];
+  starts?: any[];
+  values?: any[];
 }
 
 export interface WasmModule {
@@ -128,7 +136,7 @@ export interface WasmModule {
   code: FunctionBody[];
   customSections: { name: string; size: number; payload?: Uint8Array }[];
   names?: WasmNames;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 
@@ -197,7 +205,7 @@ export class WasmReader {
   readVarInt(): number {
     let result = 0;
     let shift = 0;
-    let byte = 0;
+    let byte: number;
     while (true) {
       byte = this.readByte();
       result |= (byte & 0x7f) << shift;
@@ -219,7 +227,7 @@ export class WasmReader {
   readVarInt64(): bigint {
     let result = 0n;
     let shift = 0n;
-    let byte = 0;
+    let byte: number;
     while (true) {
       byte = this.readByte();
       result |= BigInt(byte & 0x7f) << shift;
@@ -487,7 +495,7 @@ export function parseInstructions(
     const op = opcodes[opcode];
     const mnemonic = op ? op.name : `unknown_0x${opcode.toString(16)}`;
     const argsType = op ? op.args : undefined;
-    let args: any = undefined;
+    let args: unknown = undefined;
 
     if (argsType) {
       switch (argsType) {
@@ -674,7 +682,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
             size: customPayloadSize,
             payload: customPayload,
           });
-        } catch (e) {
+        } catch {
           // ignore
         }
       } else if (sectionId === 1) {
@@ -699,7 +707,210 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
               names.locals = { ...names.locals, ...parsedModule.names.locals };
             }
           }
-        } catch (e) {
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 2) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          const coreInstances: any[] = [];
+          for (let i = 0; i < count; i++) {
+            const tag = subReader.readByte();
+            if (tag === 0x00) {
+              const moduleIdx = subReader.readVarUint();
+              const args = subReader.readVector(() => {
+                const name = subReader.readString();
+                const sort = subReader.readByte();
+                const index = subReader.readVarUint();
+                return { name, sort, index };
+              });
+              coreInstances.push({ type: 'instantiate', moduleIdx, args });
+            } else if (tag === 0x01) {
+              const exportsList = subReader.readVector(() => {
+                const name = subReader.readString();
+                const sort = subReader.readByte();
+                const index = subReader.readVarUint();
+                return { name, sort, index };
+              });
+              coreInstances.push({ type: 'from-exports', exports: exportsList });
+            }
+          }
+          section.coreInstances = coreInstances;
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 3) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          const coreTypes: any[] = [];
+          for (let i = 0; i < count; i++) {
+            const tag = subReader.readByte();
+            if (tag === 0x60) {
+              const params = subReader.readVector(() => subReader.readByte() as ValueType);
+              const results = subReader.readVector(() => subReader.readByte() as ValueType);
+              coreTypes.push({ type: 'func', params, results });
+            } else if (tag === 0x50) {
+              const decsCount = subReader.readVarUint();
+              const decls: any[] = [];
+              for (let j = 0; j < decsCount; j++) {
+                const decTag = subReader.readByte();
+                if (decTag === 0x00) {
+                  const module = subReader.readString();
+                  const field = subReader.readString();
+                  decls.push({ type: 'import', module, field });
+                } else if (decTag === 0x01) {
+                  const name = subReader.readString();
+                  decls.push({ type: 'export', name });
+                }
+              }
+              coreTypes.push({ type: 'module', decls });
+            }
+          }
+          section.coreTypes = coreTypes;
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 4) {
+        section.modules = [];
+        try {
+          if (
+            payload[0] === 0x00 &&
+            payload[1] === 0x61 &&
+            payload[2] === 0x73 &&
+            payload[3] === 0x6d
+          ) {
+            const parsedComponent = parseWasm(payload);
+            section.modules.push(parsedComponent);
+
+            imports.push(...parsedComponent.imports);
+            exports.push(...parsedComponent.exports);
+            code.push(...parsedComponent.code);
+            customSections.push(...parsedComponent.customSections);
+            if (parsedComponent.names) {
+              if (!names) names = {};
+              names.functions = { ...names.functions, ...parsedComponent.names.functions };
+              names.locals = { ...names.locals, ...parsedComponent.names.locals };
+            }
+          }
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 5) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          const instances: any[] = [];
+          for (let i = 0; i < count; i++) {
+            const tag = subReader.readByte();
+            if (tag === 0x00) {
+              const componentIdx = subReader.readVarUint();
+              const args = subReader.readVector(() => {
+                const name = readComponentExternName(subReader);
+                const sort = subReader.readByte();
+                const index = subReader.readVarUint();
+                return { name, sort, index };
+              });
+              instances.push({ type: 'instantiate', componentIdx, args });
+            } else if (tag === 0x01) {
+              const exportsList = subReader.readVector(() => {
+                const name = readComponentExternName(subReader);
+                const sort = subReader.readByte();
+                const index = subReader.readVarUint();
+                return { name, sort, index };
+              });
+              instances.push({ type: 'from-exports', exports: exportsList });
+            }
+          }
+          section.instances = instances;
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 6) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          const aliases: any[] = [];
+          for (let i = 0; i < count; i++) {
+            const tag = subReader.readByte();
+            if (tag === 0x00) {
+              const instanceIdx = subReader.readVarUint();
+              const name = readComponentExternName(subReader);
+              const sort = subReader.readByte();
+              aliases.push({ type: 'export', instanceIdx, name, sort });
+            } else if (tag === 0x01) {
+              const outerIdx = subReader.readVarUint();
+              const sort = subReader.readByte();
+              const index = subReader.readVarUint();
+              aliases.push({ type: 'outer', outerIdx, sort, index });
+            }
+          }
+          section.aliases = aliases;
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 7) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          const types: any[] = [];
+          for (let i = 0; i < count; i++) {
+            const tag = subReader.readByte();
+            types.push({ tag });
+          }
+          section.types = types;
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 8) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          const canons: any[] = [];
+          for (let i = 0; i < count; i++) {
+            const tag = subReader.readByte();
+            if (tag === 0x00) {
+              const coreFuncIdx = subReader.readVarUint();
+              const optsCount = subReader.readVarUint();
+              const options: any[] = [];
+              for (let j = 0; j < optsCount; j++) {
+                const optTag = subReader.readByte();
+                let optVal: any = undefined;
+                if (optTag === 0x00) optVal = subReader.readByte();
+                else if (optTag === 0x01 || optTag === 0x02 || optTag === 0x03) optVal = subReader.readVarUint();
+                options.push({ tag: optTag, val: optVal });
+              }
+              canons.push({ type: 'lift', coreFuncIdx, options });
+            } else if (tag === 0x01) {
+              const compFuncIdx = subReader.readVarUint();
+              const optsCount = subReader.readVarUint();
+              const options: any[] = [];
+              for (let j = 0; j < optsCount; j++) {
+                const optTag = subReader.readByte();
+                let optVal: any = undefined;
+                if (optTag === 0x00) optVal = subReader.readByte();
+                else if (optTag === 0x01 || optTag === 0x02 || optTag === 0x03) optVal = subReader.readVarUint();
+                options.push({ tag: optTag, val: optVal });
+              }
+              canons.push({ type: 'lower', compFuncIdx, options });
+            } else if (tag === 0x02 || tag === 0x03 || tag === 0x04) {
+              const resourceTypeIdx = subReader.readVarUint();
+              canons.push({ type: tag === 0x02 ? 'resource.new' : tag === 0x03 ? 'resource.drop' : 'resource.rep', resourceTypeIdx });
+            }
+          }
+          section.canons = canons;
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 9) {
+        try {
+          const subReader = new WasmReader(payload);
+          const funcIdx = subReader.readVarUint();
+          const args = subReader.readVector(() => subReader.readVarUint());
+          const results = subReader.readVector(() => subReader.readByte());
+          section.starts = [{ funcIdx, args, results }];
+        } catch {
           // ignore
         }
       } else if (sectionId === 10) {
@@ -709,7 +920,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
           for (let i = 0; i < count; i++) {
             const name = readComponentExternName(subReader);
             const descTag = subReader.readByte();
-            let descVal: any = undefined;
+            let descVal: unknown = undefined;
             if (descTag <= 0x05) {
               descVal = subReader.readVarUint();
             }
@@ -720,7 +931,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
               typeIndexOrDesc: { descTag, descVal },
             });
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       } else if (sectionId === 11) {
@@ -733,11 +944,24 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
             const index = subReader.readVarUint();
             exports.push({
               name,
-              kind: sort === 0x00 ? ExportKind.Func : sort as any,
+              kind: sort === 0x00 ? ExportKind.Func : sort as ExportKind,
               index,
             });
           }
-        } catch (e) {
+        } catch {
+          // ignore
+        }
+      } else if (sectionId === 12) {
+        try {
+          const subReader = new WasmReader(payload);
+          const count = subReader.readVarUint();
+          const values: any[] = [];
+          for (let i = 0; i < count; i++) {
+            const valType = subReader.readByte();
+            values.push({ valType });
+          }
+          section.values = values;
+        } catch {
           // ignore
         }
       }
@@ -1065,7 +1289,7 @@ export function parseNameSection(payload: Uint8Array): WasmNames {
 /**
  * Parses other custom metadata sections (e.g., 'producers', 'target_features', etc.).
  */
-export function parseMetadataSection(name: string, payload: Uint8Array): any {
+export function parseMetadataSection(name: string, payload: Uint8Array): unknown {
   const reader = new WasmReader(payload);
   try {
     if (name === 'producers') {

@@ -69,6 +69,27 @@ export interface CatchHandler {
   catchAllAddr?: number;
 }
 
+export interface DexLocalVariable {
+  register: number;
+  name: string;
+  type: string;
+  signature?: string;
+  startAddress: number;
+  endAddress?: number;
+}
+
+export interface DexLineEntry {
+  address: number;
+  line: number;
+}
+
+export interface DexDebugInfo {
+  lineStart: number;
+  parameterNames: string[];
+  lineTable: DexLineEntry[];
+  localVariables: DexLocalVariable[];
+}
+
 export interface CodeItem {
   registersSize: number;
   insSize: number;
@@ -76,6 +97,7 @@ export interface CodeItem {
   insnsSize: number;
   insns: number[];
   tries: TryItem[];
+  debugInfo?: DexDebugInfo | null;
 }
 
 export interface ClassMethod {
@@ -199,7 +221,7 @@ export class DexParser {
       // Dex strings are MUTF-8. First byte is ULEB128 string length.
       if (stringDataOff < this.data.length) {
         const ref = { offset: stringDataOff };
-        const strLen = readUleb128(this.data, ref);
+        readUleb128(this.data, ref);
         const remainingBytes = this.data.slice(ref.offset);
         const strVal = decodeMutf8(remainingBytes);
         strings.push(strVal);
@@ -321,7 +343,6 @@ export class DexParser {
             if (codeOff !== 0 && codeOff < this.data.length) {
               const regSize = this.view.getUint16(codeOff, le);
               const insSize = this.view.getUint16(codeOff + 2, le);
-              const outsSize = this.view.getUint16(codeOff + 4, le);
               const triesSize = this.view.getUint16(codeOff + 6, le);
               const debugInfoOff = this.view.getUint32(codeOff + 8, le);
               const insnsSize = this.view.getUint32(codeOff + 12, le);
@@ -340,7 +361,6 @@ export class DexParser {
                 // Decode list size to find where handlers actually start
                 const listSizeRef = { offset: handlersStartOff };
                 readUleb128(this.data, listSizeRef);
-                const listSizeSize = listSizeRef.offset - handlersStartOff;
 
                 for (let t = 0; t < triesSize; t++) {
                   const tryItemOff = triesStartOff + t * 8;
@@ -378,6 +398,8 @@ export class DexParser {
                 }
               }
 
+              const debugInfo = this.parseDebugInfo(debugInfoOff, strings, types);
+
               codeItem = {
                 registersSize: regSize,
                 insSize,
@@ -385,6 +407,7 @@ export class DexParser {
                 insnsSize,
                 insns,
                 tries,
+                debugInfo,
               };
             }
 
@@ -419,6 +442,179 @@ export class DexParser {
       methodIds,
       classDefs,
       entryPoint: 0,
+    };
+  }
+
+  private parseDebugInfo(debugInfoOff: number, strings: string[], types: string[]): DexDebugInfo | null {
+    if (debugInfoOff === 0 || debugInfoOff >= this.data.length) {
+      return null;
+    }
+
+    const ref = { offset: debugInfoOff };
+    const lineStart = readUleb128(this.data, ref);
+    const parametersSize = readUleb128(this.data, ref);
+    const parameterNames: string[] = [];
+
+    for (let i = 0; i < parametersSize; i++) {
+      const nameIdxPlus1 = readUleb128(this.data, ref);
+      if (nameIdxPlus1 === 0) {
+        parameterNames.push('');
+      } else {
+        parameterNames.push(strings[nameIdxPlus1 - 1] || '');
+      }
+    }
+
+    const lineTable: DexLineEntry[] = [];
+    const localVariables: DexLocalVariable[] = [];
+
+    let address = 0;
+    let line = lineStart;
+
+    const activeLocals = new Map<number, { name: string; type: string; signature?: string; startAddress: number }>();
+
+    while (ref.offset < this.data.length) {
+      const opcode = this.data[ref.offset++];
+      if (opcode === 0x00) {
+        break;
+      }
+
+      switch (opcode) {
+        case 0x01: {
+          const addrDiff = readUleb128(this.data, ref);
+          address += addrDiff;
+          break;
+        }
+        case 0x02: {
+          const lineDiff = readSleb128(this.data, ref);
+          line += lineDiff;
+          break;
+        }
+        case 0x03: {
+          const regNum = readUleb128(this.data, ref);
+          const nameIdxPlus1 = readUleb128(this.data, ref);
+          const typeIdxPlus1 = readUleb128(this.data, ref);
+          
+          const name = nameIdxPlus1 > 0 ? (strings[nameIdxPlus1 - 1] || '') : '';
+          const typeName = typeIdxPlus1 > 0 ? (types[typeIdxPlus1 - 1] || '') : '';
+          
+          if (activeLocals.has(regNum)) {
+            const old = activeLocals.get(regNum)!;
+            localVariables.push({
+              register: regNum,
+              name: old.name,
+              type: old.type,
+              signature: old.signature,
+              startAddress: old.startAddress,
+              endAddress: address
+            });
+          }
+
+          activeLocals.set(regNum, {
+            name,
+            type: typeName,
+            startAddress: address
+          });
+          break;
+        }
+        case 0x04: {
+          const regNum = readUleb128(this.data, ref);
+          const nameIdxPlus1 = readUleb128(this.data, ref);
+          const typeIdxPlus1 = readUleb128(this.data, ref);
+          const sigIdxPlus1 = readUleb128(this.data, ref);
+          
+          const name = nameIdxPlus1 > 0 ? (strings[nameIdxPlus1 - 1] || '') : '';
+          const typeName = typeIdxPlus1 > 0 ? (types[typeIdxPlus1 - 1] || '') : '';
+          const signature = sigIdxPlus1 > 0 ? (strings[sigIdxPlus1 - 1] || '') : '';
+          
+          if (activeLocals.has(regNum)) {
+            const old = activeLocals.get(regNum)!;
+            localVariables.push({
+              register: regNum,
+              name: old.name,
+              type: old.type,
+              signature: old.signature,
+              startAddress: old.startAddress,
+              endAddress: address
+            });
+          }
+
+          activeLocals.set(regNum, {
+            name,
+            type: typeName,
+            signature,
+            startAddress: address
+          });
+          break;
+        }
+        case 0x05: {
+          const regNum = readUleb128(this.data, ref);
+          if (activeLocals.has(regNum)) {
+            const old = activeLocals.get(regNum)!;
+            localVariables.push({
+              register: regNum,
+              name: old.name,
+              type: old.type,
+              signature: old.signature,
+              startAddress: old.startAddress,
+              endAddress: address
+            });
+            activeLocals.delete(regNum);
+          }
+          break;
+        }
+        case 0x06: {
+          const regNum = readUleb128(this.data, ref);
+          let lastVar: DexLocalVariable | undefined;
+          for (let i = localVariables.length - 1; i >= 0; i--) {
+            if (localVariables[i].register === regNum) {
+              lastVar = localVariables[i];
+              break;
+            }
+          }
+          if (lastVar) {
+            activeLocals.set(regNum, {
+              name: lastVar.name,
+              type: lastVar.type,
+              signature: lastVar.signature,
+              startAddress: address
+            });
+          }
+          break;
+        }
+        case 0x07:
+        case 0x08:
+          break;
+        case 0x09: {
+          readUleb128(this.data, ref);
+          break;
+        }
+        default: {
+          const adjustedOpcode = opcode - 0x0a;
+          const addrDiff = Math.floor(adjustedOpcode / 15);
+          const lineDiff = -4 + (adjustedOpcode % 15);
+          address += addrDiff;
+          line += lineDiff;
+          lineTable.push({ address, line });
+          break;
+        }
+      }
+    }
+
+    for (const [regNum, val] of activeLocals.entries()) {
+      localVariables.push({
+        register: regNum,
+        name: val.name,
+        type: val.type,
+        signature: val.signature,
+        startAddress: val.startAddress
+      });
+    }
+
+    return {
+      lineStart,
+      parameterNames,
+      lineTable,
+      localVariables
     };
   }
 }

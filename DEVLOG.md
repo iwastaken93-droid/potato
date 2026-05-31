@@ -2069,3 +2069,8 @@ Wrote comprehensive Handoff.md covering:
 - Fixed ELF GOT/PLT symbol name resolution mismatch and AArch64 adrp/ldr patterns in [elf.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/elf.ts).
 - Implemented and verified URET MCP Server in [mcp-server.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/mcp-server.ts).
 - All 874 tests in 70 files are passing successfully.
+
+## [2026-05-31 21:24:29] - MCP Usage Documentation
+- Created [MCP_USAGE.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/MCP_USAGE.md) containing installation guide, Claude Desktop configuration, detailed description of all 11 tools/schemas, and usage examples.
+- Committed [MCP_USAGE.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/MCP_USAGE.md) to git repository.
+

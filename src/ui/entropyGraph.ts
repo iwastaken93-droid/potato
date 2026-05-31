@@ -483,7 +483,6 @@ export class EntropyGraph {
 
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
 
     const dpr = window.devicePixelRatio || 1;
     const canvasWidth = this.canvas.width / dpr;
@@ -510,7 +509,7 @@ export class EntropyGraph {
     this.draw();
   }
 
-  private handleMouseClick(e: MouseEvent) {
+  private handleMouseClick(_e: MouseEvent) {
     if (this.hoveredBlock && this.options.onNavigate) {
       // By default jump to assembly if execution section, otherwise hex
       const isExec = this.sections.some(

@@ -285,7 +285,7 @@ export class SymbolicExecutor {
     startState.currentBlockId = entryBlockId;
     startState.path.push(entryBlockId);
     
-    let queue: SymbolicState[] = [startState];
+    const queue: SymbolicState[] = [startState];
     const completed: SymbolicState[] = [];
 
     while (queue.length > 0 && completed.length < maxPaths) {

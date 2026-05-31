@@ -4,7 +4,6 @@
  * Matches a dark, glassmorphic layout and provides struct definition & relationship visualizations.
  */
 
-import { Section } from '../disassembler/types.js';
 import { renderSidebarItems, renderStructDetails } from './typeRenderers.js';
 import {
   createNewStructPrompt,
@@ -351,7 +350,7 @@ export class TypeSystemPanel {
     let arrayLength = 1;
 
     // Check array brackets
-    const arrayMatch = baseType.match(/^([^\[]+)\[(\d+)\]$/);
+    const arrayMatch = baseType.match(/^([^[]+)\[(\d+)\]$/);
     if (arrayMatch) {
       baseType = arrayMatch[1].trim();
       arrayLength = parseInt(arrayMatch[2], 10);

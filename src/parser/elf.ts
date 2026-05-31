@@ -773,7 +773,7 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
             const inst1 = view.getUint32(secOffset + i, littleEndian);
             const inst2 = view.getUint32(secOffset + i + 4, littleEndian);
 
-            if ((inst1 & 0x9f00001f) === 0x90000010) {
+            if (((inst1 & 0x9f00001f) >>> 0) === 0x90000010) {
               const immlo = (inst1 >> 29) & 3;
               const immhi = (inst1 >> 5) & 0x7ffff;
               let imm = (immhi << 2) | immlo;
@@ -783,7 +783,7 @@ export function parseElf(arrayBuffer: ArrayBuffer): ParsedElf {
               const pltEntryAddr = secAddr + BigInt(i);
               const pageAddr = (pltEntryAddr & ~0xfffn) + BigInt(imm) * 4096n;
 
-              if ((inst2 & 0xffc003ff) === 0xf9400211 || (inst2 & 0xffc003ff) === 0xf9400210) {
+              if (((inst2 & 0xffc003ff) >>> 0) === 0xf9400211 || ((inst2 & 0xffc003ff) >>> 0) === 0xf9400210) {
                 const ldrImm = ((inst2 >> 10) & 0xfff) * 8;
                 const gotAddr = pageAddr + BigInt(ldrImm);
 

@@ -10,9 +10,6 @@ import {
   diffBytes,
   diffInstructions,
   diffSections,
-  ByteDiffResult,
-  InstructionDiffResult,
-  SectionDiffResult,
 } from '../analyzer/diff.js';
 import { parseElf } from '../parser/elf.js';
 import { PEParser } from '../parser/pe.js';
@@ -25,7 +22,6 @@ import {
   captureEmulatorTrace,
   diffTraces,
   findFirstDivergence,
-  TraceDiffEntry,
 } from '../analyzer/traceDiff.js';
 
 export class DiffPanel {
@@ -540,7 +536,7 @@ export class DiffPanel {
       if (arch === 'wasm') {
         const wasm = parseWasm(arrayBuffer);
         entryPoint = wasm.version;
-        sections = wasm.customSections.map((s: any) => ({
+        sections = wasm.customSections.map((s) => ({
           name: s.name,
           virtualAddress: 0,
           virtualSize: s.size,
@@ -556,7 +552,7 @@ export class DiffPanel {
       ) {
         const elf = parseElf(arrayBuffer);
         entryPoint = Number(elf.header.entryPoint);
-        sections = elf.sectionHeaders.map((sh: any) => ({
+        sections = elf.sectionHeaders.map((sh) => ({
           name: sh.name || sh.typeName,
           virtualAddress: Number(sh.addr),
           virtualSize: Number(sh.size),
@@ -574,7 +570,7 @@ export class DiffPanel {
         entryPoint =
           Number(pe.optionalHeader.addressOfEntryPoint) +
           Number(pe.optionalHeader.imageBase);
-        sections = pe.sections.map((s: any) => ({
+        sections = pe.sections.map((s) => ({
           name: s.name,
           virtualAddress:
             s.virtualAddress + Number(pe.optionalHeader.imageBase),
@@ -606,7 +602,7 @@ export class DiffPanel {
           data[3] === 0xfe)
       ) {
         const macho = parseMacho(arrayBuffer);
-        sections = macho.sections.map((s: any) => ({
+        sections = macho.sections.map((s) => ({
           name: s.sectname,
           virtualAddress: Number(s.addr),
           virtualSize: Number(s.size),
@@ -665,7 +661,7 @@ export class DiffPanel {
     this.instructions2 = router.disassemble(data, {
       arch,
       baseAddress:
-        sections.find((s: any) => s.flags.execute)?.virtualAddress || 0x1000,
+        sections.find((s) => s.flags.execute)?.virtualAddress || 0x1000,
       entryPoint,
     });
 

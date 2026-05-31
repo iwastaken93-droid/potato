@@ -4,7 +4,7 @@
  * Displays explanations, detected patterns, pseudocode, and security recommendations.
  */
 
-import { Symbol, Instruction } from '../disassembler/types.js';
+import { Symbol } from '../disassembler/types.js';
 import { AIExplanationEngine, AIExplanationResult } from '../analyzer/ai.js';
 
 export interface AIPanelOptions {

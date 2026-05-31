@@ -51,7 +51,7 @@ export interface ParsedDotNetMetadata {
   cliHeader: CliHeader | null;
   metadataRoot: MetadataRoot;
   tablesHeader: TablesHeader | null;
-  tables: Record<string, any[]>;
+  tables: Record<string, unknown[]>;
   heaps: {
     strings: string[];
     userStrings: string[];
@@ -380,7 +380,7 @@ export class DotNetMetadataParser {
 
   public parse(): ParsedDotNetMetadata {
     let cliHeader: CliHeader | null = null;
-    let metadataRootOffset = 0;
+    let metadataRootOffset: number;
 
     // Detect if we are parsing raw BSJB metadata root or a full PE file
     if (
@@ -649,7 +649,7 @@ export class DotNetMetadataParser {
 
     // Parse Tables
     let tablesHeader: TablesHeader | null = null;
-    const parsedTables: Record<string, any[]> = {};
+    const parsedTables: Record<string, unknown[]> = {};
 
     if (tablesStream) {
       const start = metadataRootOffset + tablesStream.offset;
@@ -730,12 +730,12 @@ export class DotNetMetadataParser {
             continue;
           }
 
-          const rowsList: any[] = [];
+          const rowsList: Record<string, unknown>[] = [];
           for (let r = 0; r < rowCount; r++) {
-            const rowData: Record<string, any> = { _rowIndex: r + 1 };
+            const rowData: Record<string, unknown> = { _rowIndex: r + 1 };
             for (const col of schema.columns) {
               let colSize = 0;
-              let resolvedVal: any = null;
+              let resolvedVal: unknown = null;
 
               if (col.type === 'u8') {
                 colSize = 1;

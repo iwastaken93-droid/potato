@@ -379,7 +379,7 @@ Examples:
     this.outputArea.scrollTop = this.outputArea.scrollHeight;
   }
 
-  private formatResult(result: any): string {
+  private formatResult(result: unknown): string {
     if (result === undefined) return 'undefined';
     if (result === null) return 'null';
     if (typeof result === 'object') {
@@ -392,7 +392,7 @@ Examples:
             .join(' ')} ... ]`;
         }
         return JSON.stringify(result, null, 2);
-      } catch (e) {
+      } catch {
         return String(result);
       }
     }

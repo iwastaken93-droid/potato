@@ -472,11 +472,12 @@ export class SignaturePanel {
     try {
       this.currentResults = this.scanner.scan(this.binaryData);
       this.renderResults();
-    } catch (e: any) {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       this.statusTextEl.textContent = 'Scan failed';
       this.resultsListEl.innerHTML = `
         <div style="text-align: center; color: var(--error); margin-top: 4rem; font-size: 0.95rem;">
-          ⚠️ Scan failed: ${e.message || e}
+          ⚠️ Scan failed: ${msg}
         </div>
       `;
     }

@@ -8,8 +8,6 @@ import { Section } from '../disassembler/types.js';
 import {
   YaraEngine,
   YaraScanResult,
-  YaraRule,
-  parseYaraRules,
   serializeYaraRules,
 } from '../analyzer/yara.js';
 
@@ -559,9 +557,10 @@ rule Common_Strings {
       this.yaraEngine.compile(source);
       this.compileStatusEl.className = 'yara-compile-status success';
       this.compileStatusEl.textContent = `Success: Compiled ${this.yaraEngine.getRules().length} rules`;
-    } catch (err: any) {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       this.compileStatusEl.className = 'yara-compile-status error';
-      this.compileStatusEl.textContent = `Compilation failed: ${err.message || err}`;
+      this.compileStatusEl.textContent = `Compilation failed: ${msg}`;
       return;
     }
 
@@ -577,10 +576,11 @@ rule Common_Strings {
     try {
       const results = this.yaraEngine.scan(this.binaryData);
       this.renderResults(results);
-    } catch (err: any) {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       this.resultsListEl.innerHTML = `
         <div style="text-align: center; color: #f87171; margin-top: 4rem; font-size: 0.95rem;">
-          Scan execution error: ${err.message || err}
+          Scan execution error: ${msg}
         </div>
       `;
     }

@@ -7,9 +7,6 @@
 import {
   CollabEngine,
   Peer,
-  SyncComment,
-  SyncHighlight,
-  SyncRename,
 } from '../network/collab.js';
 
 export interface CollabPanelOptions {

@@ -384,7 +384,7 @@ export class EmulatorPanel {
           val.startsWith('0x') ? val : '0x' + val
         );
         this.updateMemoryView();
-      } catch (err) {
+      } catch {
         alert('Invalid memory address format');
       }
     });
@@ -410,7 +410,7 @@ export class EmulatorPanel {
           );
           this.emulator.cpu.write(reg, val);
           this.updateUI();
-        } catch (err) {
+        } catch {
           alert('Invalid value format');
         }
       }

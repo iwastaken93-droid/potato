@@ -1683,7 +1683,7 @@ export function disassembleCil(
     const addr = baseAddress + i;
     const startIdx = i;
 
-    let op1 = data[i];
+    const op1 = data[i];
     let op2: number | null = null;
     let opcodeInfo: CilOpcode | undefined;
 

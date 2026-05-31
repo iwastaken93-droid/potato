@@ -6,7 +6,7 @@
 
 import { Section, Symbol } from '../disassembler/types.js';
 import { ExtractedString } from '../analyzer/strings.js';
-import { SignatureScanner, ScanResult } from '../analyzer/signatures.js';
+import { SignatureScanner } from '../analyzer/signatures.js';
 import {
   calculateEntropy,
   findHighEntropyBlocks,

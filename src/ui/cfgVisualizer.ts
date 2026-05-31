@@ -1,5 +1,4 @@
 import { BasicBlock } from '../disassembler/cfg.js';
-import { Instruction } from '../disassembler/types.js';
 
 export function parseCoverageTable(tableData: string): Record<string, number> {
   const result: Record<string, number> = {};

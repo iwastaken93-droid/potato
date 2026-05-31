@@ -362,7 +362,7 @@ export class DependencyGraph {
     });
 
     // 3. Import Symbol Nodes
-    data.imports.forEach((imp, i) => {
+    data.imports.forEach((imp) => {
       const libNode = libraryNodesMap.get(imp.library);
       if (!libNode) return;
 
@@ -434,7 +434,7 @@ export class DependencyGraph {
     });
 
     // 5. Local Function Nodes & Call connections
-    data.locals.forEach((loc, i) => {
+    data.locals.forEach((loc) => {
       const angle = Math.random() * Math.PI * 2;
       const rx = cx + Math.cos(angle) * 180;
       const ry = cy + Math.sin(angle) * 180;

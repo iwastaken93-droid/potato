@@ -765,7 +765,7 @@ describe('ELF Parser Unit Tests', () => {
     writeStr(shstrtab, 42, '.got.plt');
 
     const dynstr = new Uint8Array(buffer, dynstrOffset, dynstrSize);
-    writeStr(dynstr, 1, 'foo');
+    writeStr(dynstr, 1, 'bar');
 
     const sym1Addr = dynsymOffset + 24;
     view.setUint32(sym1Addr, 1, true);
@@ -787,17 +787,17 @@ describe('ELF Parser Unit Tests', () => {
     const parsed = parseElf(buffer);
 
     expect(parsed.symbols.length).toBe(2);
-    expect(parsed.symbols[1].name).toBe('foo');
+    expect(parsed.symbols[1].name).toBe('bar');
     expect(parsed.symbols[1].bind).toBe('GLOBAL');
     expect(parsed.symbols[1].type).toBe('FUNC');
 
     expect(parsed.relocations.length).toBe(1);
-    expect(parsed.relocations[0].symbolName).toBe('foo');
+    expect(parsed.relocations[0].symbolName).toBe('bar');
     expect(parsed.relocations[0].typeName).toBe('R_X86_64_JUMP_SLOT');
     expect(parsed.relocations[0].offset).toBe(0x2008n);
 
     expect(parsed.gotEntries.length).toBe(1);
-    expect(parsed.gotEntries[0].symbolName).toBe('foo');
+    expect(parsed.gotEntries[0].symbolName).toBe('bar');
     expect(parsed.gotEntries[0].address).toBe(0x2008n);
     expect(parsed.gotEntries[0].relocationType).toBe('R_X86_64_JUMP_SLOT');
 

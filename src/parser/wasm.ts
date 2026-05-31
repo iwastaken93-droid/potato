@@ -107,20 +107,72 @@ export interface WasmNames {
   data?: Record<number, string>;
 }
 
+export interface CoreInstance {
+  type: 'instantiate' | 'from-exports';
+  moduleIdx?: number;
+  args?: { name: string; sort: number; index: number }[];
+  exports?: { name: string; sort: number; index: number }[];
+}
+
+export interface CoreType {
+  type: 'func' | 'module';
+  params?: ValueType[];
+  results?: ValueType[];
+  decls?: { type: 'import' | 'export'; module?: string; field?: string; name?: string }[];
+}
+
+export interface WasmInstance {
+  type: 'instantiate' | 'from-exports';
+  componentIdx?: number;
+  args?: { name: string; sort: number; index: number }[];
+  exports?: { name: string; sort: number; index: number }[];
+}
+
+export interface WasmAlias {
+  type: 'export' | 'outer';
+  instanceIdx?: number;
+  name?: string;
+  sort?: number;
+  outerIdx?: number;
+  index?: number;
+}
+
+export interface WasmType {
+  tag: number;
+}
+
+export interface WasmCanon {
+  type: 'lift' | 'lower' | 'resource.new' | 'resource.drop' | 'resource.rep';
+  coreFuncIdx?: number;
+  compFuncIdx?: number;
+  resourceTypeIdx?: number;
+  options?: { tag: number; val: number | undefined }[];
+}
+
+export interface WasmStart {
+  funcIdx: number;
+  args: number[];
+  results: number[];
+}
+
+export interface WasmValue {
+  valType: number;
+}
+
 export interface ComponentSection {
   id: number;
   name: string;
   size: number;
   payload: Uint8Array;
   modules?: WasmModule[];
-  coreInstances?: any[];
-  coreTypes?: any[];
-  instances?: any[];
-  aliases?: any[];
-  types?: any[];
-  canons?: any[];
-  starts?: any[];
-  values?: any[];
+  coreInstances?: CoreInstance[];
+  coreTypes?: CoreType[];
+  instances?: WasmInstance[];
+  aliases?: WasmAlias[];
+  types?: WasmType[];
+  canons?: WasmCanon[];
+  starts?: WasmStart[];
+  values?: WasmValue[];
 }
 
 export interface WasmModule {
@@ -714,7 +766,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
         try {
           const subReader = new WasmReader(payload);
           const count = subReader.readVarUint();
-          const coreInstances: any[] = [];
+          const coreInstances: CoreInstance[] = [];
           for (let i = 0; i < count; i++) {
             const tag = subReader.readByte();
             if (tag === 0x00) {
@@ -744,7 +796,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
         try {
           const subReader = new WasmReader(payload);
           const count = subReader.readVarUint();
-          const coreTypes: any[] = [];
+          const coreTypes: CoreType[] = [];
           for (let i = 0; i < count; i++) {
             const tag = subReader.readByte();
             if (tag === 0x60) {
@@ -753,7 +805,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
               coreTypes.push({ type: 'func', params, results });
             } else if (tag === 0x50) {
               const decsCount = subReader.readVarUint();
-              const decls: any[] = [];
+              const decls: { type: 'import' | 'export'; module?: string; field?: string; name?: string }[] = [];
               for (let j = 0; j < decsCount; j++) {
                 const decTag = subReader.readByte();
                 if (decTag === 0x00) {
@@ -801,7 +853,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
         try {
           const subReader = new WasmReader(payload);
           const count = subReader.readVarUint();
-          const instances: any[] = [];
+          const instances: WasmInstance[] = [];
           for (let i = 0; i < count; i++) {
             const tag = subReader.readByte();
             if (tag === 0x00) {
@@ -831,7 +883,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
         try {
           const subReader = new WasmReader(payload);
           const count = subReader.readVarUint();
-          const aliases: any[] = [];
+          const aliases: WasmAlias[] = [];
           for (let i = 0; i < count; i++) {
             const tag = subReader.readByte();
             if (tag === 0x00) {
@@ -854,7 +906,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
         try {
           const subReader = new WasmReader(payload);
           const count = subReader.readVarUint();
-          const types: any[] = [];
+          const types: WasmType[] = [];
           for (let i = 0; i < count; i++) {
             const tag = subReader.readByte();
             types.push({ tag });
@@ -867,16 +919,16 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
         try {
           const subReader = new WasmReader(payload);
           const count = subReader.readVarUint();
-          const canons: any[] = [];
+          const canons: WasmCanon[] = [];
           for (let i = 0; i < count; i++) {
             const tag = subReader.readByte();
             if (tag === 0x00) {
               const coreFuncIdx = subReader.readVarUint();
               const optsCount = subReader.readVarUint();
-              const options: any[] = [];
+              const options: { tag: number; val: number | undefined }[] = [];
               for (let j = 0; j < optsCount; j++) {
                 const optTag = subReader.readByte();
-                let optVal: any = undefined;
+                let optVal: number | undefined = undefined;
                 if (optTag === 0x00) optVal = subReader.readByte();
                 else if (optTag === 0x01 || optTag === 0x02 || optTag === 0x03) optVal = subReader.readVarUint();
                 options.push({ tag: optTag, val: optVal });
@@ -885,10 +937,10 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
             } else if (tag === 0x01) {
               const compFuncIdx = subReader.readVarUint();
               const optsCount = subReader.readVarUint();
-              const options: any[] = [];
+              const options: { tag: number; val: number | undefined }[] = [];
               for (let j = 0; j < optsCount; j++) {
                 const optTag = subReader.readByte();
-                let optVal: any = undefined;
+                let optVal: number | undefined = undefined;
                 if (optTag === 0x00) optVal = subReader.readByte();
                 else if (optTag === 0x01 || optTag === 0x02 || optTag === 0x03) optVal = subReader.readVarUint();
                 options.push({ tag: optTag, val: optVal });
@@ -955,7 +1007,7 @@ export function parseWasm(binary: ArrayBuffer | Uint8Array): WasmModule {
         try {
           const subReader = new WasmReader(payload);
           const count = subReader.readVarUint();
-          const values: any[] = [];
+          const values: WasmValue[] = [];
           for (let i = 0; i < count; i++) {
             const valType = subReader.readByte();
             values.push({ valType });

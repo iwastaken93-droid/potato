@@ -1,4 +1,4 @@
-import { FunctionCallGraph, FCGNode, FCGEdge } from '../analyzer/fcg.js';
+import { FunctionCallGraph, FCGNode } from '../analyzer/fcg.js';
 
 export interface FCGVisualizerOptions {
   onNodeSelect?: (address: number) => void;

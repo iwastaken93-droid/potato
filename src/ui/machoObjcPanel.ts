@@ -2,7 +2,6 @@ import {
   ParsedObjcMetadata,
   ObjcClass,
   ObjcProtocol,
-  ObjcMethod,
 } from '../parser/machoObjc.js';
 
 export interface MachoObjcPanelOptions {

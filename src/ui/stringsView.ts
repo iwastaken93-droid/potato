@@ -460,7 +460,7 @@ export class StringsView {
 
     thead.querySelectorAll('th').forEach((th) => {
       th.addEventListener('click', () => {
-        const sortField = th.dataset.sort as any;
+        const sortField = th.dataset.sort as 'offset' | 'address' | 'encoding' | 'value';
         if (this.sortBy === sortField) {
           this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
         } else {
@@ -537,7 +537,7 @@ export class StringsView {
 
     // 2. Sorting
     this.filteredStrings.sort((a, b) => {
-      let comparison = 0;
+      let comparison: number;
       if (this.sortBy === 'offset') {
         comparison = a.offset - b.offset;
       } else if (this.sortBy === 'address') {

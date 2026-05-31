@@ -440,7 +440,7 @@ export class SearchPanel {
       btn.className = `search-mode-btn ${this.activeMode === mode.id ? 'active' : ''}`;
       btn.innerHTML = mode.label;
       btn.addEventListener('click', () =>
-        this.switchMode(mode.id as any, mode.placeholder)
+        this.switchMode(mode.id as 'text' | 'hex' | 'instruction', mode.placeholder)
       );
       this.modeButtons.set(mode.id, btn);
       modeSelector.appendChild(btn);

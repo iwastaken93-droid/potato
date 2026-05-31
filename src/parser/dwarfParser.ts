@@ -571,10 +571,6 @@ export function parseDwarfLine(
     let line = 1;
     let column = 0;
     let isStmt = defaultIsStmt;
-    let basicBlock = false;
-    let prologueEnd = false;
-    let epilogueBegin = false;
-    let discriminator = 0;
 
     const appendRow = () => {
       const fileEntry = files[file];

@@ -70,11 +70,43 @@ export function disassembleArm(data: Uint8Array, baseAddress: number): Instructi
           mnemonic = opcode === 0x1a ? 'fmul' : 'fdiv';
         }
         valid = true;
+      } else if (opcode === 0x03) {
+        valid = true;
+        if (u === 0) {
+          if (size === 0) mnemonic = 'and';
+          else if (size === 1) mnemonic = 'orr';
+          else if (size === 2) mnemonic = 'eor';
+          else if (size === 3) mnemonic = 'bsl';
+        } else {
+          if (size === 0) mnemonic = 'bic';
+          else if (size === 1) mnemonic = 'bif';
+          else if (size === 2) mnemonic = 'bit';
+          else if (size === 3) mnemonic = 'orn';
+        }
+      } else if (opcode === 0x19) {
+        mnemonic = u ? 'pmul' : 'mul';
+        valid = true;
+      } else if (opcode === 0x0c) {
+        mnemonic = u ? 'umax' : 'smax';
+        valid = true;
+      } else if (opcode === 0x0d) {
+        mnemonic = u ? 'umin' : 'smin';
+        valid = true;
+      } else if (opcode === 0x1e) {
+        isFloat = true;
+        mnemonic = u ? 'fmin' : 'fmax';
+        valid = true;
+      } else if (opcode === 0x1c) {
+        isFloat = true;
+        mnemonic = u ? 'fminnm' : 'fmaxnm';
+        valid = true;
       }
 
       if (valid) {
         let suffix = '';
-        if (isFloat) {
+        if (opcode === 0x03) {
+          suffix = q ? '16b' : '8b';
+        } else if (isFloat) {
           const sz = (val >> 22) & 1;
           suffix = sz === 0 ? (q ? '4s' : '2s') : (q ? '2d' : '2d');
         } else {

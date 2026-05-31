@@ -445,7 +445,6 @@ export class PatcherPanel {
 
       // Convert virtual address to file offset
       let offset = address;
-      let foundSection = false;
 
       // If we have sections, we need to translate Virtual Address -> Offset
       if (this.sections.length > 0) {
@@ -455,7 +454,6 @@ export class PatcherPanel {
             address < s.virtualAddress + s.fileSize
           ) {
             offset = address - s.virtualAddress + s.fileOffset;
-            foundSection = true;
             break;
           }
         }
@@ -493,8 +491,9 @@ export class PatcherPanel {
         this.patcher.getPatchedBinary(),
         this.patcher.getHistory()
       );
-    } catch (err: any) {
-      alert('Failed to apply patch: ' + err.message);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert('Failed to apply patch: ' + msg);
     }
   }
 

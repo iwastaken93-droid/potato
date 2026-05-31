@@ -498,7 +498,7 @@ export class GDBPanel {
             const regIdxHex = index.toString(16);
             const valHex = toLittleEndianHex(parsedVal, reg.size);
             this.sendRawRSPCommand(`P${regIdxHex}=${valHex}`);
-          } catch (e) {
+          } catch {
             alert('Invalid hexadecimal number format');
           }
         }
@@ -557,8 +557,9 @@ export class GDBPanel {
       } else {
         this.memDumpEl.textContent = `Memory Read Failed: RSP error response (${responseHex})`;
       }
-    } catch (e: any) {
-      this.memDumpEl.textContent = `Error parsing inspect address: ${e.message}`;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.memDumpEl.textContent = `Error parsing inspect address: ${msg}`;
     }
   }
 }

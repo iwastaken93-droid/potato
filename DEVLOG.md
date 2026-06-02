@@ -2454,3 +2454,5 @@ Run git diff to list unstaged modified files.
 - No tracked source code files modified.
 - Only [DEVLOG.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/DEVLOG.md) modified.
 
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders

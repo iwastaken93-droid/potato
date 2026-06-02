@@ -126,6 +126,23 @@ describe('MCP Server URET Engine Tests', () => {
     expect(content.cpuState.rip).toBe('4097');
   });
 
+  it('should load binary in emulatorControl via MCP tool', async () => {
+    const loadResult = await client.callTool({
+      name: 'emulatorControl',
+      arguments: {
+        action: 'load',
+        data: '9090',
+        entryPoint: 0x2000
+      }
+    });
+
+    expect(loadResult.isError).toBeUndefined();
+    const content = JSON.parse(loadResult.content[0].text);
+    expect(content.success).toBe(true);
+    expect(content.entryPoint).toBe(0x2000);
+    expect(content.cpuState.rip).toBe('8192');
+  });
+
   it('should executeScript with parsed metadata and sandbox fs context', async () => {
     const result = await client.callTool({
       name: 'executeScript',

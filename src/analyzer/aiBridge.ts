@@ -12,12 +12,27 @@ import { AIExplanationEngine } from './ai.js';
 import { Emulator } from '../emulator/emulator.js';
 import { extractStrings } from './strings.js';
 import { calculateEntropy, findHighEntropyBlocks, mapSectionEntropy } from './entropy.js';
+import { XRefEngine } from './xrefs.js';
+import { buildCFG } from '../disassembler/cfg.js';
+import { Section, Symbol, Instruction } from '../disassembler/types.js';
 
 /**
  * Helper to convert Hex or Base64 string to Uint8Array
  */
-export function toUint8Array(input: string): Uint8Array {
+export function toUint8Array(input: any): Uint8Array {
+  if (input instanceof Uint8Array) {
+    if (input.byteLength > 10485760) {
+      throw new Error('Input size exceeds 10MB limit');
+    }
+    return input;
+  }
+  if (typeof input !== 'string') {
+    input = String(input || '');
+  }
   const trimmed = input.trim();
+  if (trimmed.length > 20971520) {
+    throw new Error('Input size exceeds 10MB limit');
+  }
   // Check if hex
   if (/^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0) {
     const bytes = new Uint8Array(trimmed.length / 2);
@@ -28,16 +43,30 @@ export function toUint8Array(input: string): Uint8Array {
   }
   // Try Base64
   try {
+    const estimatedLen = Math.floor((trimmed.length * 3) / 4);
+    if (estimatedLen > 10485760) {
+      throw new Error('Input size exceeds 10MB limit');
+    }
     const binaryString = atob(trimmed);
     const len = binaryString.length;
+    if (len > 10485760) {
+      throw new Error('Input size exceeds 10MB limit');
+    }
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes;
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.message === 'Input size exceeds 10MB limit') {
+      throw e;
+    }
     // Treat as raw UTF-8 string bytes
-    return new TextEncoder().encode(trimmed);
+    const bytes = new TextEncoder().encode(trimmed);
+    if (bytes.length > 10485760) {
+      throw new Error('Input size exceeds 10MB limit');
+    }
+    return bytes;
   }
 }
 
@@ -237,8 +266,10 @@ export const TOOL_SCHEMAS = {
     parameters: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['run', 'step', 'reset', 'readReg', 'writeReg', 'readMem', 'writeMem'], description: 'Emulator action to perform. "reset": initialize with instructions/entryPoint. "step"/"run": execute. "readReg"/"writeReg": manipulate registers. "readMem"/"writeMem": manipulate memory.' },
+        action: { type: 'string', enum: ['run', 'step', 'reset', 'readReg', 'writeReg', 'readMem', 'writeMem', 'load'], description: 'Emulator action to perform. "reset": initialize with instructions/entryPoint. "step"/"run": execute. "readReg"/"writeReg": manipulate registers. "readMem"/"writeMem": manipulate memory. "load": load PE/ELF/Mach-O/raw binary.' },
         instructions: { type: 'array', items: { type: 'object' }, description: 'Instructions to load when action is "reset".' },
+        data: { type: 'string', description: 'Hex, Base64, or file path of executable binary to load (load only).' },
+        entryPoint: { type: 'number', description: 'Entry point address for the binary (load/reset only).' },
         registers: { type: 'object', description: 'Register name to value mappings. Values can be numbers or strings representing BigInt.' },
         memory: {
           type: 'array',
@@ -307,10 +338,61 @@ export const TOOL_SCHEMAS = {
       properties: {
         data: { type: 'string', description: 'Hex or Base64 encoded binary data.' },
         offset: { type: 'number', description: 'Start byte offset within binary data (default 0).' },
+        limit: { type: 'number', description: 'Number of bytes to dump (alias for length).' },
         length: { type: 'number', description: 'Total number of bytes to dump (defaults to remaining bytes).' },
         bytesPerLine: { type: 'number', description: 'Number of bytes to display per line (default 16).' }
       },
       required: ['data']
+    },
+    findXRefs: {
+      name: 'findXRefs',
+      description: 'Find incoming and outgoing cross-references (XRefs) for a specific target address in a binary file.',
+      parameters: {
+        type: 'object',
+        properties: {
+          data: { type: 'string', description: 'Hex or Base64 encoded binary content to analyze.' },
+          address: { type: 'number', description: 'The target address to query cross-references for.' },
+          arch: { type: 'string', description: 'Target CPU architecture. Default is x86_64.' },
+          baseAddress: { type: 'number', description: 'Optional virtual address base for raw disassembling.' }
+        },
+        required: ['data', 'address']
+      }
+    },
+    buildCFG: {
+      name: 'buildCFG',
+      description: 'Build a Control Flow Graph (CFG) from a sequence of assembly instructions, identifying basic blocks and successors.',
+      parameters: {
+        type: 'object',
+        properties: {
+          instructions: {
+            type: 'array',
+            description: 'A sequential list of instructions to build the CFG from.',
+            items: {
+              type: 'object',
+              properties: {
+                address: { type: 'number', description: 'Instruction virtual address.' },
+                mnemonic: { type: 'string', description: 'Mnemonic/opcode name (e.g., "mov", "jmp").' },
+                opStr: { type: 'string', description: 'Operands/arguments string (e.g., "rax, rbx").' },
+                operands: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      type: { type: 'string' },
+                      reg: { type: 'string' },
+                      imm: { type: 'number' },
+                      mem: { type: 'object' }
+                    }
+                  }
+                },
+                size: { type: 'number', description: 'Size of the instruction in bytes.' }
+              },
+              required: ['address', 'mnemonic', 'size']
+            }
+          }
+        },
+        required: ['instructions']
+      }
     }
   }
 };
@@ -647,7 +729,7 @@ function resolveElfOrPe(
       let sliceBytes = bytes;
       let resolvedBase = baseAddr;
 
-      if (resolvedBase === undefined || resolvedBase === null || resolvedBase === 0) {
+      if (resolvedBase === undefined || resolvedBase === null) {
         // Try .text section first
         const textSec = elf.sectionHeaders.find(s => s.name === '.text');
         if (textSec) {
@@ -706,7 +788,7 @@ function resolveElfOrPe(
         return 0;
       };
 
-      if (resolvedBase === undefined || resolvedBase === null || resolvedBase === 0) {
+      if (resolvedBase === undefined || resolvedBase === null) {
         // Try .text section first
         const textSec = pe.sections.find(s => s.name === '.text');
         if (textSec) {
@@ -850,15 +932,54 @@ export class AIBridge {
 
         if (detected === 'elf') {
           const parsed = parseElf(bytes.buffer as ArrayBuffer);
-          return { success: true, format: 'elf', header: parsed.header, sections: parsed.sectionHeaders, symbols: parsed.symbols };
+          const entryPoint = Number(parsed.header.entryPoint);
+          return {
+            success: true,
+            format: 'elf',
+            header: parsed.header,
+            sections: parsed.sectionHeaders,
+            symbols: parsed.symbols,
+            entryPoint,
+            entryPointAddress: entryPoint
+          };
         } else if (detected === 'pe') {
           const parser = new PEParser(bytes.buffer as ArrayBuffer);
           const parsed = parser.parse();
-          return { success: true, format: 'pe', header: parsed.coffHeader, sections: parsed.sections, imports: parsed.imports };
+          const entryPoint = parsed.optionalHeader?.addressOfEntryPoint || 0;
+          const imageBase = parsed.optionalHeader?.imageBase || 0;
+          const entryPointAddress = Number(imageBase) + entryPoint;
+          return {
+            success: true,
+            format: 'pe',
+            header: parsed.coffHeader,
+            sections: parsed.sections,
+            imports: parsed.imports,
+            entryPoint,
+            entryPointAddress,
+            entryPointRVA: entryPoint,
+            imageBase: typeof imageBase === 'bigint' ? imageBase.toString() : imageBase
+          };
         } else if (detected === 'macho') {
           const parser = new MachoParser(bytes);
           const parsed = parser.parse();
-          return { success: true, format: 'macho', header: parsed.header, sections: parsed.sections, symbols: parsed.symbols };
+          let entryPoint = 0;
+          const lcMain = parsed.loadCommands.find(lc => lc.cmd === 0x80000028);
+          if (lcMain && lcMain.payload && typeof lcMain.payload.entryoff === 'number') {
+            entryPoint = lcMain.payload.entryoff;
+          }
+          const textSegment = parsed.segments.find(seg => seg.segname === '__TEXT');
+          const imageBase = textSegment ? Number(textSegment.vmaddr) : 0;
+          const entryPointAddress = imageBase + entryPoint;
+          return {
+            success: true,
+            format: 'macho',
+            header: parsed.header,
+            sections: parsed.sections,
+            symbols: parsed.symbols,
+            entryPoint,
+            entryPointAddress,
+            imageBase
+          };
         }
         throw new Error(`Unsupported binary format: ${detected}`);
       }
@@ -1186,16 +1307,107 @@ export class AIBridge {
             }
           }
           return { success: true, memory: results };
-        } else if (action === 'writeMem') {
-          if (params.memory) {
-            for (const m of params.memory) {
-              const addr = BigInt(m.address);
-              const val = toUint8Array(m.value);
-              emu.memory.map(addr, val.length);
-              emu.memory.writeBuffer(addr, val);
-            }
+        } else if (action === 'load') {
+          if (!params.data) {
+            throw new Error('Missing "data" parameter for load action');
           }
-          return { success: true };
+          const bytes = toUint8Array(params.data);
+          let detected = 'auto';
+          if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+            detected = 'elf';
+          } else if (bytes[0] === 0x4d && bytes[1] === 0x5a) {
+            detected = 'pe';
+          } else if (
+            (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+            (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+          ) {
+            detected = 'macho';
+          }
+
+          let entryPoint = 0;
+
+          if (detected === 'elf') {
+            const parsed = parseElf(bytes.buffer as ArrayBuffer);
+            entryPoint = Number(parsed.header.entryPoint);
+            emu.reset(entryPoint);
+
+            if (parsed.programHeaders && parsed.programHeaders.length > 0) {
+              for (const ph of parsed.programHeaders) {
+                if (ph.type === 1) { // PT_LOAD
+                  const vaddr = BigInt(ph.vaddr);
+                  const memsz = Number(ph.memsz);
+                  const filesz = Number(ph.filesz);
+                  const offset = Number(ph.offset);
+                  if (memsz > 0) {
+                    emu.memory.map(vaddr, memsz);
+                    if (filesz > 0) {
+                      const segmentData = bytes.subarray(offset, offset + filesz);
+                      emu.memory.writeBuffer(vaddr, segmentData);
+                    }
+                  }
+                }
+              }
+            } else {
+              for (const sec of parsed.sectionHeaders) {
+                const size = Number(sec.size);
+                const addr = BigInt(sec.addr);
+                const offset = Number(sec.offset);
+                if (size > 0 && addr > 0n) {
+                  emu.memory.map(addr, size);
+                  const secData = bytes.subarray(offset, offset + size);
+                  emu.memory.writeBuffer(addr, secData);
+                }
+              }
+            }
+          } else if (detected === 'pe') {
+            const parser = new PEParser(bytes.buffer as ArrayBuffer);
+            const parsed = parser.parse();
+            const imageBase = Number(parsed.optionalHeader.imageBase);
+            entryPoint = imageBase + parsed.optionalHeader.addressOfEntryPoint;
+            emu.reset(entryPoint);
+
+            for (const sec of parsed.sections) {
+              const size = sec.virtualSize || sec.sizeOfRawData;
+              const addr = BigInt(imageBase + sec.virtualAddress);
+              if (size > 0) {
+                emu.memory.map(addr, size);
+                if (sec.sizeOfRawData > 0) {
+                  const secData = bytes.subarray(sec.pointerToRawData, sec.pointerToRawData + sec.sizeOfRawData);
+                  emu.memory.writeBuffer(addr, secData);
+                }
+              }
+            }
+          } else if (detected === 'macho') {
+            const parser = new MachoParser(bytes);
+            const parsed = parser.parse();
+            entryPoint = 0;
+            emu.reset(entryPoint);
+            for (const s of parsed.sections) {
+              const size = Number(s.size);
+              const addr = BigInt(s.addr);
+              if (size > 0) {
+                emu.memory.map(addr, size);
+                const secData = bytes.subarray(s.offset, s.offset + size);
+                emu.memory.writeBuffer(addr, secData);
+              }
+            }
+          } else {
+            entryPoint = params.entryPoint || 0;
+            emu.reset(entryPoint);
+            emu.memory.map(BigInt(entryPoint), bytes.length);
+            emu.memory.writeBuffer(BigInt(entryPoint), bytes);
+          }
+
+          emu.cpu.write('rip', BigInt(entryPoint));
+
+          return {
+            success: true,
+            entryPoint,
+            cpuState: {
+              rip: emu.cpu.read('rip').toString(),
+              rsp: emu.cpu.read('rsp').toString()
+            }
+          };
         }
         throw new Error(`Unsupported emulator action: ${action}`);
       }
@@ -1256,20 +1468,80 @@ export class AIBridge {
           stride: params.stride,
           threshold: params.threshold
         });
+
+        let format = 'unknown';
+        const sectionBreakdown: { name: string; offset: number; size: number; entropy: number }[] = [];
+
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+          format = 'elf';
+        } else if (bytes[0] === 0x4d && bytes[1] === 0x5a) {
+          format = 'pe';
+        } else if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) {
+          format = 'macho';
+        }
+
+        try {
+          if (format === 'elf') {
+            const parsed = parseElf(bytes.buffer as ArrayBuffer);
+            for (const section of parsed.sectionHeaders) {
+              const secOffset = Number(section.offset);
+              const secSize = Number(section.size);
+              if (secOffset > 0 && secSize > 0 && secOffset + secSize <= bytes.length) {
+                const secBytes = bytes.subarray(secOffset, secOffset + secSize);
+                const entropy = calculateEntropy(secBytes);
+                sectionBreakdown.push({ name: section.name, offset: secOffset, size: secSize, entropy });
+              }
+            }
+          } else if (format === 'pe') {
+            const parser = new PEParser(bytes.buffer as ArrayBuffer);
+            const parsed = parser.parse();
+            for (const section of parsed.sections) {
+              const secOffset = section.pointerToRawData;
+              const secSize = section.sizeOfRawData;
+              if (secOffset > 0 && secSize > 0 && secOffset + secSize <= bytes.length) {
+                const secBytes = bytes.subarray(secOffset, secOffset + secSize);
+                const entropy = calculateEntropy(secBytes);
+                sectionBreakdown.push({ name: section.name, offset: secOffset, size: secSize, entropy });
+              }
+            }
+          } else if (format === 'macho') {
+            const parser = new MachoParser(bytes);
+            const parsed = parser.parse();
+            for (const section of parsed.sections) {
+              const secOffset = section.offset;
+              const secSize = Number(section.size);
+              if (secOffset > 0 && secSize > 0 && secOffset + secSize <= bytes.length) {
+                const secBytes = bytes.subarray(secOffset, secOffset + secSize);
+                const entropy = calculateEntropy(secBytes);
+                sectionBreakdown.push({ name: section.sectname, offset: secOffset, size: secSize, entropy });
+              }
+            }
+          }
+        } catch (_) {
+          // ignore parsing error for sections, fallback to empty array
+        }
+
         return {
           success: true,
           overall,
-          highEntropyBlocks: blocks.filter(b => b.isHighEntropy)
+          highEntropyBlocks: blocks.filter(b => b.isHighEntropy),
+          sectionBreakdown
         };
       }
 
       case 'hexDump': {
         const bytes = toUint8Array(params.data);
         const offset = params.offset || 0;
-        const length = params.length !== undefined ? params.length : bytes.length - offset;
+        const limit = params.limit !== undefined ? params.limit : params.length;
+        const length = limit !== undefined ? limit : bytes.length - offset;
         const bytesPerLine = params.bytesPerLine || 16;
 
-        const sub = bytes.subarray(offset, offset + length);
+        const startOffset = Math.max(0, Math.min(offset, bytes.length));
+        const endOffset = Math.max(startOffset, Math.min(startOffset + length, bytes.length));
+        const sub = bytes.subarray(startOffset, endOffset);
         const lines: string[] = [];
 
         for (let i = 0; i < sub.length; i += bytesPerLine) {
@@ -1306,6 +1578,177 @@ export class AIBridge {
           formatted: lines.join('\n'),
           lines
         };
+      }
+
+      case 'findXRefs': {
+        const bytes = toUint8Array(params.data);
+        let sections: Section[] = [];
+        let symbols: Symbol[] = [];
+        let baseAddress = params.baseAddress ?? params.address ?? 0;
+
+        let detected = 'auto';
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+          detected = 'elf';
+        } else if (bytes[0] === 0x4d && bytes[1] === 0x5a) {
+          detected = 'pe';
+        } else if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) {
+          detected = 'macho';
+        }
+
+        if (detected === 'elf') {
+          try {
+            const elf = parseElf(bytes.buffer as ArrayBuffer);
+            sections = elf.sectionHeaders.map(s => {
+              const flagsNum = Number(s.flags);
+              const isWritable = (flagsNum & 1) !== 0;
+              const isAlloc = (flagsNum & 2) !== 0;
+              const isExecutable = (flagsNum & 4) !== 0;
+              return {
+                name: s.name,
+                virtualAddress: Number(s.addr),
+                virtualSize: Number(s.size),
+                fileOffset: Number(s.offset),
+                fileSize: Number(s.size),
+                flags: { read: isAlloc, write: isWritable, execute: isExecutable }
+              };
+            });
+            symbols = elf.symbols.map(sym => ({
+              name: sym.name,
+              address: Number(sym.value),
+              size: Number(sym.size),
+              type: sym.type === 'FUNC' ? 'function' : sym.type === 'OBJECT' ? 'object' : 'none',
+              binding: sym.bind === 'GLOBAL' ? 'global' : sym.bind === 'WEAK' ? 'weak' : 'local'
+            }));
+            baseAddress = Number(elf.header.entryPoint);
+          } catch (_) {
+            // fallback
+          }
+        } else if (detected === 'pe') {
+          try {
+            const parser = new PEParser(bytes.buffer as ArrayBuffer);
+            const pe = parser.parse();
+            const imgBase = Number(pe.optionalHeader.imageBase);
+            sections = pe.sections.map(s => {
+              const isExecutable = (s.characteristics & 0x20000000) !== 0;
+              const isReadable = (s.characteristics & 0x40000000) !== 0;
+              const isWritable = (s.characteristics & 0x80000000) !== 0;
+              return {
+                name: s.name,
+                virtualAddress: imgBase + s.virtualAddress,
+                virtualSize: s.virtualSize,
+                fileOffset: s.pointerToRawData,
+                fileSize: s.sizeOfRawData,
+                flags: { read: isReadable, write: isWritable, execute: isExecutable }
+              };
+            });
+            baseAddress = imgBase + pe.optionalHeader.addressOfEntryPoint;
+          } catch (_) {
+            // fallback
+          }
+        } else if (detected === 'macho') {
+          try {
+            const parser = new MachoParser(bytes);
+            const macho = parser.parse();
+            sections = macho.sections.map(s => {
+              const isText = s.sectname === '__text' || s.segname === '__TEXT';
+              return {
+                name: s.sectname,
+                virtualAddress: Number(s.addr),
+                virtualSize: Number(s.size),
+                fileOffset: s.offset,
+                fileSize: Number(s.size),
+                flags: { read: true, write: s.segname === '__DATA', execute: isText }
+              };
+            });
+            symbols = macho.symbols.map(sym => ({
+              name: sym.name,
+              address: Number(sym.value),
+              binding: 'global',
+              type: 'none'
+            }));
+          } catch (_) {
+            // fallback
+          }
+        }
+
+        if (sections.length === 0) {
+          sections = [{
+            name: '.text',
+            virtualAddress: baseAddress,
+            virtualSize: bytes.length,
+            fileOffset: 0,
+            fileSize: bytes.length,
+            flags: { read: true, write: false, execute: true }
+          }];
+        }
+
+        const router = new DisassemblerRouter();
+        const allInstructions: Instruction[] = [];
+        for (const sec of sections) {
+          if (sec.flags.execute && sec.fileSize > 0) {
+            try {
+              const secBytes = bytes.subarray(sec.fileOffset, sec.fileOffset + sec.fileSize);
+              const insts = router.disassemble(secBytes, {
+                arch: params.arch || 'x86_64',
+                baseAddress: sec.virtualAddress
+              });
+              const mappedInsts = insts.map(inst => ({
+                ...inst,
+                op: inst.mnemonic,
+                args: inst.opStr ? inst.opStr.split(',').map(s => s.trim()) : []
+              }));
+              allInstructions.push(...mappedInsts);
+            } catch (_) {
+              // ignore
+            }
+          }
+        }
+
+        if (allInstructions.length === 0) {
+          try {
+            const insts = router.disassemble(bytes, {
+              arch: params.arch || 'x86_64',
+              baseAddress: baseAddress
+            });
+            const mappedInsts = insts.map(inst => ({
+              ...inst,
+              op: inst.mnemonic,
+              args: inst.opStr ? inst.opStr.split(',').map(s => s.trim()) : []
+            }));
+            allInstructions.push(...mappedInsts);
+          } catch (_) {
+            // ignore
+          }
+        }
+
+        const engine = new XRefEngine();
+        engine.analyze(allInstructions, sections, symbols, bytes, baseAddress);
+
+        const targetAddr = Number(params.address);
+        const incoming = engine.getXRefsTo(targetAddr);
+        const outgoing = engine.getXRefsFrom(targetAddr);
+
+        return { success: true, incoming, outgoing };
+      }
+
+      case 'buildCFG': {
+        const insts: any[] = params.instructions;
+        if (!insts || !Array.isArray(insts)) {
+          throw new Error('Instructions array is required');
+        }
+        const mappedInsts = insts.map((inst: any) => ({
+          address: Number(inst.address),
+          bytes: inst.bytes instanceof Uint8Array ? inst.bytes : new Uint8Array(),
+          mnemonic: inst.mnemonic || inst.op || '',
+          opStr: inst.opStr || (inst.args ? inst.args.join(', ') : ''),
+          operands: inst.operands || [],
+          size: Number(inst.size || 1)
+        }));
+        const blocks = buildCFG(mappedInsts);
+        return { success: true, blocks };
       }
 
       default:

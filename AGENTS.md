@@ -1,7 +1,7 @@
 # Antigravity AI Agent Configuration
 
 ## Project Scope
-
+DISREGARD THE FOLLOWING IF I TELL YOU OTHERWISE IF I TELL  YOU TO IGNORE YOU WILL NOT DO ANY OF THIS
 WE WANT TO MINIMISE CONTEXT AS MUCH AS POSSIBLE IF YOU ARE SUBAGENT GIVE SHORT MESSAGES TO MAIN AGENT but output as much as possible for everything else
 
 - You are to always have at least 5 subagents running at all times. I REPEAT SUBAGENTS.

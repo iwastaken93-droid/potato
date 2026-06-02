@@ -351,4 +351,215 @@ describe('AI Query Bridge & Tool System Tests', () => {
     expect(result.lines.length).toBe(2);
     expect(result.formatted).toContain('ABCDEF12');
   });
+
+  it('should find cross-references via the bridge', async () => {
+    const result = await AIBridge.executeQuery({
+      action: 'findXRefs',
+      params: {
+        data: 'e8fa0f0000',
+        address: 0x1000,
+        baseAddress: 0x1000
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.incoming).toBeDefined();
+    expect(result.outgoing).toBeDefined();
+  });
+
+  it('should build control flow graph via the bridge', async () => {
+    const result = await AIBridge.executeQuery({
+      action: 'buildCFG',
+      params: {
+        instructions: [
+          { address: 0x1000, mnemonic: 'mov', opStr: 'rax, rbx', size: 3 },
+          { address: 0x1003, mnemonic: 'jmp', opStr: '0x100a', operands: [{ type: 'imm', imm: 0x100a }], size: 5 },
+          { address: 0x1008, mnemonic: 'nop', size: 1 },
+          { address: 0x100a, mnemonic: 'ret', size: 1 }
+        ]
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.blocks.length).toBeGreaterThan(0);
+    const entryBlock = result.blocks.find((b: any) => b.startAddress === 0x1000);
+    expect(entryBlock).toBeDefined();
+    expect(entryBlock.successors).toContain('block_0x100a');
+  });
+  });
+
+  it('should return entry point metadata in parseBinary', async () => {
+    const buffer = new ArrayBuffer(352);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d; // 'M'
+    bytes[1] = 0x5a; // 'Z'
+    view.setUint32(60, 64, true); // e_lfanew
+    view.setUint32(64, 0x00004550, true); // PE signature
+    view.setUint16(68, 0x14c, true); // Machine: Intel 386
+    view.setUint16(70, 1, true); // Number of Sections
+    view.setUint16(84, 224, true); // SizeOfOptionalHeader
+    view.setUint16(88, 0x10b, true); // Magic (PE32)
+    view.setUint32(104, 0x1000, true); // AddressOfEntryPoint
+    view.setUint32(128, 0x400000, true); // ImageBase (PE32)
+
+    const hex = toHex(bytes);
+    const result = await AIBridge.executeQuery({
+      action: 'parseBinary',
+      params: {
+        data: hex,
+        format: 'pe'
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.entryPoint).toBe(0x1000);
+    expect(result.entryPointAddress).toBe(0x401000);
+    expect(result.entryPointRVA).toBe(0x1000);
+    expect(result.imageBase).toBe('4194304');
+  });
+
+  it('should limit input sizes to 10MB to prevent memory OOM crashes', async () => {
+    const hugeInput = 'A'.repeat(21 * 1024 * 1024); // 21MB, exceeds 20 million chars
+    await expect(AIBridge.executeQuery({
+      action: 'hexDump',
+      params: { data: hugeInput }
+    })).rejects.toThrow('Input size exceeds 10MB limit');
+  });
+
+  it('should support limit and offset in hexDump for paging', async () => {
+    const data = '00112233445566778899aabbccddeeff';
+    const result = await AIBridge.executeQuery({
+      action: 'hexDump',
+      params: {
+        data,
+        offset: 4,
+        limit: 8
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.formatted).toContain('04050607 08090a0b');
+    expect(result.lines.length).toBe(1);
+  });
+
+  it('should calculate section breakdown entropy in entropyAnalysis', async () => {
+    const buffer = new ArrayBuffer(500);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d; // 'M'
+    bytes[1] = 0x5a; // 'Z'
+    view.setUint32(60, 64, true); // e_lfanew
+    view.setUint32(64, 0x00004550, true); // PE signature
+    view.setUint16(68, 0x14c, true); // Machine: Intel 386
+    view.setUint16(70, 1, true); // Number of Sections
+    view.setUint16(84, 224, true); // SizeOfOptionalHeader
+    view.setUint16(88, 0x10b, true); // Magic (PE32)
+
+    // Section header details for a single section
+    const secOffset = 64 + 24 + 224; // PE signature + COFF header + Optional header
+    // Section Name: ".text"
+    bytes[secOffset] = 0x2e; bytes[secOffset+1] = 0x74; bytes[secOffset+2] = 0x65; bytes[secOffset+3] = 0x78; bytes[secOffset+4] = 0x74;
+    view.setUint32(secOffset + 8, 32, true); // VirtualSize = 32
+    view.setUint32(secOffset + 12, 0x1000, true); // VirtualAddress = 0x1000
+    view.setUint32(secOffset + 16, 32, true); // SizeOfRawData = 32
+    view.setUint32(secOffset + 20, 400, true); // PointerToRawData = 400
+
+    // Fill some random bytes into the raw data section to have some entropy
+    for (let i = 400; i < 432; i++) {
+      bytes[i] = i % 256;
+    }
+
+    const hex = toHex(bytes);
+    const result = await AIBridge.executeQuery({
+      action: 'entropyAnalysis',
+      params: { data: hex }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.sectionBreakdown).toBeDefined();
+    expect(result.sectionBreakdown.length).toBe(1);
+    expect(result.sectionBreakdown[0].name).toBe('.text');
+    expect(result.sectionBreakdown[0].entropy).toBeGreaterThan(0);
+  });
+
+  it('should cross-reference vulnerable functions against imported library names in vulnScan', async () => {
+    const buffer = new ArrayBuffer(500);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d; // 'M'
+    bytes[1] = 0x5a; // 'Z'
+    view.setUint32(60, 64, true); // e_lfanew
+    view.setUint32(64, 0x00004550, true); // PE signature
+    view.setUint16(68, 0x14c, true); // Machine: Intel 386
+    view.setUint16(70, 1, true); // Number of Sections
+    view.setUint16(84, 224, true); // SizeOfOptionalHeader
+    view.setUint16(88, 0x10b, true); // Magic (PE32)
+
+    // Data directories: Import table RVA at 120 (offset 64 + 24 + 96 = 184)
+    view.setUint32(208, 0x2000, true); // Import directory RVA = 0x2000
+    view.setUint32(212, 40, true); // Import directory size = 40
+
+    // Section header
+    const secOffset = 64 + 24 + 224; 
+    bytes[secOffset] = 0x2e; bytes[secOffset+1] = 0x69; bytes[secOffset+2] = 0x64; bytes[secOffset+3] = 0x61; bytes[secOffset+4] = 0x74; bytes[secOffset+5] = 0x61; // ".idata"
+    view.setUint32(secOffset + 8, 100, true); // VirtualSize = 100
+    view.setUint32(secOffset + 12, 0x2000, true); // VirtualAddress = 0x2000
+    view.setUint32(secOffset + 16, 100, true); // SizeOfRawData = 100
+    view.setUint32(secOffset + 20, 300, true); // PointerToRawData = 300
+
+    // 300 is our raw data start for .idata (corresponds to RVA 0x2000)
+    // Import Directory Entry at RVA 0x2000 (offset 300):
+    // Import Lookup Table RVA at 300
+    view.setUint32(300, 0x2028, true); 
+    // Time/Date stamp
+    // Forwarder chain
+    // Name RVA at 30c (offset 312) -> points to "KERNEL32.dll" at RVA 0x2050 (offset 380)
+    view.setUint32(312, 0x2050, true);
+    // Import Address Table RVA at 316 (offset 316) -> points to RVA 0x2038 (offset 356)
+    view.setUint32(316, 0x2038, true);
+
+    // Import Lookup Table at RVA 0x2028 (offset 340):
+    // Import "strcpy" hint/name RVA = 0x2060 (offset 396)
+    view.setUint32(340, 0x2060, true);
+    // Null terminator for ILT
+    view.setUint32(344, 0, true);
+
+    // Import Address Table at RVA 0x2038 (offset 356):
+    view.setUint32(356, 0x2060, true);
+    view.setUint32(360, 0, true);
+
+    // Write "KERNEL32.dll" string at RVA 0x2050 (offset 380)
+    const nameStr = 'KERNEL32.dll';
+    for (let i = 0; i < nameStr.length; i++) {
+      bytes[380 + i] = nameStr.charCodeAt(i);
+    }
+
+    // Write "strcpy" string at RVA 0x2060 (offset 396)
+    // Hint: 0 (2 bytes)
+    view.setUint16(396, 0, true);
+    const funcStr = 'strcpy';
+    for (let i = 0; i < funcStr.length; i++) {
+      bytes[398 + i] = funcStr.charCodeAt(i);
+    }
+
+    const hex = toHex(bytes);
+    const result = await AIBridge.executeQuery({
+      action: 'vulnScan',
+      params: {
+        data: hex,
+        symbols: [{ name: 'strcpy', address: 0x2038 }]
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.vulnerabilities.length).toBeGreaterThan(0);
+    const match = result.vulnerabilities.find((v: any) => v.evidence === 'strcpy');
+    expect(match).toBeDefined();
+    expect(match.library).toBe('KERNEL32.dll');
+  });
 });
+

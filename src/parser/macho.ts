@@ -360,6 +360,10 @@ export class MachoParser {
         } catch {
           // ignore or handle gracefully
         }
+      } else if (cmd === 0x80000028) {
+        // LC_MAIN
+        payload.entryoff = Number(this.view.getBigUint64(offset + 8, isLittleEndian));
+        payload.stacksize = Number(this.view.getBigUint64(offset + 16, isLittleEndian));
       }
 
       loadCommands.push({

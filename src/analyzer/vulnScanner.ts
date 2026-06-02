@@ -7,6 +7,7 @@
  */
 
 import { Section, Symbol, Instruction } from '../disassembler/types.js';
+import { PEParser } from '../parser/pe.js';
 
 export interface VulnMatch {
   /** Vulnerability type: 'unsafe_api' | 'buffer_overflow' | 'integer_overflow' | 'format_string' */
@@ -23,6 +24,8 @@ export interface VulnMatch {
   address?: number;
   /** Extracted symbol name or trigger string */
   evidence: string;
+  /** Library/DLL name where the function is imported from */
+  library?: string;
 }
 
 export interface VulnScannerConfig {
@@ -165,6 +168,36 @@ export class VulnScanner {
   ): VulnMatch[] {
     const matches: VulnMatch[] = [];
 
+    const symbolToLibrary = new Map<string, string>();
+    if (binaryData && binaryData.length > 0) {
+      let detected = 'auto';
+      if (binaryData[0] === 0x7f && binaryData[1] === 0x45 && binaryData[2] === 0x4c && binaryData[3] === 0x46) {
+        detected = 'elf';
+      } else if (binaryData[0] === 0x4d && binaryData[1] === 0x5a) {
+        detected = 'pe';
+      } else if (
+        (binaryData[0] === 0xfe && binaryData[1] === 0xed && binaryData[2] === 0xfa && binaryData[3] === 0xcf) ||
+        (binaryData[0] === 0xcf && binaryData[1] === 0xfa && binaryData[2] === 0xed && binaryData[3] === 0xfe)
+      ) {
+        detected = 'macho';
+      }
+
+      try {
+        if (detected === 'pe') {
+          const parser = new PEParser(binaryData.buffer as ArrayBuffer);
+          const parsed = parser.parse();
+          for (const impTable of parsed.imports) {
+            for (const imp of impTable.imports) {
+              if (imp.name) {
+                symbolToLibrary.set(imp.name, impTable.dllName);
+                symbolToLibrary.set(this.cleanSymbolName(imp.name), impTable.dllName);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     // 1. Unsafe API Checks (via imported symbols & instruction calls)
     if (config.unsafeApi) {
       // Direct symbol scan
@@ -172,12 +205,19 @@ export class VulnScanner {
         const cleanedName = this.cleanSymbolName(sym.name);
         if (VulnScanner.UNSAFE_APIS.has(cleanedName)) {
           const apiInfo = VulnScanner.UNSAFE_APIS.get(cleanedName)!;
+          let libraryName: string | undefined;
+          if (symbolToLibrary.has(sym.name)) {
+            libraryName = symbolToLibrary.get(sym.name);
+          } else if (symbolToLibrary.has(cleanedName)) {
+            libraryName = symbolToLibrary.get(cleanedName);
+          }
           matches.push({
             category: 'unsafe_api',
             severity: apiInfo.severity,
             description: apiInfo.desc,
             address: sym.address,
             evidence: sym.name,
+            ...(libraryName ? { library: libraryName } : {})
           });
         }
       }
@@ -192,12 +232,19 @@ export class VulnScanner {
           const cleanedDest = this.cleanSymbolName(dest);
           if (VulnScanner.UNSAFE_APIS.has(cleanedDest)) {
             const apiInfo = VulnScanner.UNSAFE_APIS.get(cleanedDest)!;
+            let libraryName: string | undefined;
+            if (symbolToLibrary.has(dest)) {
+              libraryName = symbolToLibrary.get(dest);
+            } else if (symbolToLibrary.has(cleanedDest)) {
+              libraryName = symbolToLibrary.get(cleanedDest);
+            }
             matches.push({
               category: 'unsafe_api',
               severity: apiInfo.severity,
               description: `Instruction calls dangerous API: ${cleanedDest}. ${apiInfo.desc}`,
               address: inst.address,
               evidence: inst.opStr,
+              ...(libraryName ? { library: libraryName } : {})
             });
           }
         }

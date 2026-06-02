@@ -45,11 +45,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         try {
           const resolvedPath = path.resolve(val.trim());
           if (fs.existsSync(resolvedPath) && fs.lstatSync(resolvedPath).isFile()) {
+            const stats = fs.statSync(resolvedPath);
+            if (stats.size > 10485760) {
+              throw new Error('Input size exceeds 10MB limit');
+            }
             const buffer = fs.readFileSync(resolvedPath);
             // Convert to hex representation since tools expect hex or base64 or utf8 bytes
             return buffer.toString("hex");
           }
-        } catch (_) {
+        } catch (e: any) {
+          if (e?.message === 'Input size exceeds 10MB limit') {
+            throw e;
+          }
           // ignore resolving errors and treat as normal data string
         }
       }
@@ -72,7 +79,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: "text",
-          text: JSON.stringify(result, null, 2),
+          text: JSON.stringify(result, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2),
         },
       ],
     };

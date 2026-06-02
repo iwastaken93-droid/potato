@@ -167,10 +167,12 @@ describe('Binary Signature Scanner Unit Tests', () => {
 
       it('should match RegExp patterns containing non-ASCII bytes mapped via latin1', () => {
         const scanner = new SignatureScanner(false);
+        // eslint-disable-next-line no-control-regex
+        const rx = /\x80\xff\x00/;
         scanner.register({
           name: 'BinaryRegex',
           category: 'other',
-          patterns: [{ type: 'regex', value: /\x80\xff\x00/ }],
+          patterns: [{ type: 'regex', value: rx }],
         });
         const buffer = new Uint8Array([0x01, 0x80, 0xff, 0x00, 0x02]);
         const results = scanner.scan(buffer);

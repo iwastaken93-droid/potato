@@ -899,3 +899,338 @@ export function parseDwarfInfo(
 
   return symbols;
 }
+
+// ============================================================================
+// DWARF v5 .debug_loclists Parsing
+// ============================================================================
+
+export interface LoclistEntry {
+  type: number;
+  typeName: string;
+  startAddress?: number;
+  endAddress?: number;
+  length?: number;
+  offsetStart?: number;
+  offsetEnd?: number;
+  baseAddressIndex?: number;
+  startAddressIndex?: number;
+  endAddressIndex?: number;
+  expression: Uint8Array;
+}
+
+export interface LoclistTable {
+  offset: number;
+  length: number;
+  version: number;
+  addressSize: number;
+  segmentSelectorSize: number;
+  offsetEntryCount: number;
+  offsets: number[];
+  lists: Map<number, LoclistEntry[]>;
+}
+
+export function parseLoclistEntry(
+  view: DataView,
+  offset: number,
+  addressSize: number
+): { entry: LoclistEntry; nextOffset: number } {
+  const type = view.getUint8(offset);
+  let current = offset + 1;
+
+  let typeName = '';
+  let startAddress: number | undefined;
+  let endAddress: number | undefined;
+  let length: number | undefined;
+  let offsetStart: number | undefined;
+  let offsetEnd: number | undefined;
+  let baseAddressIndex: number | undefined;
+  let startAddressIndex: number | undefined;
+  let endAddressIndex: number | undefined;
+  let expression = new Uint8Array(0);
+
+  switch (type) {
+    case 0x00: // DW_LLE_end_of_list
+      typeName = 'DW_LLE_end_of_list';
+      break;
+
+    case 0x01: { // DW_LLE_base_addressx
+      typeName = 'DW_LLE_base_addressx';
+      const indexRes = readULEB128(view, current);
+      current += indexRes.bytesRead;
+      baseAddressIndex = indexRes.value;
+      break;
+    }
+
+    case 0x02: { // DW_LLE_startx_endx
+      typeName = 'DW_LLE_startx_endx';
+      const startRes = readULEB128(view, current);
+      current += startRes.bytesRead;
+      const endRes = readULEB128(view, current);
+      current += endRes.bytesRead;
+      startAddressIndex = startRes.value;
+      endAddressIndex = endRes.value;
+
+      const exprLenRes = readULEB128(view, current);
+      current += exprLenRes.bytesRead;
+      if (exprLenRes.value > 0) {
+        if (current + exprLenRes.value > view.byteLength) throw new Error('Out of bounds');
+        expression = new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset + current, exprLenRes.value);
+        current += exprLenRes.value;
+      }
+      break;
+    }
+
+    case 0x03: { // DW_LLE_startx_length
+      typeName = 'DW_LLE_startx_length';
+      const startRes = readULEB128(view, current);
+      current += startRes.bytesRead;
+      const lenRes = readULEB128(view, current);
+      current += lenRes.bytesRead;
+      startAddressIndex = startRes.value;
+      length = lenRes.value;
+
+      const exprLenRes = readULEB128(view, current);
+      current += exprLenRes.bytesRead;
+      if (exprLenRes.value > 0) {
+        if (current + exprLenRes.value > view.byteLength) throw new Error('Out of bounds');
+        expression = new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset + current, exprLenRes.value);
+        current += exprLenRes.value;
+      }
+      break;
+    }
+
+    case 0x04: { // DW_LLE_offset_pair
+      typeName = 'DW_LLE_offset_pair';
+      const startRes = readULEB128(view, current);
+      current += startRes.bytesRead;
+      const endRes = readULEB128(view, current);
+      current += endRes.bytesRead;
+      offsetStart = startRes.value;
+      offsetEnd = endRes.value;
+
+      const exprLenRes = readULEB128(view, current);
+      current += exprLenRes.bytesRead;
+      if (exprLenRes.value > 0) {
+        if (current + exprLenRes.value > view.byteLength) throw new Error('Out of bounds');
+        expression = new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset + current, exprLenRes.value);
+        current += exprLenRes.value;
+      }
+      break;
+    }
+
+    case 0x05: { // DW_LLE_default_location
+      typeName = 'DW_LLE_default_location';
+      const exprLenRes = readULEB128(view, current);
+      current += exprLenRes.bytesRead;
+      if (exprLenRes.value > 0) {
+        if (current + exprLenRes.value > view.byteLength) throw new Error('Out of bounds');
+        expression = new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset + current, exprLenRes.value);
+        current += exprLenRes.value;
+      }
+      break;
+    }
+
+    case 0x06: { // DW_LLE_base_address
+      typeName = 'DW_LLE_base_address';
+      if (current + addressSize > view.byteLength) throw new Error('Out of bounds');
+      startAddress = addressSize === 8 
+        ? Number(view.getBigUint64(current, true)) 
+        : view.getUint32(current, true);
+      current += addressSize;
+      break;
+    }
+
+    case 0x07: { // DW_LLE_start_end
+      typeName = 'DW_LLE_start_end';
+      if (current + 2 * addressSize > view.byteLength) throw new Error('Out of bounds');
+      startAddress = addressSize === 8 
+        ? Number(view.getBigUint64(current, true)) 
+        : view.getUint32(current, true);
+      current += addressSize;
+      endAddress = addressSize === 8 
+        ? Number(view.getBigUint64(current, true)) 
+        : view.getUint32(current, true);
+      current += addressSize;
+
+      const exprLenRes = readULEB128(view, current);
+      current += exprLenRes.bytesRead;
+      if (exprLenRes.value > 0) {
+        if (current + exprLenRes.value > view.byteLength) throw new Error('Out of bounds');
+        expression = new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset + current, exprLenRes.value);
+        current += exprLenRes.value;
+      }
+      break;
+    }
+
+    case 0x08: { // DW_LLE_start_length
+      typeName = 'DW_LLE_start_length';
+      if (current + addressSize > view.byteLength) throw new Error('Out of bounds');
+      startAddress = addressSize === 8 
+        ? Number(view.getBigUint64(current, true)) 
+        : view.getUint32(current, true);
+      current += addressSize;
+      const lenRes = readULEB128(view, current);
+      current += lenRes.bytesRead;
+      length = lenRes.value;
+
+      const exprLenRes = readULEB128(view, current);
+      current += exprLenRes.bytesRead;
+      if (exprLenRes.value > 0) {
+        if (current + exprLenRes.value > view.byteLength) throw new Error('Out of bounds');
+        expression = new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset + current, exprLenRes.value);
+        current += exprLenRes.value;
+      }
+      break;
+    }
+
+    default:
+      throw new Error(`Unsupported DW_LLE type: 0x${type.toString(16)}`);
+  }
+
+  return {
+    entry: {
+      type,
+      typeName,
+      startAddress,
+      endAddress,
+      length,
+      offsetStart,
+      offsetEnd,
+      baseAddressIndex,
+      startAddressIndex,
+      endAddressIndex,
+      expression,
+    },
+    nextOffset: current,
+  };
+}
+
+export function parseDebugLoclists(
+  debugLoclistsBuffer: ArrayBuffer
+): LoclistTable[] {
+  const tables: LoclistTable[] = [];
+  const view = new DataView(debugLoclistsBuffer);
+  let offset = 0;
+
+  while (offset < view.byteLength) {
+    const tableOffset = offset;
+    if (offset + 4 > view.byteLength) break;
+
+    let unitLength = view.getUint32(offset, true);
+    offset += 4;
+    let is64Bit = false;
+
+    if (unitLength === 0xffffffff) {
+      if (offset + 8 > view.byteLength) break;
+      unitLength = Number(view.getBigUint64(offset, true));
+      offset += 8;
+      is64Bit = true;
+    }
+
+    if (offset + unitLength > view.byteLength) {
+      break; // Truncated or invalid length
+    }
+    const unitEndOffset = tableOffset + (is64Bit ? 12 : 4) + unitLength;
+
+    if (offset + 2 > view.byteLength) break;
+    const version = view.getUint16(offset, true);
+    offset += 2;
+
+    if (version !== 5) {
+      // debug_loclists is a DWARF v5 section
+      offset = unitEndOffset;
+      continue;
+    }
+
+    if (offset + 2 > view.byteLength) break;
+    const addressSize = view.getUint8(offset);
+    offset++;
+    const segmentSelectorSize = view.getUint8(offset);
+    offset++;
+
+    if (offset + 4 > view.byteLength) break;
+    const offsetEntryCount = view.getUint32(offset, true);
+    offset += 4;
+
+    const offsetSize = is64Bit ? 8 : 4;
+    const offsets: number[] = [];
+    const offsetTableStart = offset;
+
+    for (let i = 0; i < offsetEntryCount; i++) {
+      if (offset + offsetSize > view.byteLength) break;
+      const offVal = offsetSize === 8 
+        ? Number(view.getBigUint64(offset, true)) 
+        : view.getUint32(offset, true);
+      offsets.push(offVal);
+      offset += offsetSize;
+    }
+
+    const lists = new Map<number, LoclistEntry[]>();
+    const parsedOffsets = new Set<number>();
+
+    const parseListAt = (startOffset: number) => {
+      if (parsedOffsets.has(startOffset)) return;
+      parsedOffsets.add(startOffset);
+
+      let current = startOffset;
+      const listEntries: LoclistEntry[] = [];
+      
+      while (current < unitEndOffset) {
+        try {
+          const entry = parseLoclistEntry(view, current, addressSize);
+          listEntries.push(entry.entry);
+          current = entry.nextOffset;
+          if (entry.entry.type === 0x00) { // DW_LLE_end_of_list
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
+
+      if (listEntries.length > 0) {
+        lists.set(startOffset, listEntries);
+      }
+    };
+
+    let listDataOffset = offset;
+    while (listDataOffset < unitEndOffset) {
+      const start = listDataOffset;
+      parseListAt(start);
+      const parsed = lists.get(start);
+      if (parsed && parsed.length > 0) {
+        let current = start;
+        for (const entry of parsed) {
+          const res = parseLoclistEntry(view, current, addressSize);
+          current = res.nextOffset;
+        }
+        listDataOffset = current;
+      } else {
+        listDataOffset++;
+      }
+    }
+
+    for (const offVal of offsets) {
+      const absOffset = offsetTableStart + offVal;
+      if (absOffset < unitEndOffset) {
+        parseListAt(absOffset);
+      }
+    }
+
+    tables.push({
+      offset: tableOffset,
+      length: unitLength,
+      version,
+      addressSize,
+      segmentSelectorSize,
+      offsetEntryCount,
+      offsets,
+      lists,
+    });
+
+    offset = unitEndOffset;
+  }
+
+  return tables;
+}
+

@@ -485,23 +485,34 @@ export function disassembleRiscv(data: Uint8Array, baseAddress: number): Instruc
           break;
         }
         case 0x33: { // OP
-          if (funct3 === 0x0) {
-            if (funct7 === 0x00) {
-              mnemonic = 'add';
-            } else if (funct7 === 0x20) {
-              mnemonic = 'sub';
+          if (funct7 === 0x01) { // M extension
+            if (funct3 === 0x0) mnemonic = 'mul';
+            else if (funct3 === 0x1) mnemonic = 'mulh';
+            else if (funct3 === 0x2) mnemonic = 'mulhsu';
+            else if (funct3 === 0x3) mnemonic = 'mulhu';
+            else if (funct3 === 0x4) mnemonic = 'div';
+            else if (funct3 === 0x5) mnemonic = 'divu';
+            else if (funct3 === 0x6) mnemonic = 'rem';
+            else if (funct3 === 0x7) mnemonic = 'remu';
+          } else { // Standard OP RV32I
+            if (funct3 === 0x0) {
+              if (funct7 === 0x00) {
+                mnemonic = 'add';
+              } else if (funct7 === 0x20) {
+                mnemonic = 'sub';
+              }
+            } else if (funct3 === 0x1 && funct7 === 0x00) {
+              mnemonic = 'sll';
+            } else if (funct3 === 0x4 && funct7 === 0x00) {
+              mnemonic = 'xor';
+            } else if (funct3 === 0x5) {
+              if (funct7 === 0x00) mnemonic = 'srl';
+              else if (funct7 === 0x20) mnemonic = 'sra';
+            } else if (funct3 === 0x6 && funct7 === 0x00) {
+              mnemonic = 'or';
+            } else if (funct3 === 0x7 && funct7 === 0x00) {
+              mnemonic = 'and';
             }
-          } else if (funct3 === 0x1 && funct7 === 0x00) {
-            mnemonic = 'sll';
-          } else if (funct3 === 0x4 && funct7 === 0x00) {
-            mnemonic = 'xor';
-          } else if (funct3 === 0x5) {
-            if (funct7 === 0x00) mnemonic = 'srl';
-            else if (funct7 === 0x20) mnemonic = 'sra';
-          } else if (funct3 === 0x6 && funct7 === 0x00) {
-            mnemonic = 'or';
-          } else if (funct3 === 0x7 && funct7 === 0x00) {
-            mnemonic = 'and';
           }
 
           if (mnemonic !== 'db') {
@@ -511,6 +522,40 @@ export function disassembleRiscv(data: Uint8Array, baseAddress: number): Instruc
               { type: 'reg', reg: rs1Name },
               { type: 'reg', reg: rs2Name }
             ];
+          }
+          break;
+        }
+        case 0x2f: { // OP-AMO (A extension)
+          if (funct3 === 0x2) {
+            const funct5 = (val >>> 27) & 0x1f;
+            if (funct5 === 0x02) mnemonic = 'lr.w';
+            else if (funct5 === 0x03) mnemonic = 'sc.w';
+            else if (funct5 === 0x01) mnemonic = 'amoswap.w';
+            else if (funct5 === 0x00) mnemonic = 'amoadd.w';
+            else if (funct5 === 0x04) mnemonic = 'amoxor.w';
+            else if (funct5 === 0x0c) mnemonic = 'amoand.w';
+            else if (funct5 === 0x08) mnemonic = 'amoor.w';
+            else if (funct5 === 0x10) mnemonic = 'amomin.w';
+            else if (funct5 === 0x14) mnemonic = 'amomax.w';
+            else if (funct5 === 0x18) mnemonic = 'amominu.w';
+            else if (funct5 === 0x1c) mnemonic = 'amomaxu.w';
+
+            if (mnemonic !== 'db') {
+              if (mnemonic === 'lr.w') {
+                opStr = `${rdName}, (${rs1Name})`;
+                operands = [
+                  { type: 'reg', reg: rdName },
+                  { type: 'mem', mem: { base: rs1Name, disp: 0 } }
+                ];
+              } else {
+                opStr = `${rdName}, ${rs2Name}, (${rs1Name})`;
+                operands = [
+                  { type: 'reg', reg: rdName },
+                  { type: 'reg', reg: rs2Name },
+                  { type: 'mem', mem: { base: rs1Name, disp: 0 } }
+                ];
+              }
+            }
           }
           break;
         }

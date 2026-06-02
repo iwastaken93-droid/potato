@@ -37,9 +37,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   try {
+    const fs = await import("fs");
+    const path = await import("path");
+    
+    const resolveDataParam = (val: any): string => {
+      if (typeof val === 'string' && val.trim().length > 0) {
+        try {
+          const resolvedPath = path.resolve(val.trim());
+          if (fs.existsSync(resolvedPath) && fs.lstatSync(resolvedPath).isFile()) {
+            const buffer = fs.readFileSync(resolvedPath);
+            // Convert to hex representation since tools expect hex or base64 or utf8 bytes
+            return buffer.toString("hex");
+          }
+        } catch (_) {
+          // ignore resolving errors and treat as normal data string
+        }
+      }
+      return val;
+    };
+
+    const processedArgs = { ...(args || {}) };
+    for (const key of ['data', 'dataA', 'dataB']) {
+      if (key in processedArgs) {
+        processedArgs[key] = resolveDataParam(processedArgs[key]);
+      }
+    }
+
     const result = await AIBridge.executeQuery({
       action: name,
-      params: args || {},
+      params: processedArgs,
     });
 
     return {

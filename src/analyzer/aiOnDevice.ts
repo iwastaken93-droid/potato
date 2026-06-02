@@ -4,6 +4,7 @@
  */
 
 import { AIExplanationResult, AIPattern } from './ai.js';
+import { computeSHA256 } from './hashes.js';
 
 // --- ONNX Runtime Web Type Definitions ---
 export interface ORTTensor {
@@ -711,6 +712,8 @@ export class OnDeviceLLMManager {
 
     this.updateStatus('ready');
 
+    const inputHash = computeSHA256(new TextEncoder().encode(code));
+
     return {
       summary,
       functionality,
@@ -718,6 +721,7 @@ export class OnDeviceLLMManager {
       pseudocode,
       complexity: { time: timeComp, space: spaceComp },
       suggestions,
+      inputHash,
     };
   }
 

@@ -2372,13 +2372,32 @@ Verified [src/parser/javaClass.ts](file:///C:/Users/NaThA/hacks/antigravity_thin
 - Verified TypeScript compilation (\	sc\) compiles cleanly without any errors.
 - Summarized audit and test execution facts.
 
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+## [2026-06-02 16:15] Subagent extracted MCP configuration JSON block.
+
+## [2026-06-02 16:13] Run git diff to check tests/javaClass.test.ts. Verified pristine local changes.
+
+## [2026-06-02 16:16] Final Unit Test Verification & MCP Audit Commit
+- Verified/added unit tests for Java class LineNumberTable and LocalVariableTable attributes.
+- Audited the MCP tool review gaps comparing implementation against mcp-tool-review.md.
+- Staged tests/javaClass.test.ts and DEVLOG.md for git commit.
+
+## [2026-06-02 16:13] Build Verification
+- Checked build directory dist/ to make sure it contains compiled JS files matching the src/ structure.
+- Verified all 104 TS/JS files from [src/](file:///C:/Users/NaThA/hacks/antigravity_things/agy\test/src) have corresponding JS outputs in [dist/](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/dist).
+
+## [2026-06-02 16:13:33]
+- Check git status after commit. Many modified and untracked files exist.
+
+## [2026-06-02 16:15:00] Production Build Verification
+- Command: `pnpm build`
+- Result: Build succeeded. Vite bundle successfully compiled `dist/index.js` (64.50 kB) via TypeScript compiler and Vite.
+
+## [2026-06-02T16:15:00+10:00] Subagent Report
+- Ran git log to get last commit details.
+- Verified commit 9e838025cdc62468adf12e6ca12ce6f7b60a00f7.
 
 ## [2026-06-02T16:08:00+10:00] LineNumberTable & LocalVariableTable Unit Tests
 - Implemented comprehensive unit tests verifying multiple/empty entries for LineNumberTable and LocalVariableTable in [javaClass.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/javaClass.test.ts).
-
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
 
 ## 2026-06-02 E2E Verification
 - Verified MCP tools E2E tests run cleanly.
@@ -2389,11 +2408,21 @@ Verified [src/parser/javaClass.ts](file:///C:/Users/NaThA/hacks/antigravity_thin
 - Ran lint checks via \pnpm exec eslint .\.
 - Result: 538 warnings, 0 errors. Clean build status.
 
-## [2026-06-02 16:15] Subagent extracted MCP configuration JSON block.
+## [2026-06-02T16:15:19+10:00] Git status check
+- Checked status. Unstaged changes found. [DEVLOG.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/DEVLOG.md) updated.
 
-[2026-06-02 16:13] Run git diff to check tests/javaClass.test.ts. Verified pristine local changes.
+## [2026-06-02 16:16:00] Check Staged Changes
+- Ran git diff --cached
+- Result: No staged changes found.
 
-## [2026-06-02 16:16] Final Unit Test Verification & MCP Audit Commit
-- Verified/added unit tests for Java class LineNumberTable and LocalVariableTable attributes.
-- Audited the MCP tool review gaps comparing implementation against mcp-tool-review.md.
-- Staged tests/javaClass.test.ts and DEVLOG.md for git commit.
+## [2026-06-02T16:16:28+10:00] Subagent Entry
+Run git diff to list unstaged modified files.
+
+## [2026-06-02T16:17:30+10:00] Subagent verification
+- Verified last 10 lines of DEVLOG.md.
+- Run verification script, cleaned duplicates.
+
+## [2026-06-02T16:20:00+10:00] Commit Run
+- Stage tracked modified files.
+- Commit changes summarizing RISC-V extensions, PE Authenticode, DWARF loclists, MCP server enhancements, scripting, emulator upgrade, test suites.
+

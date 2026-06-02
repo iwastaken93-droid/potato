@@ -4,6 +4,8 @@
  * Simulates/stubs a local AI assistant that analyzes disassembled or decompiled code blocks.
  */
 
+import { computeSHA256 } from './hashes.js';
+
 export interface AIPattern {
   name: string;
   confidence: number; // 0 to 100
@@ -23,6 +25,7 @@ export interface AIExplanationResult {
   pseudocode: string;
   complexity: AIComplexity;
   suggestions: string[];
+  inputHash: string;
 }
 
 export class AIExplanationEngine {
@@ -36,6 +39,8 @@ export class AIExplanationEngine {
     const cleanCode = code.trim();
     const funcName = context?.functionName || 'unknown_function';
     const lowerCode = cleanCode.toLowerCase();
+    const inputHash = computeSHA256(new TextEncoder().encode(code));
+
 
     // Default response state
     let summary: string;
@@ -502,12 +507,60 @@ export class AIExplanationEngine {
     }
     // 10. DEFAULT / Iterative loop
     else {
-      summary = `Implements an iterative control loop processing general buffer items or variables inside '${funcName}'.`;
+      const lines = cleanCode.split('\n').map(l => l.trim()).filter(Boolean);
+      const instructionCount = lines.length;
+
+      const operationsUsedSet = new Set<string>();
+      const registersUsedSet = new Set<string>();
+      
+      const commonMnemonics = ['mov', 'add', 'sub', 'xor', 'cmp', 'jmp', 'call', 'push', 'pop', 'lea', 'test', 'inc', 'dec', 'shl', 'shr', 'ret', 'jne', 'je', 'jz', 'jnz', 'or', 'and', 'nop'];
+      const commonRegisters = ['rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rsp', 'rbp', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15', 'eax', 'ebx', 'ecx', 'edx', 'esi', 'edi', 'esp', 'ebp'];
+
+      for (const line of lines) {
+        const tokens = line.split(/[\s,()\[\]+*\-:]+/).map(t => t.toLowerCase());
+        for (const token of tokens) {
+          if (commonMnemonics.includes(token)) {
+            operationsUsedSet.add(token);
+          }
+          if (commonRegisters.includes(token)) {
+            registersUsedSet.add(token);
+          }
+        }
+      }
+
+      const operationsUsed = Array.from(operationsUsedSet);
+      const registersUsed = Array.from(registersUsedSet);
+
+      const opStr = operationsUsed.length > 0 ? `operations like ${operationsUsed.join(', ')}` : 'standard operations';
+      const regStr = registersUsed.length > 0 ? `registers (${registersUsed.join(', ')})` : 'stack variables';
+
+      summary = `Dynamic analysis of '${funcName}' containing ${instructionCount} instructions/statements. Characterized by control/data flow using ${regStr} performing ${opStr}.`;
+      
       functionality.push(
-        'Initializes loop counter variables and index flags.',
-        'Applies logical comparison instructions (CMP/TEST) to manage conditional jumps.',
-        'Reads variables, registers, or memory buffers sequentially.'
+        `Executes ${instructionCount} sequential processing instructions.`,
+        `Manipulates program state using variables/registers: ${registersUsed.slice(0, 4).join(', ') || 'stack memory'}.`
       );
+
+      if (operationsUsed.includes('cmp') || operationsUsed.includes('test')) {
+        functionality.push('Performs logical comparison and status flag checks.');
+      }
+      if (operationsUsed.includes('jmp') || operationsUsed.includes('je') || operationsUsed.includes('jne')) {
+        functionality.push('Implements conditional or unconditional branching logic.');
+      }
+      if (operationsUsed.includes('call')) {
+        functionality.push('Invokes external subroutines or API function calls.');
+      }
+
+      patterns.push({
+        name: 'Dynamic Instruction Flow',
+        confidence: 85,
+        description: 'Analyzed unique instructions and registers to characterize function behavior.',
+        matchedElements: [
+          `Detected registers: ${registersUsed.join(', ') || 'none'}`,
+          `Detected operations: ${operationsUsed.join(', ') || 'none'}`
+        ]
+      });
+
       if (hasLoops) {
         patterns.push({
           name: 'Looping Iterative Routine',
@@ -521,18 +574,16 @@ export class AIExplanationEngine {
           ],
         });
       }
-      pseudocode = `void process_items(uint32_t* items, size_t count) {
-    for (size_t i = 0; i < count; i++) {
-        // Core block operations
-        uint32_t temp = items[i];
-        temp = (temp ^ 0x3D) + 0x10;
-        items[i] = temp;
-    }
-}`;
-      timeComp = 'O(N) where N is number of iterations';
-      spaceComp = 'O(1)';
+
+      const pseudoLines = lines.map(line => `    ${line}`).slice(0, 10);
+      pseudocode = `// Dynamically generated C-like pseudocode representation for ${funcName}:\nvoid ${funcName}() {\n${pseudoLines.join('\n')}${lines.length > 10 ? '\n    // ... (truncated)' : ''}\n}`;
+
+      timeComp = hasLoops ? 'O(N) loop execution' : 'O(1) sequential instructions';
+      spaceComp = 'O(1) local variable usage';
+
       suggestions.push(
-        'Ensure loop index boundaries are securely bounded relative to target buffer allocations to block out-of-bounds reads/writes.'
+        'Review the code flow paths to verify that all register and memory accesses are properly bounds-checked.',
+        'Ensure that local registers/variables are properly initialized before being read.'
       );
     }
 
@@ -546,6 +597,7 @@ export class AIExplanationEngine {
         space: spaceComp,
       },
       suggestions,
+      inputHash,
     };
   }
 }

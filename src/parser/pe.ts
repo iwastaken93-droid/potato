@@ -3,6 +3,8 @@
  * Parses DOS Header, COFF File Header, Optional Header, Section Headers, and Import/Export Tables.
  */
 
+import { computeMD5, computeSHA1, computeSHA256 } from '../analyzer/hashes.js';
+
 export interface DosHeader {
   magic: string; // Should be "MZ"
   e_lfanew: number; // File offset of the PE header
@@ -121,6 +123,21 @@ export interface ParsedTLS {
   rawAddressOfCallbacks: bigint | number;
 }
 
+export interface AuthenticodeCertificate {
+  revision: number;
+  type: number;
+  data: Uint8Array;
+}
+
+export interface AuthenticodeInfo {
+  isValid: boolean;
+  error?: string;
+  hashAlgorithm?: string;
+  expectedHash?: string;
+  actualHash?: string;
+  certificates: AuthenticodeCertificate[];
+}
+
 export interface ParsedPE {
   is32Bit: boolean;
   dosHeader: DosHeader;
@@ -136,6 +153,160 @@ export interface ParsedPE {
     all: ParsedResource[];
   };
   tls?: ParsedTLS;
+  authenticode?: AuthenticodeInfo;
+}
+
+interface Asn1Node {
+  tag: number;
+  value: Uint8Array;
+  children?: Asn1Node[];
+}
+
+function decodeDer(bytes: Uint8Array, offset = 0): { node: Asn1Node; readBytes: number } | null {
+  if (offset >= bytes.length) return null;
+  const start = offset;
+  const tag = bytes[offset++];
+  
+  if (offset >= bytes.length) return null;
+  const lenByte = bytes[offset++];
+  let length = 0;
+  if (lenByte & 0x80) {
+    const numBytes = lenByte & 0x7f;
+    if (offset + numBytes > bytes.length) return null;
+    for (let i = 0; i < numBytes; i++) {
+      length = (length * 256) + bytes[offset++];
+    }
+  } else {
+    length = lenByte;
+  }
+  
+  if (offset + length > bytes.length) return null;
+  const value = bytes.subarray(offset, offset + length);
+  offset += length;
+  
+  const node: Asn1Node = { tag, value };
+  
+  const isConstructed = (tag & 0x20) !== 0;
+  if (isConstructed) {
+    const children: Asn1Node[] = [];
+    let childOffset = 0;
+    while (childOffset < value.length) {
+      const childResult = decodeDer(value, childOffset);
+      if (!childResult) break;
+      children.push(childResult.node);
+      childOffset += childResult.readBytes;
+    }
+    node.children = children;
+  }
+  
+  return { node, readBytes: offset - start };
+}
+
+function decodeOid(bytes: Uint8Array): string {
+  if (bytes.length === 0) return '';
+  const first = bytes[0];
+  const parts: number[] = [Math.floor(first / 40), first % 40];
+  let value = 0;
+  for (let i = 1; i < bytes.length; i++) {
+    const b = bytes[i];
+    value = (value << 7) | (b & 0x7f);
+    if ((b & 0x80) === 0) {
+      parts.push(value);
+      value = 0;
+    }
+  }
+  return parts.join('.');
+}
+
+const OID_TO_HASH_ALGO: Record<string, string> = {
+  '1.3.14.3.2.26': 'sha1',
+  '2.16.840.1.101.3.4.2.1': 'sha256',
+  '1.2.840.113549.2.5': 'md5',
+  '2.16.840.1.101.3.4.2.2': 'sha384',
+  '2.16.840.1.101.3.4.2.3': 'sha512',
+};
+
+function findDigestInfo(node: Asn1Node): { algorithm: string; digest: Uint8Array } | null {
+  if (node.tag === 0x30 && node.children && node.children.length >= 2) {
+    const first = node.children[0];
+    const second = node.children[1];
+    if (first.tag === 0x30 && first.children && first.children.length >= 1 && second.tag === 0x04) {
+      const oidNode = first.children[0];
+      if (oidNode.tag === 0x06) {
+        const oid = decodeOid(oidNode.value);
+        const algo = OID_TO_HASH_ALGO[oid];
+        if (algo) {
+          return { algorithm: algo, digest: second.value };
+        }
+      }
+    }
+  }
+  if (node.children) {
+    for (const child of node.children) {
+      const res = findDigestInfo(child);
+      if (res) return res;
+    }
+  }
+  return null;
+}
+
+function findAuthenticodeDigest(node: Asn1Node): { algorithm: string; digest: Uint8Array } | null {
+  if (node.tag === 0x30 && node.children) {
+    const hasAuthenticodeOid = node.children.some(
+      c => c.tag === 0x06 && decodeOid(c.value) === '1.3.6.1.4.1.311.2.1.4'
+    );
+    if (hasAuthenticodeOid) {
+      return findDigestInfo(node);
+    }
+  }
+  if (node.children) {
+    for (const child of node.children) {
+      const res = findAuthenticodeDigest(child);
+      if (res) return res;
+    }
+  }
+  return null;
+}
+
+function getAuthenticodeHashBytes(
+  bytes: Uint8Array,
+  optionalOffset: number,
+  is32Bit: boolean,
+  certTableOffset: number,
+  certTableSize: number
+): Uint8Array {
+  const securityDirOffset = is32Bit ? optionalOffset + 128 : optionalOffset + 144;
+  const chunks: Uint8Array[] = [];
+  
+  // 1. Up to CheckSum
+  chunks.push(bytes.subarray(0, optionalOffset + 64));
+  
+  // 2. From after CheckSum to Security Directory
+  if (securityDirOffset > optionalOffset + 68) {
+    chunks.push(bytes.subarray(optionalOffset + 68, securityDirOffset));
+  }
+  
+  // 3. From after Security Directory to Certificate Table
+  const startOfCertTable = certTableOffset > 0 && certTableOffset < bytes.length ? certTableOffset : bytes.length;
+  if (startOfCertTable > securityDirOffset + 8) {
+    chunks.push(bytes.subarray(securityDirOffset + 8, startOfCertTable));
+  }
+  
+  // 4. From after Certificate Table to End of File
+  if (certTableOffset > 0 && certTableOffset + certTableSize < bytes.length) {
+    chunks.push(bytes.subarray(certTableOffset + certTableSize));
+  }
+  
+  // Concatenate all chunks
+  let totalLen = 0;
+  for (const chunk of chunks) totalLen += chunk.length;
+  const result = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
 }
 
 export class PEParser {
@@ -857,6 +1028,97 @@ export class PEParser {
       }
     }
 
+    // 10. Parse & Verify Authenticode (Directory 4)
+    let authenticode: AuthenticodeInfo | undefined;
+    const certificates: AuthenticodeCertificate[] = [];
+
+    if (dataDirectories.length > 4 && dataDirectories[4].virtualAddress !== 0 && dataDirectories[4].size > 0) {
+      const certTableOffset = dataDirectories[4].virtualAddress; // File offset for Security directory
+      const certTableSize = dataDirectories[4].size;
+      
+      let isValid = false;
+      let verifyError: string | undefined;
+      let expectedHash: string | undefined;
+      let hashAlgorithm: string | undefined;
+      let actualHash: string | undefined;
+
+      if (certTableOffset + certTableSize <= len) {
+        let offset = certTableOffset;
+        const endOffset = certTableOffset + certTableSize;
+        while (offset + 8 <= endOffset) {
+          const dwLength = readU32(offset);
+          const wRevision = readU16(offset + 4);
+          const wCertificateType = readU16(offset + 6);
+          if (dwLength < 8 || offset + dwLength > endOffset) {
+            break;
+          }
+          const certData = bytes.subarray(offset + 8, offset + dwLength);
+          certificates.push({
+            revision: wRevision,
+            type: wCertificateType,
+            data: certData,
+          });
+          
+          // Pad dwLength to 8-byte alignment
+          const paddedLength = (dwLength + 7) & ~7;
+          offset += paddedLength;
+        }
+
+        const pkcsCert = certificates.find(c => c.type === 0x0002);
+        if (pkcsCert) {
+          try {
+            const decoded = decodeDer(pkcsCert.data);
+            if (decoded) {
+              const digestResult = findAuthenticodeDigest(decoded.node);
+              if (digestResult) {
+                hashAlgorithm = digestResult.algorithm;
+                expectedHash = Array.from(digestResult.digest)
+                  .map(b => b.toString(16).padStart(2, '0'))
+                  .join('');
+
+                const hashBytes = getAuthenticodeHashBytes(bytes, optionalOffset, is32Bit, certTableOffset, certTableSize);
+                if (hashAlgorithm === 'sha256') {
+                  actualHash = computeSHA256(hashBytes);
+                } else if (hashAlgorithm === 'sha1') {
+                  actualHash = computeSHA1(hashBytes);
+                } else if (hashAlgorithm === 'md5') {
+                  actualHash = computeMD5(hashBytes);
+                }
+
+                if (actualHash) {
+                  isValid = actualHash.toLowerCase() === expectedHash.toLowerCase();
+                  if (!isValid) {
+                    verifyError = 'Hash mismatch';
+                  }
+                } else {
+                  verifyError = `Unsupported hash algorithm: ${hashAlgorithm}`;
+                }
+              } else {
+                verifyError = 'Could not find Authenticode digest in PKCS#7 data';
+              }
+            } else {
+              verifyError = 'Failed to parse ASN.1 DER PKCS#7 structure';
+            }
+          } catch (e) {
+            verifyError = `ASN.1 parsing error: ${e instanceof Error ? e.message : String(e)}`;
+          }
+        } else {
+          verifyError = 'No PKCS#7 signed data certificate found';
+        }
+      } else {
+        verifyError = 'Certificate table offset/size points outside of file limits';
+      }
+
+      authenticode = {
+        isValid,
+        error: verifyError,
+        hashAlgorithm,
+        expectedHash,
+        actualHash,
+        certificates,
+      };
+    }
+
     return {
       is32Bit,
       dosHeader,
@@ -867,6 +1129,7 @@ export class PEParser {
       exports,
       resources,
       tls,
+      authenticode,
     };
   }
 }

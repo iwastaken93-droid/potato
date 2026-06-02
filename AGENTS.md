@@ -30,7 +30,7 @@ WE WANT TO MINIMISE CONTEXT AS MUCH AS POSSIBLE IF YOU ARE SUBAGENT GIVE SHORT M
   IF you are subagent activate caveman full skill
   remember to kill the subagents when they finish
   activate caveman full skill
-
+THERE IS NOTHING OUTSIDE OF WORKSPACE YOU IDIOT DONT EVEN BOTHER
 ---
 
 name: caveman

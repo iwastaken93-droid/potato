@@ -277,12 +277,12 @@ describe('Syscall and Windows API Emulation Tests', () => {
     emu.cpu.write('r8', 0x1000n); // MEM_COMMIT
     emu.cpu.write('r9', 0x40n); // flProtect = PAGE_EXECUTE_READWRITE
 
-    let rsp = emu.cpu.read('rsp') - 8n;
+    const rsp = emu.cpu.read('rsp') - 8n;
     emu.cpu.write('rsp', rsp);
     emu.memory.write64(rsp, 0x9999n);
     emu.cpu.write('rip', hookAddr);
 
-    let res = emu.step();
+    const res = emu.step();
     expect(res.success).toBe(true);
     expect(emu.cpu.read('rax')).toBe(0x40000000n);
 

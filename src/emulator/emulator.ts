@@ -9,6 +9,7 @@ import { Instruction, Operand, MemoryOperand } from '../disassembler/types.js';
 import { SyscallHandler } from './syscall.js';
 import { SymbolicExecutor, SymbolicState, SymbolicExpr } from '../analyzer/symbolic.js';
 import { IRTranslator, IROperand } from '../disassembler/ir.js';
+import { DisassemblerRouter } from '../disassembler/router.js';
 
 export interface ExecutionResult {
   success: boolean;
@@ -115,7 +116,57 @@ export class Emulator {
       }
     }
 
-    const inst = this.instructions.get(ripVal);
+    let inst = this.instructions.get(ripVal);
+    if (!inst) {
+      try {
+        const router = new DisassemblerRouter();
+        const bytes = new Uint8Array(15);
+        let readLen = 0;
+        for (let i = 0; i < 15; i++) {
+          try {
+            bytes[i] = this.memory.read8(BigInt(ripVal + i));
+            readLen = i + 1;
+          } catch {
+            break;
+          }
+        }
+        if (readLen > 0) {
+          const insts = router.disassemble(bytes.subarray(0, readLen), {
+            arch: 'x86_64',
+            baseAddress: ripVal
+          });
+          if (insts && insts.length > 0) {
+            const firstInst = insts[0];
+            const mnemonic = firstInst.mnemonic;
+            const operands = (firstInst.operands || []).map((arg: any) => {
+              if (typeof arg === 'object') {
+                if (arg.type === 'imm' && typeof arg.imm !== 'bigint') {
+                  return { type: 'imm', imm: BigInt(arg.imm) };
+                }
+                return arg;
+              }
+              const trimmed = String(arg).trim();
+              if (trimmed.startsWith('0x') || /^\d+$/.test(trimmed)) {
+                return { type: 'imm', imm: BigInt(trimmed) };
+              }
+              return { type: 'reg', reg: trimmed };
+            });
+            inst = {
+              address: firstInst.address,
+              bytes: firstInst.bytes || new Uint8Array(0),
+              mnemonic,
+              opStr: firstInst.opStr || '',
+              operands,
+              size: firstInst.size || 4
+            };
+            this.instructions.set(ripVal, inst);
+          }
+        }
+      } catch (_) {
+        // Ignore parsing errors and proceed with fallback check
+      }
+    }
+
     if (!inst) {
       return {
         success: false,
@@ -353,6 +404,10 @@ export class Emulator {
         this.cpu.write('rsp', rsp);
         this.cpu.write('rip', returnAddr);
         this.pcWritten = true;
+        break;
+      }
+
+      case 'nop': {
         break;
       }
 

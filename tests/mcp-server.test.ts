@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { server } from '../src/mcp-server.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -16,6 +16,11 @@ describe('MCP Server URET Engine Tests', () => {
       server.connect(serverTransport),
       client.connect(clientTransport),
     ]);
+  });
+
+  afterAll(async () => {
+    await client.close();
+    await server.close();
   });
 
   it('should list available tools', async () => {
@@ -67,5 +72,89 @@ describe('MCP Server URET Engine Tests', () => {
     expect(content.success).toBe(true);
     expect(content.pathFound).toBe(true);
     expect(content.solutions.x).toBe(42);
+  });
+
+  it('should resolve data from file path', async () => {
+    const fs = await import('fs');
+    const path = await import("path");
+    const tempFile = path.resolve('temp_test_mcp_resolve.txt');
+    fs.writeFileSync(tempFile, Buffer.from('90', 'hex'));
+
+    try {
+      const result = await client.callTool({
+        name: 'disassemble',
+        arguments: {
+          data: tempFile,
+          arch: 'x86_64',
+        },
+      });
+
+      expect(result.isError).toBeUndefined();
+      const content = JSON.parse(result.content[0].text);
+      expect(content.success).toBe(true);
+      expect(content.instructions.length).toBeGreaterThan(0);
+      expect(content.instructions[0].op).toBe('nop');
+    } finally {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    }
+  });
+
+  it('should run emulatorControl dynamic instruction execution', async () => {
+    await client.callTool({
+      name: 'emulatorControl',
+      arguments: { action: 'reset', entryPoint: 0x1000 }
+    });
+
+    await client.callTool({
+      name: 'emulatorControl',
+      arguments: {
+        action: 'writeMem',
+        memory: [{ address: '0x1000', value: '90' }]
+      }
+    });
+
+    const stepResult = await client.callTool({
+      name: 'emulatorControl',
+      arguments: { action: 'step', steps: 1 }
+    });
+
+    expect(stepResult.isError).toBeUndefined();
+    const content = JSON.parse(stepResult.content[0].text);
+    expect(content.success).toBe(true);
+    expect(content.cpuState.rip).toBe('4097');
+  });
+
+  it('should executeScript with parsed metadata and sandbox fs context', async () => {
+    const result = await client.callTool({
+      name: 'executeScript',
+      arguments: {
+        data: '9090',
+        script: 'return { size: fileSize, type: fileType, pathExists: fs.existsSync(".") };'
+      }
+    });
+
+    expect(result.isError).toBeUndefined();
+    const content = JSON.parse(result.content[0].text);
+    expect(content.success).toBe(true);
+    expect(content.result.size).toBe(2);
+    expect(content.result.pathExists).toBe(true);
+  });
+
+  it('should patchBinary with simplified schema', async () => {
+    const result = await client.callTool({
+      name: 'patchBinary',
+      arguments: {
+        data: '90909090',
+        offset: 1,
+        patchedBytes: 'ebfe'
+      }
+    });
+
+    expect(result.isError).toBeUndefined();
+    const content = JSON.parse(result.content[0].text);
+    expect(content.success).toBe(true);
+    expect(content.patchedData).toBe('90ebfe90');
   });
 });

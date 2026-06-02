@@ -33,6 +33,10 @@ import {
   parseFormValue,
   parseDwarfLine,
   parseDwarfInfo,
+  parseDebugLoclists,
+  parseLoclistEntry,
+  LoclistEntry,
+  LoclistTable,
 } from './dwarfParser.js';
 
 export {
@@ -41,6 +45,10 @@ export {
   parseFormValue,
   parseDwarfLine,
   parseDwarfInfo,
+  parseDebugLoclists,
+  parseLoclistEntry,
+  LoclistEntry,
+  LoclistTable,
 };
 
 // ============================================================================

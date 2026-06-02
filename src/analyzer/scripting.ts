@@ -1,5 +1,7 @@
 import { Instruction, Section, Symbol } from '../disassembler/types.js';
 import { ExtractedString } from './strings.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface ScriptingContext {
   binaryData: Uint8Array;
@@ -63,6 +65,29 @@ export class ScriptingEngine {
       strings: this.context.extractedStrings,
       imports: this.context.dependencies?.imports || [],
       exports: this.context.dependencies?.exports || [],
+      fileSize: this.context.binaryData.length,
+      fileType: (() => {
+        const bytes = this.context.binaryData;
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) return 'ELF';
+        if (bytes[0] === 0x4d && bytes[1] === 0x5a) return 'PE';
+        if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) return 'Mach-O';
+        return 'Unknown';
+      })(),
+      fs: {
+        readFileSync: (p: string, options?: any) => fs.readFileSync(p, options),
+        writeFileSync: (p: string, data: any, options?: any) => fs.writeFileSync(p, data, options),
+        existsSync: (p: string) => fs.existsSync(p),
+        readdirSync: (p: string) => fs.readdirSync(p),
+      },
+      path: {
+        resolve: (...args: string[]) => path.resolve(...args),
+        join: (...args: string[]) => path.join(...args),
+        basename: (p: string, ext?: string) => path.basename(p, ext),
+        dirname: (p: string) => path.dirname(p),
+      },
 
       getFunctions: () =>
         this.context.symbols.filter((s) => s.type === 'function'),

@@ -1118,4 +1118,222 @@ describe('PE Parser Unit Tests', () => {
     expect(parsed.tls!.rawAddressOfCallbacks).toBe(0x140002050n);
     expect(parsed.tls!.callbacks).toEqual([0x1010, 0x1020]);
   });
+
+  it('should parse and verify PE Authenticode signature', async () => {
+    function buildDer(tag: number, val: Uint8Array): Uint8Array {
+      let lenBytes: number[];
+      if (val.length < 128) {
+        lenBytes = [val.length];
+      } else {
+        const temp: number[] = [];
+        let l = val.length;
+        while (l > 0) {
+          temp.push(l & 0xff);
+          l = l >> 8;
+        }
+        temp.reverse();
+        lenBytes = [0x80 | temp.length, ...temp];
+      }
+      const res = new Uint8Array(1 + lenBytes.length + val.length);
+      res[0] = tag;
+      res.set(lenBytes, 1);
+      res.set(val, 1 + lenBytes.length);
+      return res;
+    }
+
+    const concat = (...arrays: Uint8Array[]): Uint8Array => {
+      let total = 0;
+      for (const arr of arrays) total += arr.length;
+      const res = new Uint8Array(total);
+      let offset = 0;
+      for (const arr of arrays) {
+        res.set(arr, offset);
+        offset += arr.length;
+      }
+      return res;
+    };
+
+    const authOid = new Uint8Array([0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x04]);
+    const sha256Oid = new Uint8Array([0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]);
+    const expectedHashBytes = new Uint8Array(32);
+    
+    const authOidNode = buildDer(0x06, authOid);
+    const sha256OidNode = buildDer(0x06, sha256Oid);
+    const algId = buildDer(0x30, sha256OidNode);
+    const digestVal = buildDer(0x04, expectedHashBytes);
+    const digestInfo = buildDer(0x30, concat(algId, digestVal));
+    const pkcsDataValue = buildDer(0x30, concat(authOidNode, digestInfo));
+    
+    const bCertificate = pkcsDataValue;
+    const certLength = 8 + bCertificate.length;
+    const certPaddedLength = (certLength + 7) & ~7;
+    
+    const buffer = new ArrayBuffer(352 + certPaddedLength);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d;
+    bytes[1] = 0x5a;
+    const e_lfanew = 64;
+    view.setUint32(60, e_lfanew, true);
+    view.setUint32(e_lfanew, 0x00004550, true);
+
+    const coffOffset = e_lfanew + 4;
+    view.setUint16(coffOffset, 0x14c, true);
+    view.setUint16(coffOffset + 2, 1, true);
+    view.setUint16(coffOffset + 16, 224, true);
+
+    const optionalOffset = coffOffset + 20;
+    view.setUint16(optionalOffset, 0x10b, true);
+    
+    const winOffset = optionalOffset + 28;
+    view.setUint32(winOffset + 28, 0x8000, true);
+    view.setUint32(winOffset + 32, 0x400, true);
+
+    const afterStackHeapOffset = optionalOffset + 88;
+    view.setUint32(afterStackHeapOffset + 4, 5, true);
+
+    const securityDirOffset = optionalOffset + 128;
+    const certTableOffset = 352;
+    view.setUint32(securityDirOffset, certTableOffset, true);
+    view.setUint32(securityDirOffset + 4, certPaddedLength, true);
+
+    view.setUint32(certTableOffset, certLength, true);
+    view.setUint16(certTableOffset + 4, 0x0200, true);
+    view.setUint16(certTableOffset + 6, 0x0002, true);
+    bytes.set(bCertificate, certTableOffset + 8);
+    
+    const getHashBytes = (buf: Uint8Array) => {
+      const securityDirPos = optionalOffset + 128;
+      const ch1 = buf.subarray(0, optionalOffset + 64);
+      const ch2 = buf.subarray(optionalOffset + 68, securityDirPos);
+      const ch3 = buf.subarray(securityDirPos + 8, certTableOffset);
+      const ch4 = buf.subarray(certTableOffset + certPaddedLength);
+      
+      const totalLen = ch1.length + ch2.length + ch3.length + ch4.length;
+      const res = new Uint8Array(totalLen);
+      res.set(ch1, 0);
+      res.set(ch2, ch1.length);
+      res.set(ch3, ch1.length + ch2.length);
+      res.set(ch4, ch1.length + ch2.length + ch3.length);
+      return res;
+    };
+    
+    const hashBytes = getHashBytes(bytes);
+    
+    const { computeSHA256 } = await import('../src/analyzer/hashes.js');
+    const computedHex = computeSHA256(hashBytes);
+    
+    const computedBytes = new Uint8Array(computedHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+    
+    const zeroIdx = bytes.indexOf(0, certTableOffset + 8 + 10);
+    bytes.set(computedBytes, zeroIdx);
+
+    const parser = new PEParser(buffer);
+    const parsed = parser.parse();
+
+    expect(parsed.authenticode).toBeDefined();
+    expect(parsed.authenticode!.isValid).toBe(true);
+    expect(parsed.authenticode!.hashAlgorithm).toBe('sha256');
+    expect(parsed.authenticode!.expectedHash).toBe(computedHex);
+    expect(parsed.authenticode!.actualHash).toBe(computedHex);
+    expect(parsed.authenticode!.certificates.length).toBe(1);
+    expect(parsed.authenticode!.certificates[0].revision).toBe(0x0200);
+    expect(parsed.authenticode!.certificates[0].type).toBe(0x0002);
+  });
+
+  it('should detect hash mismatch in PE Authenticode signature', async () => {
+    function buildDer(tag: number, val: Uint8Array): Uint8Array {
+      let lenBytes: number[];
+      if (val.length < 128) {
+        lenBytes = [val.length];
+      } else {
+        const temp: number[] = [];
+        let l = val.length;
+        while (l > 0) {
+          temp.push(l & 0xff);
+          l = l >> 8;
+        }
+        temp.reverse();
+        lenBytes = [0x80 | temp.length, ...temp];
+      }
+      const res = new Uint8Array(1 + lenBytes.length + val.length);
+      res[0] = tag;
+      res.set(lenBytes, 1);
+      res.set(val, 1 + lenBytes.length);
+      return res;
+    }
+
+    const concat = (...arrays: Uint8Array[]): Uint8Array => {
+      let total = 0;
+      for (const arr of arrays) total += arr.length;
+      const res = new Uint8Array(total);
+      let offset = 0;
+      for (const arr of arrays) {
+        res.set(arr, offset);
+        offset += arr.length;
+      }
+      return res;
+    };
+
+    const authOid = new Uint8Array([0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x04]);
+    const sha256Oid = new Uint8Array([0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]);
+    const expectedHashBytes = new Uint8Array(32);
+    expectedHashBytes.fill(0xAA); // Incorrect expected hash
+    
+    const authOidNode = buildDer(0x06, authOid);
+    const sha256OidNode = buildDer(0x06, sha256Oid);
+    const algId = buildDer(0x30, sha256OidNode);
+    const digestVal = buildDer(0x04, expectedHashBytes);
+    const digestInfo = buildDer(0x30, concat(algId, digestVal));
+    const pkcsDataValue = buildDer(0x30, concat(authOidNode, digestInfo));
+    
+    const bCertificate = pkcsDataValue;
+    const certLength = 8 + bCertificate.length;
+    const certPaddedLength = (certLength + 7) & ~7;
+    
+    const buffer = new ArrayBuffer(352 + certPaddedLength);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d;
+    bytes[1] = 0x5a;
+    const e_lfanew = 64;
+    view.setUint32(60, e_lfanew, true);
+    view.setUint32(e_lfanew, 0x00004550, true);
+
+    const coffOffset = e_lfanew + 4;
+    view.setUint16(coffOffset, 0x14c, true);
+    view.setUint16(coffOffset + 2, 1, true);
+    view.setUint16(coffOffset + 16, 224, true);
+
+    const optionalOffset = coffOffset + 20;
+    view.setUint16(optionalOffset, 0x10b, true);
+    
+    const winOffset = optionalOffset + 28;
+    view.setUint32(winOffset + 28, 0x8000, true);
+    view.setUint32(winOffset + 32, 0x400, true);
+
+    const afterStackHeapOffset = optionalOffset + 88;
+    view.setUint32(afterStackHeapOffset + 4, 5, true);
+
+    const securityDirOffset = optionalOffset + 128;
+    const certTableOffset = 352;
+    view.setUint32(securityDirOffset, certTableOffset, true);
+    view.setUint32(securityDirOffset + 4, certPaddedLength, true);
+
+    view.setUint32(certTableOffset, certLength, true);
+    view.setUint16(certTableOffset + 4, 0x0200, true);
+    view.setUint16(certTableOffset + 6, 0x0002, true);
+    bytes.set(bCertificate, certTableOffset + 8);
+
+    const parser = new PEParser(buffer);
+    const parsed = parser.parse();
+
+    expect(parsed.authenticode).toBeDefined();
+    expect(parsed.authenticode!.isValid).toBe(false);
+    expect(parsed.authenticode!.error).toBe('Hash mismatch');
+    expect(parsed.authenticode!.hashAlgorithm).toBe('sha256');
+    expect(parsed.authenticode!.expectedHash).toBe('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+  });
 });

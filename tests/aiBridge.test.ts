@@ -201,6 +201,36 @@ describe('AI Query Bridge & Tool System Tests', () => {
     expect(result.solutions!.x).toBe(15);
   });
 
+  it('should explore multiple paths and solve branch constraints', async () => {
+    const result = await AIBridge.executeQuery({
+      action: 'symbolicExecute',
+      params: {
+        instructions: [
+          { address: 0x1000, op: 'mov', args: ['rax', 'x'] },
+          { address: 0x1004, op: 'cmp', args: ['rax', '50'] },
+          { address: 0x1008, op: 'jl', args: ['0x1018'] },
+          // Path 1: x >= 50
+          { address: 0x100c, op: 'cmp', args: ['rax', '70'] },
+          { address: 0x1010, op: 'je', args: ['0x2000'] },
+          { address: 0x1014, op: 'jmp', args: ['0x3000'] },
+          // Path 2: x < 50
+          { address: 0x1018, op: 'cmp', args: ['rax', '20'] },
+          { address: 0x101c, op: 'je', args: ['0x2000'] }
+        ],
+        inputs: [
+          { name: 'x', min: 0, max: 100 }
+        ],
+        targetAddress: 0x2000
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.pathFound).toBe(true);
+    // Should find solutions for x = 70 or x = 20 depending on which path is evaluated first
+    expect(result.solutions).toBeDefined();
+    expect([20, 70]).toContain(result.solutions!.x);
+  });
+
   it('should control emulator via the bridge', async () => {
     // Reset and load instructions
     const resetResult = await AIBridge.executeQuery({
@@ -228,5 +258,97 @@ describe('AI Query Bridge & Tool System Tests', () => {
 
     expect(stepResult.success).toBe(true);
     expect(stepResult.cpuState.rax).toBe('66'); // 0x42
+  });
+
+  it('should extract strings via the bridge', async () => {
+    const raw = 'Hello\x00World\x00\x00\x00';
+    const hex = toHex(new TextEncoder().encode(raw));
+    const result = await AIBridge.executeQuery({
+      action: 'extractStrings',
+      params: {
+        data: hex,
+        minLength: 4
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.strings.map((s: any) => s.value)).toContain('Hello');
+    expect(result.strings.map((s: any) => s.value)).toContain('World');
+  });
+
+  it('should get sections from PE via the bridge', async () => {
+    const buffer = new ArrayBuffer(352);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    bytes[0] = 0x4d; // 'M'
+    bytes[1] = 0x5a; // 'Z'
+    view.setUint32(60, 64, true); // e_lfanew
+    view.setUint32(64, 0x00004550, true); // PE signature
+    view.setUint16(68, 0x14c, true); // Machine: Intel 386
+    view.setUint16(70, 1, true); // Number of Sections
+    view.setUint16(84, 224, true); // SizeOfOptionalHeader
+    view.setUint16(88, 0x10b, true); // Magic (PE32)
+
+    // Setup section table
+    const secOffset = 64 + 24 + 224; // PE signature + COFF header + Optional header
+    // Section name ".text"
+    bytes[secOffset] = 0x2e; bytes[secOffset + 1] = 0x74; bytes[secOffset + 2] = 0x65; bytes[secOffset + 3] = 0x78; bytes[secOffset + 4] = 0x74;
+    view.setUint32(secOffset + 8, 0x1000, true); // VirtualSize
+    view.setUint32(secOffset + 12, 0x1000, true); // VirtualAddress
+    view.setUint32(secOffset + 16, 0x200, true); // SizeOfRawData
+    view.setUint32(secOffset + 20, 0x200, true); // PointerToRawData
+
+    const hex = toHex(bytes);
+    const result = await AIBridge.executeQuery({
+      action: 'getSections',
+      params: {
+        data: hex,
+        format: 'pe'
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.format).toBe('pe');
+    expect(result.sections.length).toBe(1);
+    expect(result.sections[0].name).toBe('.text');
+  });
+
+  it('should run entropy analysis via the bridge', async () => {
+    // 256 random-ish bytes
+    const randomBytes = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+      randomBytes[i] = Math.floor(Math.random() * 256);
+    }
+    const hex = toHex(randomBytes);
+    const result = await AIBridge.executeQuery({
+      action: 'entropyAnalysis',
+      params: {
+        data: hex,
+        blockSize: 64,
+        stride: 32,
+        threshold: 5.0
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.overall).toBeGreaterThan(4.0);
+    expect(result.highEntropyBlocks.length).toBeGreaterThan(0);
+  });
+
+  it('should generate a hex dump via the bridge', async () => {
+    const raw = 'ABCDEF1234567890';
+    const hex = toHex(new TextEncoder().encode(raw));
+    const result = await AIBridge.executeQuery({
+      action: 'hexDump',
+      params: {
+        data: hex,
+        bytesPerLine: 8
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.lines.length).toBe(2);
+    expect(result.formatted).toContain('ABCDEF12');
   });
 });

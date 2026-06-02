@@ -314,6 +314,7 @@ describe('CollabEngine WebSocket Sync Tests', () => {
         sentMessages.push(JSON.parse(data));
       });
       this.close = vi.fn();
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       mockWebSocketInstance = this;
       return this;
     });

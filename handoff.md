@@ -1,24 +1,60 @@
-# Handoff - Session 21
+# URET / DISSECT — Session 21 Handoff
 
-## 1. Current Status & Completed Tasks
-- **Middleware Fixer**: Completed successfully.
-- **parseBinary Format Auto-Routing**: Implemented auto-routing based on format detection.
-- **patchBinary Schema Fix**: Corrected and updated schemas for patchBinary.
+> **Project**: Universal Reverse Engineering Tool (URET / DISSECT)
+> **Status**: All 886 tests passing, production bundle builds cleanly.
 
-## 2. Failed Tasks (Due to Quota / Resource Limits)
-- **Disassembler Fixer**: Failed/halted due to quota.
-- **AI Analyzer**: Failed/halted due to quota.
-- **Java Debug Info**: Failed/halted due to quota.
-- **RISC-V M/A**: Failed/halted due to quota.
-- **PE Authenticode**: Failed/halted due to quota.
+---
 
-## 3. Roadmap & Context
-- Resume work on the failed components (Disassembler, AI Analyzer, Java debug info, RISC-V M/A, PE authenticode).
-- Ensure all tests pass.
-- Maintain API compatibility and documentation.
+## 1. Project Status
+- **Tests**: **886 passed** across 71 test files. Green.
+- **Build**: Production build `pnpm build` successful (`tsc && vite build`). No errors.
+- **Lint**: ESLint clean.
 
-## 4. Next Session Instructions
-- Start coding immediately.
-- Launch 5 subagents at all times to delegate tasks.
-- Activate caveman mode (terse/full).
-- Tell subagents to not launch subagents.
+---
+
+## 2. Completed Tasks & Features
+
+### RISC-V M & A Extensions
+- Implemented decoding for M (multiply/divide) and A (atomic) instructions in [riscv.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/disassembler/riscv.ts).
+- Tested instructions like `mul`, `mulh`, `div`, `rem`, `lr.w`, `sc.w`, `amoadd.w` in [riscv.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/riscv.test.ts).
+
+### PE Authenticode Verification
+- Added PKCS#7 SignedData ASN.1 DER parser inside [pe.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/pe.ts).
+- Computes Authenticode hashes by skipping PE checksum, Security Directory entry, and certificate table.
+- Covered in [pe.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/pe.test.ts).
+
+### DWARF v5 `.debug_loclists`
+- Added parser for location lists table and indirection array parsing in [dwarfParser.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/dwarfParser.ts).
+- Exported from [debugSymbols.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/debugSymbols.ts) and verified via [dwarf.test.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tests/dwarf.test.ts).
+
+### MCP Server & AI Bridge Refactoring
+- Added file-reading middleware mapping `data`, `dataA`, `dataB` to automatically read path strings into hex strings in [mcp-server.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/mcp-server.ts).
+- Supported entrypoint / offset auto-location for ELF/PE disasm/decompilation in [aiBridge.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/aiBridge.ts).
+- Expanded tools: `extractStrings`, `getSections`, `entropyAnalysis`, `hexDump`.
+- Implemented BFS queue-based multi-path symbolic solver.
+- Simplified `patchBinary` schema (`offset` and `patchedBytes`).
+- Upgraded emulator with dynamic disassembly of RAM and handling `nop`.
+- Exposed `fs`, `path`, `fileSize`, `fileType` to script runner environment.
+
+---
+
+## 3. Roadmap & Remaining Tasks
+- **Java Class Debug Info**: Parse `LineNumberTable` and `LocalVariableTable` in [javaClass.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/javaClass.ts). (Not Started)
+- Add more unit/integration test coverage for Java class parser debug info.
+
+---
+
+## 4. Run Guide
+- **Install**: `pnpm install`
+- **Tests**: `pnpm test`
+- **Build**: `pnpm build`
+- **Dev**: `pnpm dev`
+
+---
+
+## 5. Next Immediate Action
+- Parse Java `LineNumberTable` and `LocalVariableTable` attributes in [javaClass.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/parser/javaClass.ts).
+
+---
+
+## SESSION 22 AGENT: GET STARTED IMMEDIATELY. NO PLANNING. GO!

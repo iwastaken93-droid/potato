@@ -64,7 +64,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
 
     const processedArgs = { ...(args || {}) };
-    for (const key of ['data', 'dataA', 'dataB']) {
+    for (const key of ['data', 'dataA', 'dataB', 'filePath']) {
       if (key in processedArgs) {
         processedArgs[key] = resolveDataParam(processedArgs[key]);
       }

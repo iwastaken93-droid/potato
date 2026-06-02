@@ -386,7 +386,6 @@ describe('AI Query Bridge & Tool System Tests', () => {
     expect(entryBlock).toBeDefined();
     expect(entryBlock.successors).toContain('block_0x100a');
   });
-  });
 
   it('should return entry point metadata in parseBinary', async () => {
     const buffer = new ArrayBuffer(352);
@@ -402,7 +401,7 @@ describe('AI Query Bridge & Tool System Tests', () => {
     view.setUint16(84, 224, true); // SizeOfOptionalHeader
     view.setUint16(88, 0x10b, true); // Magic (PE32)
     view.setUint32(104, 0x1000, true); // AddressOfEntryPoint
-    view.setUint32(128, 0x400000, true); // ImageBase (PE32)
+    view.setUint32(116, 0x400000, true); // ImageBase (PE32)
 
     const hex = toHex(bytes);
     const result = await AIBridge.executeQuery({
@@ -417,7 +416,7 @@ describe('AI Query Bridge & Tool System Tests', () => {
     expect(result.entryPoint).toBe(0x1000);
     expect(result.entryPointAddress).toBe(0x401000);
     expect(result.entryPointRVA).toBe(0x1000);
-    expect(result.imageBase).toBe('4194304');
+    expect(result.imageBase.toString()).toBe('4194304');
   });
 
   it('should limit input sizes to 10MB to prevent memory OOM crashes', async () => {
@@ -440,7 +439,7 @@ describe('AI Query Bridge & Tool System Tests', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.formatted).toContain('04050607 08090a0b');
+    expect(result.formatted).toContain('44 55 66 77 88 99 aa bb');
     expect(result.lines.length).toBe(1);
   });
 
@@ -499,9 +498,10 @@ describe('AI Query Bridge & Tool System Tests', () => {
     view.setUint16(84, 224, true); // SizeOfOptionalHeader
     view.setUint16(88, 0x10b, true); // Magic (PE32)
 
-    // Data directories: Import table RVA at 120 (offset 64 + 24 + 96 = 184)
-    view.setUint32(208, 0x2000, true); // Import directory RVA = 0x2000
-    view.setUint32(212, 40, true); // Import directory size = 40
+    // Data directories: Import table RVA (offset 64 + 24 + 96 + 8 = 192)
+    view.setUint32(180, 16, true); // Number of RVA and Sizes
+    view.setUint32(192, 0x2000, true); // Import directory RVA = 0x2000
+    view.setUint32(196, 40, true); // Import directory size = 40
 
     // Section header
     const secOffset = 64 + 24 + 224; 

@@ -370,6 +370,45 @@ export class VulnScanner {
       }
     }
 
+    // 4. API Combination Risk Scoring
+    const cleanSymNames = new Set(symbols.map(s => this.cleanSymbolName(s.name)));
+
+    const hasMemAlloc = cleanSymNames.has('VirtualAlloc') || cleanSymNames.has('VirtualProtect') || cleanSymNames.has('VirtualAllocEx');
+    const hasExecution = cleanSymNames.has('system') || cleanSymNames.has('CreateProcess') || cleanSymNames.has('CreateProcessA') || cleanSymNames.has('CreateProcessW') || cleanSymNames.has('ShellExecute') || cleanSymNames.has('ShellExecuteA') || cleanSymNames.has('ShellExecuteW') || cleanSymNames.has('CreateRemoteThread') || cleanSymNames.has('WriteProcessMemory') || cleanSymNames.has('execve');
+
+    if (hasMemAlloc && hasExecution) {
+      matches.push({
+        category: 'unsafe_api',
+        severity: 'high',
+        description: 'Dangerous API combination: Memory allocation/protection API (VirtualAlloc/VirtualProtect) + Execution/Injection API (system/CreateProcess/CreateRemoteThread/WriteProcessMemory) detected. Often indicative of dynamic shellcode loading and execution.',
+        evidence: Array.from(cleanSymNames).filter(name => ['VirtualAlloc', 'VirtualProtect', 'VirtualAllocEx', 'system', 'CreateProcess', 'CreateProcessA', 'CreateProcessW', 'ShellExecute', 'ShellExecuteA', 'ShellExecuteW', 'CreateRemoteThread', 'WriteProcessMemory', 'execve'].includes(name)).join(', ')
+      });
+    }
+
+    const hasAntiDebug = cleanSymNames.has('IsDebuggerPresent') || cleanSymNames.has('CheckRemoteDebuggerPresent') || cleanSymNames.has('NtQueryInformationProcess') || cleanSymNames.has('ptrace');
+    const hasExit = cleanSymNames.has('TerminateProcess') || cleanSymNames.has('ExitProcess') || cleanSymNames.has('exit') || cleanSymNames.has('_exit');
+
+    if (hasAntiDebug && hasExit) {
+      matches.push({
+        category: 'unsafe_api',
+        severity: 'medium',
+        description: 'Suspicious API combination: Anti-debugging/evasion API (IsDebuggerPresent/NtQueryInformationProcess/ptrace) + Process termination API (TerminateProcess/ExitProcess/exit) detected. Often indicative of anti-analysis or VM evasion checks.',
+        evidence: Array.from(cleanSymNames).filter(name => ['IsDebuggerPresent', 'CheckRemoteDebuggerPresent', 'NtQueryInformationProcess', 'ptrace', 'TerminateProcess', 'ExitProcess', 'exit', '_exit'].includes(name)).join(', ')
+      });
+    }
+
+    const hasLoadLib = cleanSymNames.has('LoadLibrary') || cleanSymNames.has('LoadLibraryA') || cleanSymNames.has('LoadLibraryW') || cleanSymNames.has('dlopen');
+    const hasGetProc = cleanSymNames.has('GetProcAddress') || cleanSymNames.has('dlsym');
+
+    if (hasLoadLib && hasGetProc) {
+      matches.push({
+        category: 'unsafe_api',
+        severity: 'medium',
+        description: 'Evasive API combination: Dynamic library load API (LoadLibrary/dlopen) + Symbol resolution API (GetProcAddress/dlsym) detected. Often used to dynamically resolve and call API functions to evade static analysis.',
+        evidence: Array.from(cleanSymNames).filter(name => ['LoadLibrary', 'LoadLibraryA', 'LoadLibraryW', 'dlopen', 'GetProcAddress', 'dlsym'].includes(name)).join(', ')
+      });
+    }
+
     return matches;
   }
 

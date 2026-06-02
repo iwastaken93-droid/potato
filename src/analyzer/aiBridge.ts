@@ -343,56 +343,174 @@ export const TOOL_SCHEMAS = {
         bytesPerLine: { type: 'number', description: 'Number of bytes to display per line (default 16).' }
       },
       required: ['data']
-    },
-    findXRefs: {
-      name: 'findXRefs',
-      description: 'Find incoming and outgoing cross-references (XRefs) for a specific target address in a binary file.',
-      parameters: {
-        type: 'object',
-        properties: {
-          data: { type: 'string', description: 'Hex or Base64 encoded binary content to analyze.' },
-          address: { type: 'number', description: 'The target address to query cross-references for.' },
-          arch: { type: 'string', description: 'Target CPU architecture. Default is x86_64.' },
-          baseAddress: { type: 'number', description: 'Optional virtual address base for raw disassembling.' }
-        },
-        required: ['data', 'address']
-      }
-    },
-    buildCFG: {
-      name: 'buildCFG',
-      description: 'Build a Control Flow Graph (CFG) from a sequence of assembly instructions, identifying basic blocks and successors.',
-      parameters: {
-        type: 'object',
-        properties: {
-          instructions: {
-            type: 'array',
-            description: 'A sequential list of instructions to build the CFG from.',
-            items: {
-              type: 'object',
-              properties: {
-                address: { type: 'number', description: 'Instruction virtual address.' },
-                mnemonic: { type: 'string', description: 'Mnemonic/opcode name (e.g., "mov", "jmp").' },
-                opStr: { type: 'string', description: 'Operands/arguments string (e.g., "rax, rbx").' },
-                operands: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      type: { type: 'string' },
-                      reg: { type: 'string' },
-                      imm: { type: 'number' },
-                      mem: { type: 'object' }
-                    }
+    }
+  },
+  findXRefs: {
+    name: 'findXRefs',
+    description: 'Find incoming and outgoing cross-references (XRefs) for a specific target address in a binary file.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary content to analyze.' },
+        address: { type: 'number', description: 'The target address to query cross-references for.' },
+        arch: { type: 'string', description: 'Target CPU architecture. Default is x86_64.' },
+        baseAddress: { type: 'number', description: 'Optional virtual address base for raw disassembling.' }
+      },
+      required: ['data', 'address']
+    }
+  },
+  buildCFG: {
+    name: 'buildCFG',
+    description: 'Build a Control Flow Graph (CFG) from a sequence of assembly instructions, identifying basic blocks and successors.',
+    parameters: {
+      type: 'object',
+      properties: {
+        instructions: {
+          type: 'array',
+          description: 'A sequential list of instructions to build the CFG from.',
+          items: {
+            type: 'object',
+            properties: {
+              address: { type: 'number', description: 'Instruction virtual address.' },
+              mnemonic: { type: 'string', description: 'Mnemonic/opcode name (e.g., "mov", "jmp").' },
+              opStr: { type: 'string', description: 'Operands/arguments string (e.g., "rax, rbx").' },
+              operands: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string' },
+                    reg: { type: 'string' },
+                    imm: { type: 'number' },
+                    mem: { type: 'object' }
                   }
-                },
-                size: { type: 'number', description: 'Size of the instruction in bytes.' }
+                }
               },
-              required: ['address', 'mnemonic', 'size']
-            }
+              size: { type: 'number', description: 'Size of the instruction in bytes.' }
+            },
+            required: ['address', 'mnemonic', 'size']
+          }
+        }
+      },
+      required: ['instructions']
+    }
+  },
+  loadBinary: {
+    name: 'loadBinary',
+    description: 'Load an executable binary into the session cache. All subsequent tool calls will use this loaded binary by default if "data" is omitted.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data.' },
+        filePath: { type: 'string', description: 'Local path of binary to load (resolved by server).' }
+      }
+    }
+  },
+  diffSections: {
+    name: 'diffSections',
+    description: 'Compare raw bytes of specific sections between two loaded binaries to find changed offsets and values.',
+    parameters: {
+      type: 'object',
+      properties: {
+        dataA: { type: 'string', description: 'Hex or Base64 encoded binary A (optional if session binary loaded).' },
+        dataB: { type: 'string', description: 'Hex or Base64 encoded binary B.' },
+        sections: { type: 'array', items: { type: 'string' }, description: 'List of section names to compare. Default: [".text"].' }
+      },
+      required: ['dataB']
+    }
+  },
+  exportToIda: {
+    name: 'exportToIda',
+    description: 'Generate an IDC script containing function renames and string comments for importing into IDA Pro/Ghidra.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data (optional if session binary loaded).' }
+      }
+    }
+  },
+  patchAndRun: {
+    name: 'patchAndRun',
+    description: 'Apply byte-level patches to a binary and emulate execution starting from entrypoint until hitting target address or step limit.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data (optional if session binary loaded).' },
+        patches: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              offset: { type: 'number', description: 'Byte offset in raw binary file.' },
+              patchedBytes: { type: 'string', description: 'Hex or Base64 replacement bytes.' }
+            },
+            required: ['offset', 'patchedBytes']
           }
         },
-        required: ['instructions']
-      }
+        runUntil: { type: 'number', description: 'Virtual address/PC to run emulation until (breakpoint).' },
+        maxSteps: { type: 'number', description: 'Maximum step limit for emulator execution. Default 1000.' }
+      },
+      required: ['patches']
+    }
+  },
+  callTree: {
+    name: 'callTree',
+    description: 'Compute the callers and callees call tree for a specific function name or virtual address in the binary.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data (optional if session binary loaded).' },
+        target: { type: 'string', description: 'Function name or virtual address (hex or decimal) to query.' },
+        arch: { type: 'string', description: 'Target CPU architecture. Default is x86_64.' }
+      },
+      required: ['target']
+    }
+  },
+  typeStructRecovery: {
+    name: 'typeStructRecovery',
+    description: 'Scan binary function instructions to reconstruct struct field layouts based on base registers and offset loads/stores.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data (optional if session binary loaded).' },
+        address: { type: 'number', description: 'Virtual address of the function to analyze.' },
+        arch: { type: 'string', description: 'Target CPU architecture. Default is x86_64.' }
+      },
+      required: ['address']
+    }
+  },
+  emulatorHooks: {
+    name: 'emulatorHooks',
+    description: 'Manage emulation breakpoints and run emulation with breakpoint hit reporting.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['run', 'setBreakpoints', 'clearBreakpoints'], description: 'Emulation action. "run": execute until breakpoint or halt. "setBreakpoints": configure breakpoint list.' },
+        breakpoints: { type: 'array', items: { type: 'number' }, description: 'List of virtual addresses to use as breakpoints.' },
+        steps: { type: 'number', description: 'Maximum steps to execute in "run" (default 1000).' }
+      },
+      required: ['action']
+    }
+  },
+  pipelineChainMode: {
+    name: 'pipelineChainMode',
+    description: 'Execute a series of URET tools in sequence, passing outputs from one tool as inputs to subsequent tools using reference placeholders.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pipeline: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              tool: { type: 'string', description: 'Name of the tool to execute.' },
+              params: { type: 'object', description: 'Parameters for the tool, supporting "$$prev.property$$" placeholder resolution.' }
+            },
+            required: ['tool', 'params']
+          }
+        }
+      },
+      required: ['pipeline']
     }
   }
 };
@@ -853,6 +971,7 @@ function resolveElfOrPe(
  */
 export class AIBridge {
   private static emulatorInstance: Emulator | null = null;
+  private static loadedBinaryBytes: Uint8Array | null = null;
 
   private static getEmulator(): Emulator {
     if (!this.emulatorInstance) {
@@ -863,6 +982,15 @@ export class AIBridge {
 
   public static async executeQuery(query: { action: string; params: any }): Promise<any> {
     const { action, params } = query;
+
+    if (params) {
+      if (!params.data && !params.dataA && !params.instructions && AIBridge.loadedBinaryBytes) {
+        params.data = toHex(AIBridge.loadedBinaryBytes);
+      }
+      if (!params.dataA && AIBridge.loadedBinaryBytes) {
+        params.dataA = toHex(AIBridge.loadedBinaryBytes);
+      }
+    }
 
     switch (action) {
       case 'disassemble': {
@@ -964,8 +1092,8 @@ export class AIBridge {
           const parsed = parser.parse();
           let entryPoint = 0;
           const lcMain = parsed.loadCommands.find(lc => lc.cmd === 0x80000028);
-          if (lcMain && lcMain.payload && typeof lcMain.payload.entryoff === 'number') {
-            entryPoint = lcMain.payload.entryoff;
+          if (lcMain && lcMain.payload && typeof (lcMain.payload as any).entryoff === 'number') {
+            entryPoint = (lcMain.payload as any).entryoff;
           }
           const textSegment = parsed.segments.find(seg => seg.segname === '__TEXT');
           const imageBase = textSegment ? Number(textSegment.vmaddr) : 0;
@@ -1307,6 +1435,20 @@ export class AIBridge {
             }
           }
           return { success: true, memory: results };
+        } else if (action === 'writeMem') {
+          if (params.memory) {
+            for (const m of params.memory) {
+              const addr = BigInt(m.address);
+              const data = toUint8Array(m.value);
+              try {
+                emu.memory.writeBuffer(addr, data);
+              } catch (e) {
+                emu.memory.map(addr, data.length);
+                emu.memory.writeBuffer(addr, data);
+              }
+            }
+          }
+          return { success: true };
         } else if (action === 'load') {
           if (!params.data) {
             throw new Error('Missing "data" parameter for load action');
@@ -1749,6 +1891,486 @@ export class AIBridge {
         }));
         const blocks = buildCFG(mappedInsts);
         return { success: true, blocks };
+      }
+
+      case 'loadBinary': {
+        if (!params.data && !params.filePath) {
+          throw new Error('Either "data" or "filePath" must be provided');
+        }
+        let bytes: Uint8Array;
+        if (params.filePath) {
+          try {
+            const fs = await import('fs');
+            if (fs.existsSync(params.filePath)) {
+              bytes = new Uint8Array(fs.readFileSync(params.filePath));
+            } else {
+              bytes = toUint8Array(params.filePath);
+            }
+          } catch (e) {
+            bytes = toUint8Array(params.filePath);
+          }
+        } else {
+          bytes = toUint8Array(params.data);
+        }
+        AIBridge.loadedBinaryBytes = bytes;
+        
+        let detected = 'unknown';
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+        else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+        else if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) detected = 'macho';
+
+        return { success: true, message: 'Binary loaded successfully into session context', size: bytes.length, format: detected };
+      }
+
+      case 'diffSections': {
+        const bytesA = toUint8Array(params.dataA);
+        const bytesB = toUint8Array(params.dataB);
+        const sectionsList = params.sections || ['.text'];
+
+        const getSectionsData = (bytes: Uint8Array): Record<string, Uint8Array> => {
+          const res: Record<string, Uint8Array> = {};
+          let detected = 'auto';
+          if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+          else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+          else if (
+            (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+            (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+          ) detected = 'macho';
+
+          try {
+            if (detected === 'elf') {
+              const parsed = parseElf(bytes.buffer as ArrayBuffer);
+              for (const s of parsed.sectionHeaders) {
+                const off = Number(s.offset);
+                const sz = Number(s.size);
+                if (off > 0 && sz > 0 && off + sz <= bytes.length) {
+                  res[s.name] = bytes.subarray(off, off + sz);
+                }
+              }
+            } else if (detected === 'pe') {
+              const parser = new PEParser(bytes.buffer as ArrayBuffer);
+              const parsed = parser.parse();
+              for (const s of parsed.sections) {
+                const off = s.pointerToRawData;
+                const sz = s.sizeOfRawData;
+                if (off > 0 && sz > 0 && off + sz <= bytes.length) {
+                  res[s.name] = bytes.subarray(off, off + sz);
+                }
+              }
+            } else if (detected === 'macho') {
+              const parser = new MachoParser(bytes);
+              const parsed = parser.parse();
+              for (const s of parsed.sections) {
+                const off = s.offset;
+                const sz = Number(s.size);
+                if (off > 0 && sz > 0 && off + sz <= bytes.length) {
+                  res[s.sectname] = bytes.subarray(off, off + sz);
+                }
+              }
+            }
+          } catch (_) {}
+          return res;
+        };
+
+        const secA = getSectionsData(bytesA);
+        const secB = getSectionsData(bytesB);
+        const diffs: Record<string, { sizeA: number; sizeB: number; differences: { offset: number; valA: number; valB: number }[] }> = {};
+
+        for (const name of sectionsList) {
+          const bufA = secA[name] || new Uint8Array(0);
+          const bufB = secB[name] || new Uint8Array(0);
+          const differences: { offset: number; valA: number; valB: number }[] = [];
+          const maxLen = Math.max(bufA.length, bufB.length);
+          
+          for (let i = 0; i < maxLen; i++) {
+            const vA = i < bufA.length ? bufA[i] : -1;
+            const vB = i < bufB.length ? bufB[i] : -1;
+            if (vA !== vB) {
+              differences.push({ offset: i, valA: vA, valB: vB });
+            }
+            if (differences.length >= 100) break;
+          }
+          diffs[name] = { sizeA: bufA.length, sizeB: bufB.length, differences };
+        }
+
+        return { success: true, diffs };
+      }
+
+      case 'exportToIda': {
+        const bytes = toUint8Array(params.data);
+        let detected = 'auto';
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+        else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+        else if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) detected = 'macho';
+
+        let symbols: any[] = [];
+        let imgBase = 0;
+        try {
+          if (detected === 'elf') {
+            const parsed = parseElf(bytes.buffer as ArrayBuffer);
+            symbols = parsed.symbols.map(s => ({ name: s.name, address: Number(s.value) }));
+            imgBase = Number(parsed.header.entryPoint);
+          } else if (detected === 'pe') {
+            const parser = new PEParser(bytes.buffer as ArrayBuffer);
+            const parsed = parser.parse();
+            imgBase = Number(parsed.optionalHeader.imageBase);
+            symbols = (parsed.imports || []).flatMap(imp => imp.imports.map(i => ({ name: i.name, address: imgBase + (i.iatRva || 0) })));
+          } else if (detected === 'macho') {
+            const parser = new MachoParser(bytes);
+            const parsed = parser.parse();
+            symbols = parsed.symbols.map(s => ({ name: s.name, address: Number(s.value) }));
+          }
+        } catch (_) {}
+
+        let idc = '#include <idc.idc>\n\nstatic main() {\n';
+        for (const sym of symbols) {
+          if (sym.name && sym.address > 0) {
+            idc += `  MakeName(0x${sym.address.toString(16)}, "${sym.name.replace(/[^a-zA-Z0-9_]/g, '_')}");\n`;
+          }
+        }
+        idc += '  Message("URET Symbols imported!\\n");\n}\n';
+        return { success: true, format: 'idc', script: idc };
+      }
+
+      case 'patchAndRun': {
+        const bytes = toUint8Array(params.data);
+        const patcher = new BinaryPatcher(bytes);
+        if (params.patches && Array.isArray(params.patches)) {
+          for (const p of params.patches) {
+            const patBytes = toUint8Array(p.patchedBytes);
+            patcher.applyPatch(p.offset, patBytes, p.address || p.offset, p.description || '');
+          }
+        }
+        const patched = patcher.getPatchedBinary();
+        
+        const emu = this.getEmulator();
+        await this.executeQuery({ action: 'emulatorControl', params: { action: 'load', data: toHex(patched) } });
+        
+        const runUntil = params.runUntil;
+        const maxSteps = params.maxSteps || 1000;
+        let steps = 0;
+        let res = { success: true, halted: false, hitBreakpoint: false };
+        emu.isRunning = true;
+        
+        while (emu.isRunning && steps < maxSteps) {
+          const currentRip = Number(emu.cpu.read('rip'));
+          if (runUntil !== undefined && currentRip === runUntil) {
+            res.hitBreakpoint = true;
+            break;
+          }
+          res = emu.step();
+          steps++;
+          if (!res.success || res.halted || res.hitBreakpoint) {
+            break;
+          }
+        }
+
+        return {
+          success: true,
+          stepsRun: steps,
+          halted: res.halted,
+          hitBreakpoint: res.hitBreakpoint,
+          cpuState: {
+            rip: emu.cpu.read('rip').toString(),
+            rax: emu.cpu.read('rax').toString(),
+            rsp: emu.cpu.read('rsp').toString()
+          }
+        };
+      }
+
+      case 'callTree': {
+        const bytes = toUint8Array(params.data);
+        const target = params.target.toLowerCase();
+        
+        let entryPoint = 0;
+        let sections: Section[] = [];
+        let symbols: Symbol[] = [];
+        let baseAddress = params.baseAddress ?? params.address ?? 0;
+
+        let detected = 'auto';
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+        else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+        else if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) detected = 'macho';
+
+        try {
+          if (detected === 'elf') {
+            const elf = parseElf(bytes.buffer as ArrayBuffer);
+            sections = elf.sectionHeaders.map(s => ({
+              name: s.name,
+              virtualAddress: Number(s.addr),
+              virtualSize: Number(s.size),
+              fileOffset: Number(s.offset),
+              fileSize: Number(s.size),
+              flags: { read: true, write: false, execute: (Number(s.flags) & 4) !== 0 }
+            }));
+            symbols = elf.symbols.map(sym => ({ name: sym.name, address: Number(sym.value), binding: 'global', type: sym.type === 'FUNC' ? 'function' : 'none' }));
+            baseAddress = Number(elf.header.entryPoint);
+          } else if (detected === 'pe') {
+            const parser = new PEParser(bytes.buffer as ArrayBuffer);
+            const pe = parser.parse();
+            const imgBase = Number(pe.optionalHeader.imageBase);
+            sections = pe.sections.map(s => ({
+              name: s.name,
+              virtualAddress: imgBase + s.virtualAddress,
+              virtualSize: s.virtualSize,
+              fileOffset: s.pointerToRawData,
+              fileSize: s.sizeOfRawData,
+              flags: { read: true, write: false, execute: (s.characteristics & 0x20000000) !== 0 }
+            }));
+            baseAddress = imgBase + pe.optionalHeader.addressOfEntryPoint;
+          }
+        } catch (_) {}
+
+        if (sections.length === 0) {
+          sections = [{ name: '.text', virtualAddress: baseAddress, virtualSize: bytes.length, fileOffset: 0, fileSize: bytes.length, flags: { read: true, write: false, execute: true } }];
+        }
+
+        const router = new DisassemblerRouter();
+        const allInstructions: Instruction[] = [];
+        for (const sec of sections) {
+          if (sec.flags.execute && sec.fileSize > 0) {
+            try {
+              const secBytes = bytes.subarray(sec.fileOffset, sec.fileOffset + sec.fileSize);
+              const insts = router.disassemble(secBytes, { arch: params.arch || 'x86_64', baseAddress: sec.virtualAddress });
+              allInstructions.push(...insts.map(inst => ({
+                ...inst,
+                op: inst.mnemonic,
+                args: inst.opStr ? inst.opStr.split(',').map(s => s.trim()) : []
+              })));
+            } catch (_) {}
+          }
+        }
+
+        const xrefEngine = new XRefEngine();
+        xrefEngine.analyze(allInstructions, sections, symbols, bytes, baseAddress);
+
+        let targetAddr = 0;
+        if (target.startsWith('0x')) {
+          targetAddr = parseInt(target, 16);
+        } else if (/^\d+$/.test(target)) {
+          targetAddr = parseInt(target, 10);
+        } else {
+          const sym = symbols.find(s => s.name.toLowerCase().includes(target));
+          if (sym) targetAddr = sym.address;
+        }
+
+        if (targetAddr === 0) {
+          throw new Error(`Could not resolve target symbol or address: ${params.target}`);
+        }
+
+        const callers = xrefEngine.getXRefsTo(targetAddr).map(x => ({ callerAddress: x.from, instruction: x.context }));
+        const callees: { calleeAddress: number; instruction: string }[] = [];
+        
+        const funcInsts = allInstructions.filter(i => i.address >= targetAddr && i.address < targetAddr + 512);
+        for (const inst of funcInsts) {
+          if (inst.mnemonic.toLowerCase() === 'call' || inst.mnemonic.toLowerCase().startsWith('jmp')) {
+            const dest = inst.opStr.trim();
+            let destAddr = 0;
+            if (dest.startsWith('0x')) destAddr = parseInt(dest, 16);
+            else if (/^\d+$/.test(dest)) destAddr = parseInt(dest, 10);
+            else {
+              const sym = symbols.find(s => s.name.toLowerCase().includes(dest.toLowerCase()));
+              if (sym) destAddr = sym.address;
+            }
+            if (destAddr > 0) {
+              callees.push({ calleeAddress: destAddr, instruction: `${inst.mnemonic} ${inst.opStr}` });
+            }
+          }
+        }
+
+        return { success: true, targetAddress: targetAddr, callers, callees };
+      }
+
+      case 'typeStructRecovery': {
+        const bytes = toUint8Array(params.data);
+        const address = params.address;
+        
+        let sections: Section[] = [];
+        let baseAddress = params.baseAddress ?? params.address ?? 0;
+        let detected = 'auto';
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+        else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+
+        try {
+          if (detected === 'pe') {
+            const pe = new PEParser(bytes.buffer as ArrayBuffer).parse();
+            const imgBase = Number(pe.optionalHeader.imageBase);
+            sections = pe.sections.map(s => ({
+              name: s.name,
+              virtualAddress: imgBase + s.virtualAddress,
+              virtualSize: s.virtualSize,
+              fileOffset: s.pointerToRawData,
+              fileSize: s.sizeOfRawData,
+              flags: { read: true, write: false, execute: (s.characteristics & 0x20000000) !== 0 }
+            }));
+          }
+        } catch (_) {}
+
+        if (sections.length === 0) {
+          sections = [{ name: '.text', virtualAddress: baseAddress, virtualSize: bytes.length, fileOffset: 0, fileSize: bytes.length, flags: { read: true, write: false, execute: true } }];
+        }
+
+        let offset = address;
+        const sec = sections.find(s => address >= s.virtualAddress && address < s.virtualAddress + s.virtualSize);
+        if (sec) {
+          offset = address - sec.virtualAddress + sec.fileOffset;
+        }
+
+        if (offset < 0 || offset >= bytes.length) {
+          throw new Error('Function address is out of binary bounds');
+        }
+
+        const router = new DisassemblerRouter();
+        const sliceBytes = bytes.subarray(offset, Math.min(offset + 512, bytes.length));
+        const insts = router.disassemble(sliceBytes, { arch: params.arch || 'x86_64', baseAddress: address });
+
+        const regs: Record<string, Record<number, { size: number; isWrite: boolean }>> = {};
+        for (const inst of insts) {
+          const isRet = inst.mnemonic.toLowerCase() === 'ret';
+          if (isRet) break;
+
+          if (inst.operands) {
+            for (let i = 0; i < inst.operands.length; i++) {
+              const op = inst.operands[i];
+              if (op.type === 'mem' && op.mem) {
+                const baseReg = op.mem.base;
+                const disp = op.mem.disp || 0;
+                if (baseReg && disp > 0) {
+                  if (!regs[baseReg]) regs[baseReg] = {};
+                  const size = inst.size || 4;
+                  const isWrite = i === 0 && (inst.mnemonic.toLowerCase().startsWith('mov') || inst.mnemonic.toLowerCase().startsWith('str'));
+                  const dispKey = disp.toString();
+                  (regs[baseReg] as any)[dispKey] = { size, isWrite };
+                }
+              }
+            }
+          }
+        }
+
+        const recovered: Record<string, string> = {};
+        for (const [baseReg, fields] of Object.entries(regs)) {
+          let cDecl = `struct struct_${baseReg} {\n`;
+          const sortedOffsets = Object.keys(fields).map(Number).sort((a, b) => a - b);
+          for (const off of sortedOffsets) {
+            const info = fields[off];
+            let type = 'void*';
+            if (info.size === 1) type = 'char';
+            else if (info.size === 2) type = 'short';
+            else if (info.size === 4) type = 'int';
+            else if (info.size === 8) type = 'long long';
+            cDecl += `  ${type} field_${off.toString(16)}; // offset 0x${off.toString(16)}\n`;
+          }
+          cDecl += '};';
+          recovered[baseReg] = cDecl;
+        }
+
+        return { success: true, recoveredStructs: recovered };
+      }
+
+      case 'emulatorHooks': {
+        const emu = this.getEmulator();
+        const action = params.action;
+        
+        if (action === 'setBreakpoints') {
+          if (params.breakpoints && Array.isArray(params.breakpoints)) {
+            emu.breakpoints.clear();
+            for (const bp of params.breakpoints) {
+              emu.breakpoints.add(Number(bp));
+            }
+          }
+          return { success: true, breakpointCount: emu.breakpoints.size };
+        } else if (action === 'clearBreakpoints') {
+          emu.breakpoints.clear();
+          return { success: true };
+        } else if (action === 'run') {
+          emu.isRunning = true;
+          let steps = 0;
+          let res = { success: true, halted: false, hitBreakpoint: false };
+          const limit = params.steps || 1000;
+          
+          while (emu.isRunning && steps < limit) {
+            const currentRip = Number(emu.cpu.read('rip'));
+            if (emu.breakpoints.has(currentRip)) {
+              res.hitBreakpoint = true;
+              break;
+            }
+            res = emu.step();
+            steps++;
+            if (!res.success || res.halted || res.hitBreakpoint) {
+              break;
+            }
+          }
+          return {
+            success: true,
+            stepsRun: steps,
+            halted: res.halted,
+            hitBreakpoint: res.hitBreakpoint || emu.breakpoints.has(Number(emu.cpu.read('rip'))),
+            cpuState: {
+              rip: emu.cpu.read('rip').toString(),
+              rax: emu.cpu.read('rax').toString()
+            }
+          };
+        }
+        throw new Error(`Unsupported emulatorHooks action: ${action}`);
+      }
+
+      case 'pipelineChainMode': {
+        const pipeline = params.pipeline;
+        if (!pipeline || !Array.isArray(pipeline)) {
+          throw new Error('Pipeline array is required');
+        }
+
+        const results: any[] = [];
+        
+        const resolvePlaceholders = (val: any, stepIdx: number): any => {
+          if (typeof val === 'string') {
+            if (val.startsWith('$$') && val.endsWith('$$')) {
+              const expr = val.substring(2, val.length - 2).trim();
+              if (expr === 'prev' || expr === 'prev.result') {
+                return results.length > 0 ? results[results.length - 1] : undefined;
+              }
+              try {
+                const context = {
+                  prev: results.length > 0 ? results[results.length - 1] : undefined,
+                  results: results
+                };
+                const fn = new Function('context', `return context.${expr}`);
+                return fn(context);
+              } catch (_) {
+                return undefined;
+              }
+            }
+          } else if (val && typeof val === 'object') {
+            if (Array.isArray(val)) {
+              return val.map(item => resolvePlaceholders(item, stepIdx));
+            } else {
+              const res: any = {};
+              for (const [k, v] of Object.entries(val)) {
+                res[k] = resolvePlaceholders(v, stepIdx);
+              }
+              return res;
+            }
+          }
+          return val;
+        };
+
+        for (let i = 0; i < pipeline.length; i++) {
+          const step = pipeline[i];
+          const resolvedParams = resolvePlaceholders(step.params, i);
+          const res = await this.executeQuery({ action: step.tool, params: resolvedParams });
+          results.push(res);
+        }
+
+        return { success: true, pipelineResults: results };
       }
 
       default:

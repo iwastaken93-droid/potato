@@ -158,6 +158,62 @@ Control x86_64 emulator instance, execute instructions, read/write memory and re
     * `value` (string, Hex)
   * `steps` (number, optional): Steps for step/run action.
 
+### 12. `loadBinary`
+Load an executable binary into the session cache. All subsequent tool calls will use this loaded binary by default if "data" is omitted.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded binary data.
+  * `filePath` (string, optional): Local path of binary to load (resolved by server).
+
+### 13. `diffSections`
+Compare raw bytes of specific sections between two loaded binaries to find changed offsets and values.
+* **Arguments:**
+  * `dataA` (string, optional): Hex or Base64 encoded binary A (optional if session binary loaded).
+  * `dataB` (string, required): Hex or Base64 encoded binary B.
+  * `sections` (array of strings, optional): List of section names to compare. Default: `[".text"]`.
+
+### 14. `exportToIda`
+Generate an IDC script containing function renames and string comments for importing into IDA Pro/Ghidra.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded binary data (optional if session binary loaded).
+
+### 15. `patchAndRun`
+Apply byte-level patches to a binary and emulate execution starting from entrypoint until hitting target address or step limit.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded binary data (optional if session binary loaded).
+  * `patches` (array, required): Array of patch objects:
+    * `offset` (number, required): Byte offset in raw binary file.
+    * `patchedBytes` (string, required): Hex or Base64 replacement bytes.
+  * `runUntil` (number, optional): Virtual address/PC to run emulation until (breakpoint).
+  * `maxSteps` (number, optional): Maximum step limit for emulator execution. Default 1000.
+
+### 16. `callTree`
+Compute the callers and callees call tree for a specific function name or virtual address in the binary.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded binary data (optional if session binary loaded).
+  * `target` (string, required): Function name or virtual address (hex or decimal) to query.
+  * `arch` (string, optional): Target CPU architecture. Default is `x86_64`.
+
+### 17. `typeStructRecovery`
+Scan binary function instructions to reconstruct struct field layouts based on base registers and offset loads/stores.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded binary data (optional if session binary loaded).
+  * `address` (number, required): Virtual address of the function to analyze.
+  * `arch` (string, optional): Target CPU architecture. Default is `x86_64`.
+
+### 18. `emulatorHooks`
+Manage emulation breakpoints and run emulation with breakpoint hit reporting.
+* **Arguments:**
+  * `action` (string, required): Emulation action (`run`, `setBreakpoints`, `clearBreakpoints`).
+  * `breakpoints` (array of numbers, optional): List of virtual addresses to use as breakpoints.
+  * `steps` (number, optional): Maximum steps to execute in "run" (default 1000).
+
+### 19. `pipelineChainMode`
+Execute a series of URET tools in sequence, passing outputs from one tool as inputs to subsequent tools using reference placeholders.
+* **Arguments:**
+  * `pipeline` (array, required): Array of step objects:
+    * `tool` (string, required): Name of the tool to execute.
+    * `params` (object, required): Parameters for the tool, supporting `$$prev.property$$` placeholder resolution.
+
 ---
 
 ## Examples

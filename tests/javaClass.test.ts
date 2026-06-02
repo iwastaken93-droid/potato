@@ -449,6 +449,452 @@ describe('Java Class Parser Unit Tests', () => {
     expect(sfAttr?.decoded).toBe('ClassA');
   });
 
+  it('should successfully parse LocalVariableTable attribute', () => {
+    // CP indices:
+    // 1: Utf8 "ClassA"
+    // 2: Class (1)
+    // 3: Utf8 "java/lang/Object"
+    // 4: Class (3)
+    // 5: Utf8 "myMethod"
+    // 6: Utf8 "()V"
+    // 7: Utf8 "Code"
+    // 8: Utf8 "LocalVariableTable"
+    // 9: Utf8 "this"
+    // 10: Utf8 "LClassA;"
+
+    const buffer = new ArrayBuffer(300);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    let offset = 0;
+    view.setUint32(offset, 0xcafebabe, false);
+    offset += 4;
+    view.setUint16(offset, 0, false);
+    offset += 2;
+    view.setUint16(offset, 61, false);
+    offset += 2;
+    view.setUint16(offset, 11, false);
+    offset += 2; // cp count (11)
+
+    // CP[1]: ClassA
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 6, false);
+    offset += 2;
+    for (let j = 0; j < 6; j++) bytes[offset++] = 'ClassA'.charCodeAt(j);
+
+    // CP[2]: Class index 1
+    bytes[offset] = 7;
+    offset += 1;
+    view.setUint16(offset, 1, false);
+    offset += 2;
+
+    // CP[3]: java/lang/Object
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 16, false);
+    offset += 2;
+    for (let j = 0; j < 16; j++)
+      bytes[offset++] = 'java/lang/Object'.charCodeAt(j);
+
+    // CP[4]: Class index 3
+    bytes[offset] = 7;
+    offset += 1;
+    view.setUint16(offset, 3, false);
+    offset += 2;
+
+    // CP[5]: myMethod
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 8, false);
+    offset += 2;
+    for (let j = 0; j < 8; j++) bytes[offset++] = 'myMethod'.charCodeAt(j);
+
+    // CP[6]: ()V
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 3, false);
+    offset += 2;
+    for (let j = 0; j < 3; j++) bytes[offset++] = '()V'.charCodeAt(j);
+
+    // CP[7]: Code
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 4, false);
+    offset += 2;
+    for (let j = 0; j < 4; j++) bytes[offset++] = 'Code'.charCodeAt(j);
+
+    // CP[8]: LocalVariableTable
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 18, false);
+    offset += 2;
+    for (let j = 0; j < 18; j++)
+      bytes[offset++] = 'LocalVariableTable'.charCodeAt(j);
+
+    // CP[9]: this
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 4, false);
+    offset += 2;
+    for (let j = 0; j < 4; j++) bytes[offset++] = 'this'.charCodeAt(j);
+
+    // CP[10]: LClassA;
+    bytes[offset] = 1;
+    offset += 1;
+    view.setUint16(offset, 8, false);
+    offset += 2;
+    for (let j = 0; j < 8; j++) bytes[offset++] = 'LClassA;'.charCodeAt(j);
+
+    // Access Flags
+    view.setUint16(offset, 0x0021, false);
+    offset += 2;
+    // This class
+    view.setUint16(offset, 2, false);
+    offset += 2;
+    // Super class
+    view.setUint16(offset, 4, false);
+    offset += 2;
+    // Interfaces count
+    view.setUint16(offset, 0, false);
+    offset += 2;
+    // Fields count
+    view.setUint16(offset, 0, false);
+    offset += 2;
+
+    // Methods count: 1
+    view.setUint16(offset, 1, false);
+    offset += 2;
+    // method info: access_flags, name_index(5), descriptor_index(6), attributes_count(1)
+    view.setUint16(offset, 0x0001, false);
+    offset += 2;
+    view.setUint16(offset, 5, false);
+    offset += 2;
+    view.setUint16(offset, 6, false);
+    offset += 2;
+    view.setUint16(offset, 1, false);
+    offset += 2; // 1 attribute: Code
+
+    // Code Attribute (CP[7])
+    // max_stack (2) = 2
+    // max_locals (2) = 1
+    // code_length (4) = 2
+    // exception_table_length (2) = 0
+    // attributes_count (2) = 1 (LocalVariableTable CP[8])
+    // LocalVariableTable attribute: name_index (8), length (12), table_length (1), start_pc (0), length (2), name_index (9), descriptor_index (10), index (0)
+    // Total nested Code info length: 2 + 2 + 4 + 2 + 2 + 2 + (2 + 4 + 12) = 14 + 18 = 32 bytes
+    view.setUint16(offset, 7, false);
+    offset += 2;
+    view.setUint32(offset, 32, false);
+    offset += 4;
+    view.setUint16(offset, 2, false);
+    offset += 2;
+    view.setUint16(offset, 1, false);
+    offset += 2;
+    view.setUint32(offset, 2, false);
+    offset += 4;
+    bytes[offset++] = 0x2a; // aload_0
+    bytes[offset++] = 0xb1; // return
+    view.setUint16(offset, 0, false);
+    offset += 2;
+    view.setUint16(offset, 1, false);
+    offset += 2; // nested attributes_count
+
+    // Nested attribute: LocalVariableTable (CP[8])
+    view.setUint16(offset, 8, false);
+    offset += 2;
+    view.setUint32(offset, 12, false);
+    offset += 4;
+    view.setUint16(offset, 1, false);
+    offset += 2; // table length
+    view.setUint16(offset, 0, false);
+    offset += 2; // startPc
+    view.setUint16(offset, 2, false);
+    offset += 2; // length
+    view.setUint16(offset, 9, false);
+    offset += 2; // nameIndex (this)
+    view.setUint16(offset, 10, false);
+    offset += 2; // descriptorIndex (LClassA;)
+    view.setUint16(offset, 0, false);
+    offset += 2; // index
+
+    // Class level attributes count: 0
+    view.setUint16(offset, 0, false);
+    offset += 2;
+
+    const sliced = buffer.slice(0, offset);
+    const parsed = parseJavaClass(sliced);
+
+    const codeAttr = parsed.methods[0].attributes.find(
+      (a) => a.name === 'Code'
+    );
+    expect(codeAttr).toBeDefined();
+    expect(codeAttr?.decoded).toBeDefined();
+
+    const lvTable = codeAttr?.decoded.attributes.find(
+      (a: any) => a.name === 'LocalVariableTable'
+    );
+    expect(lvTable).toBeDefined();
+    expect(lvTable?.decoded).toEqual([
+      {
+        startPc: 0,
+        length: 2,
+        name: 'this',
+        descriptor: 'LClassA;',
+        index: 0,
+      },
+    ]);
+  });
+
+
+  it('should successfully parse LineNumberTable and LocalVariableTable with multiple entries and empty tables', () => {
+    // CP count: 14
+    // 1: Utf8 "ClassA"
+    // 2: Class (1)
+    // 3: Utf8 "java/lang/Object"
+    // 4: Class (3)
+    // 5: Utf8 "myMethod"
+    // 6: Utf8 "()V"
+    // 7: Utf8 "Code"
+    // 8: Utf8 "LineNumberTable"
+    // 9: Utf8 "LocalVariableTable"
+    // 10: Utf8 "varA"
+    // 11: Utf8 "I"
+    // 12: Utf8 "varB"
+    // 13: Utf8 "F"
+
+    const buffer = new ArrayBuffer(500);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    let offset = 0;
+    view.setUint32(offset, 0xcafebabe, false);
+    offset += 4;
+    view.setUint16(offset, 0, false);
+    offset += 2;
+    view.setUint16(offset, 61, false);
+    offset += 2;
+    view.setUint16(offset, 14, false);
+    offset += 2; // CP count (14)
+
+    // CP[1] Utf8 "ClassA"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 6, false);
+    offset += 2;
+    for (let j = 0; j < 6; j++) bytes[offset++] = 'ClassA'.charCodeAt(j);
+
+    // CP[2] Class index 1
+    bytes[offset++] = 7;
+    view.setUint16(offset, 1, false);
+    offset += 2;
+
+    // CP[3] Utf8 "java/lang/Object"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 16, false);
+    offset += 2;
+    for (let j = 0; j < 16; j++) bytes[offset++] = 'java/lang/Object'.charCodeAt(j);
+
+    // CP[4] Class index 3
+    bytes[offset++] = 7;
+    view.setUint16(offset, 3, false);
+    offset += 2;
+
+    // CP[5] Utf8 "myMethod"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 8, false);
+    offset += 2;
+    for (let j = 0; j < 8; j++) bytes[offset++] = 'myMethod'.charCodeAt(j);
+
+    // CP[6] Utf8 "()V"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 3, false);
+    offset += 2;
+    for (let j = 0; j < 3; j++) bytes[offset++] = '()V'.charCodeAt(j);
+
+    // CP[7] Utf8 "Code"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 4, false);
+    offset += 2;
+    for (let j = 0; j < 4; j++) bytes[offset++] = 'Code'.charCodeAt(j);
+
+    // CP[8] Utf8 "LineNumberTable"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 15, false);
+    offset += 2;
+    for (let j = 0; j < 15; j++) bytes[offset++] = 'LineNumberTable'.charCodeAt(j);
+
+    // CP[9] Utf8 "LocalVariableTable"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 18, false);
+    offset += 2;
+    for (let j = 0; j < 18; j++) bytes[offset++] = 'LocalVariableTable'.charCodeAt(j);
+
+    // CP[10] Utf8 "varA"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 4, false);
+    offset += 2;
+    for (let j = 0; j < 4; j++) bytes[offset++] = 'varA'.charCodeAt(j);
+
+    // CP[11] Utf8 "I"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 1, false);
+    offset += 2;
+    bytes[offset++] = 'I'.charCodeAt(0);
+
+    // CP[12] Utf8 "varB"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 4, false);
+    offset += 2;
+    for (let j = 0; j < 4; j++) bytes[offset++] = 'varB'.charCodeAt(j);
+
+    // CP[13] Utf8 "F"
+    bytes[offset++] = 1;
+    view.setUint16(offset, 1, false);
+    offset += 2;
+    bytes[offset++] = 'F'.charCodeAt(0);
+
+    // Class Info
+    view.setUint16(offset, 0x0021, false); // access flags
+    offset += 2;
+    view.setUint16(offset, 2, false); // this class
+    offset += 2;
+    view.setUint16(offset, 4, false); // super class
+    offset += 2;
+    view.setUint16(offset, 0, false); // interfaces count
+    offset += 2;
+    view.setUint16(offset, 0, false); // fields count
+    offset += 2;
+
+    // Methods count: 1
+    view.setUint16(offset, 1, false);
+    offset += 2;
+    // method info: access_flags, name_index(5), descriptor_index(6), attributes_count(1)
+    view.setUint16(offset, 0x0001, false);
+    offset += 2;
+    view.setUint16(offset, 5, false);
+    offset += 2;
+    view.setUint16(offset, 6, false);
+    offset += 2;
+    view.setUint16(offset, 1, false);
+    offset += 2; // 1 attribute (Code)
+
+    // Code Attribute (CP[7])
+    view.setUint16(offset, 7, false);
+    offset += 2;
+    view.setUint32(offset, 80, false);
+    offset += 4;
+    view.setUint16(offset, 2, false);
+    offset += 2;
+    view.setUint16(offset, 3, false);
+    offset += 2;
+    view.setUint32(offset, 8, false);
+    offset += 4;
+    for (let j = 0; j < 8; j++) bytes[offset++] = 0; // 8 dummy instructions
+    view.setUint16(offset, 0, false);
+    offset += 2;
+    view.setUint16(offset, 4, false);
+    offset += 2; // 4 attributes
+
+    // Nested 1: LineNumberTable (CP[8])
+    view.setUint16(offset, 8, false);
+    offset += 2;
+    view.setUint32(offset, 10, false);
+    offset += 4;
+    view.setUint16(offset, 2, false);
+    offset += 2; // table length: 2
+    // Entry 1: startPc=0, lineNumber=100
+    view.setUint16(offset, 0, false);
+    offset += 2;
+    view.setUint16(offset, 100, false);
+    offset += 2;
+    // Entry 2: startPc=4, lineNumber=101
+    view.setUint16(offset, 4, false);
+    offset += 2;
+    view.setUint16(offset, 101, false);
+    offset += 2;
+
+    // Nested 2: LineNumberTable (CP[8]) empty
+    view.setUint16(offset, 8, false);
+    offset += 2;
+    view.setUint32(offset, 2, false);
+    offset += 4;
+    view.setUint16(offset, 0, false);
+    offset += 2; // table length: 0
+
+    // Nested 3: LocalVariableTable (CP[9])
+    view.setUint16(offset, 9, false);
+    offset += 2;
+    view.setUint32(offset, 22, false);
+    offset += 4;
+    view.setUint16(offset, 2, false);
+    offset += 2; // table length: 2
+    // Entry 1: startPc=0, length=8, nameIdx=10 ("varA"), descIdx=11 ("I"), index=1
+    view.setUint16(offset, 0, false);
+    offset += 2;
+    view.setUint16(offset, 8, false);
+    offset += 2;
+    view.setUint16(offset, 10, false);
+    offset += 2;
+    view.setUint16(offset, 11, false);
+    offset += 2;
+    view.setUint16(offset, 1, false);
+    offset += 2;
+    // Entry 2: startPc=2, length=6, nameIdx=12 ("varB"), descIdx=13 ("F"), index=2
+    view.setUint16(offset, 2, false);
+    offset += 2;
+    view.setUint16(offset, 6, false);
+    offset += 2;
+    view.setUint16(offset, 12, false);
+    offset += 2;
+    view.setUint16(offset, 13, false);
+    offset += 2;
+    view.setUint16(offset, 2, false);
+    offset += 2;
+
+    // Nested 4: LocalVariableTable (CP[9]) empty
+    view.setUint16(offset, 9, false);
+    offset += 2;
+    view.setUint32(offset, 2, false);
+    offset += 4;
+    view.setUint16(offset, 0, false);
+    offset += 2; // table length: 0
+
+    // Class level attributes: 0
+    view.setUint16(offset, 0, false);
+    offset += 2;
+
+    const sliced = buffer.slice(0, offset);
+    const parsed = parseJavaClass(sliced);
+
+    const codeAttr = parsed.methods[0].attributes.find((a) => a.name === 'Code');
+    expect(codeAttr).toBeDefined();
+
+    const nestedAttrs = codeAttr?.decoded.attributes;
+    expect(nestedAttrs).toHaveLength(4);
+
+    // LineNumberTable with entries
+    expect(nestedAttrs[0].name).toBe('LineNumberTable');
+    expect(nestedAttrs[0].decoded).toEqual([
+      { startPc: 0, lineNumber: 100 },
+      { startPc: 4, lineNumber: 101 },
+    ]);
+
+    // LineNumberTable empty
+    expect(nestedAttrs[1].name).toBe('LineNumberTable');
+    expect(nestedAttrs[1].decoded).toEqual([]);
+
+    // LocalVariableTable with entries
+    expect(nestedAttrs[2].name).toBe('LocalVariableTable');
+    expect(nestedAttrs[2].decoded).toEqual([
+      { startPc: 0, length: 8, name: 'varA', descriptor: 'I', index: 1 },
+      { startPc: 2, length: 6, name: 'varB', descriptor: 'F', index: 2 },
+    ]);
+
+    // LocalVariableTable empty
+    expect(nestedAttrs[3].name).toBe('LocalVariableTable');
+    expect(nestedAttrs[3].decoded).toEqual([]);
+  });
+
   it('should correctly format access flags for classes, fields, and methods', () => {
     const classFlags = formatAccessFlags(
       0x0001 | 0x0010 | 0x0400 | 0x0200,

@@ -88,7 +88,7 @@ graph TD
 
 ## 🚀 Getting Started
 
-Ensure you have Node.js installed on your system. This project strictly uses **pnpm** for package management.
+Ensure you have Bun installed on your system. This project strictly uses **bun** for runtime and package management.
 
 ### Installation
 
@@ -99,8 +99,8 @@ Clone the repository and install all required dependencies:
 git clone <repository-url>
 cd test
 
-# Install dependencies using pnpm
-pnpm install
+# Install dependencies using bun
+bun install
 ```
 
 ### Running the App Locally
@@ -108,7 +108,7 @@ pnpm install
 To start the development server with Hot Module Replacement (HMR):
 
 ```bash
-pnpm run dev
+bun run dev
 ```
 
 ### Running Test Suite
@@ -116,7 +116,7 @@ pnpm run dev
 To run all disassembler, parser, analyzer, E2E, and regression tests:
 
 ```bash
-pnpm test
+bun run test
 ```
 
 ### Production Build
@@ -124,8 +124,8 @@ pnpm test
 To build the static application bundle optimized for deployment:
 
 ```bash
-pnpm run build
-pnpm run preview
+bun run build
+bun run preview
 ```
 
 ---

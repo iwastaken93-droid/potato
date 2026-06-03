@@ -6,10 +6,9 @@ This document outlines the local setup, tooling configuration, testing standards
 
 ## 📋 Prerequisites
 
-DISSECT is built using modern TypeScript (ESNext target) and utilizes `npm` as its primary package manager.
+DISSECT is built using modern TypeScript (ESNext target) and utilizes `bun` as its primary package manager.
 
-- **Node.js**: Version 18 or higher (LTS recommended).
-- **Package Manager**: `npm` (mandatory rule).
+- **Runtime & Package Manager**: `bun` (mandatory rule).
 
 ---
 
@@ -22,7 +21,7 @@ Inside the project root directory, run these scripts to execute operations:
 Bootstrap development libraries and project modules:
 
 ```bash
-npm install
+bun install
 ```
 
 ### 🏃 Running Locally (Development)
@@ -30,7 +29,7 @@ npm install
 Launches Vite's local dev server at `http://localhost:5173`. Modifying components or styles triggers Hot Module Replacement (HMR) instantly.
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 ### 🧪 Executing Unit Tests
@@ -38,7 +37,7 @@ npm run dev
 DISSECT uses **Vitest** for running unit test suites. Run tests with:
 
 ```bash
-npm test
+bun run test
 ```
 
 The test suite validates parser correctness, CPU emulator execution (registers, flags, virtual memory paging), decompiler AST mapping, and UI utility components.
@@ -48,7 +47,7 @@ The test suite validates parser correctness, CPU emulator execution (registers, 
 Bundles the code, styles, and template files into the production-ready static assets directory `dist/`:
 
 ```bash
-npm run build
+bun run build
 ```
 
 ---

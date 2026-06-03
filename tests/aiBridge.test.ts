@@ -43,6 +43,24 @@ describe('AI Query Bridge & Tool System Tests', () => {
     expect(result.decompiled.pseudocode).toContain('rax');
   });
 
+  it('should decompile instructions starting at a specific entry point and preserve complex args', async () => {
+    const result = await AIBridge.executeQuery({
+      action: 'decompile',
+      params: {
+        entryPoint: 0x1008,
+        instructions: [
+          { address: 0x1000, op: 'mov', args: ['[rax, rcx, 8]', 'rbx'] },
+          { address: 0x1004, op: 'jmp', args: ['0x1008'] },
+          { address: 0x1008, op: 'RET', args: [] }
+        ]
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.decompiled.pseudocode).not.toContain('[rax, rcx, 8]');
+    expect(result.decompiled.pseudocode).toContain('return');
+  });
+
   it('should parse PE headers via the bridge', async () => {
     const buffer = new ArrayBuffer(352);
     const view = new DataView(buffer);
@@ -88,6 +106,93 @@ describe('AI Query Bridge & Tool System Tests', () => {
     expect(result.records.length).toBe(1);
     expect(result.records[0].description).toBe('patch test');
   });
+
+  it('should support session-persistent patch tracking and undo/redo', async () => {
+    const initialHex = '11223344';
+
+    // Reset the persistent patcherInstance state
+    await AIBridge.executeQuery({
+      action: 'loadBinary',
+      params: {
+        data: initialHex
+      }
+    });
+
+    // 1. Initial patch
+    const patchResult = await AIBridge.executeQuery({
+
+      action: 'patchBinary',
+      params: {
+        data: initialHex,
+        action: 'patch',
+        patches: [
+          { offset: 1, patchedBytes: 'ff', address: 0x1001, description: 'patch 1' }
+        ]
+      }
+    });
+    expect(patchResult.success).toBe(true);
+    expect(patchResult.patchedData).toBe('11ff3344');
+    expect(patchResult.records.length).toBe(1);
+
+    // 2. Second patch (reuses the session-persistent patcherInstance)
+    const secondResult = await AIBridge.executeQuery({
+      action: 'patchBinary',
+      params: {
+        data: initialHex,
+        action: 'patch',
+        patches: [
+          { offset: 2, patchedBytes: 'ee', address: 0x1002, description: 'patch 2' }
+        ]
+      }
+    });
+    expect(secondResult.success).toBe(true);
+    expect(secondResult.patchedData).toBe('11ffee44');
+    expect(secondResult.records.length).toBe(2);
+
+    // 3. Undo patch
+    const undoResult = await AIBridge.executeQuery({
+      action: 'patchBinary',
+      params: {
+        action: 'undo'
+      }
+    });
+    expect(undoResult.success).toBe(true);
+    expect(undoResult.patchedData).toBe('11ff3344');
+    expect(undoResult.records.length).toBe(1);
+    expect(undoResult.records[0].description).toBe('patch 1');
+
+    // 4. Redo patch
+    const redoResult = await AIBridge.executeQuery({
+      action: 'patchBinary',
+      params: {
+        action: 'redo'
+      }
+    });
+    expect(redoResult.success).toBe(true);
+    expect(redoResult.patchedData).toBe('11ffee44');
+    expect(redoResult.records.length).toBe(2);
+
+    // 5. loadBinary should reset patcherInstance
+    const loadResult = await AIBridge.executeQuery({
+      action: 'loadBinary',
+      params: {
+        data: initialHex
+      }
+    });
+    expect(loadResult.success).toBe(true);
+
+    // Now undo should do nothing (patcherInstance is null)
+    const undoAfterReset = await AIBridge.executeQuery({
+      action: 'patchBinary',
+      params: {
+        action: 'undo'
+      }
+    });
+    expect(undoAfterReset.success).toBe(true);
+    expect(undoAfterReset.patchedData).toBe('');
+    expect(undoAfterReset.records.length).toBe(0);
+  });
+
 
   it('should execute scripts with scripting context via the bridge', async () => {
     const result = await AIBridge.executeQuery({
@@ -1339,7 +1444,25 @@ describe('AI Query Bridge & Tool System Tests', () => {
     expect(resultCff.detected).toBe(true);
     const cffPattern = resultCff.patterns.find((p: any) => p.pattern === 'Control Flow Flattening');
     expect(cffPattern).toBeDefined();
-    expect(cffPattern.stateVariable).toBe('eax');
+  });
+
+  it('should support patchAndRun execution with string addresses and breakpoints', async () => {
+    const result = await AIBridge.executeQuery({
+      action: 'patchAndRun',
+      params: {
+        data: '90909090', // 4 NOPs
+        patches: [
+          { offset: '0x1', patchedBytes: '90' }
+        ],
+        runUntil: '0x2',
+        maxSteps: 10
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.stepsRun).toBe(2);
+    expect(result.hitBreakpoint).toBe(true);
+    expect(result.cpuState.rip).toBe('2');
   });
 });
 

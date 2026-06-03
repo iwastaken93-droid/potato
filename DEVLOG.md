@@ -2519,3 +2519,19 @@ Run git diff to list unstaged modified files.
 - Formulated function boundaries `{ startVA, endVA, estimatedName }` by scanning and matching instructions.
 - Fixed a ReferenceError in `callTree` case (re-declared `sections` and `symbols`).
 - Added unit tests in [tests/aiBridge.test.ts](file:///c/Users/NaThA/hacks/sbx/potato/tests/aiBridge.test.ts).
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders

@@ -71,6 +71,15 @@ export class Decompiler {
     blocks: BasicBlock[],
     entryBlockId: string
   ): DecompiledFunction {
+    // Normalize all instruction ops to uppercase to ensure case-insensitive matching
+    for (const b of blocks) {
+      for (const inst of b.instructions) {
+        if (inst.op) {
+          inst.op = inst.op.toUpperCase();
+        }
+      }
+    }
+
     this.typeMap.clear();
     this.structDefinitions.clear();
     this.structNameCounter = 0;

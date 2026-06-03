@@ -73,10 +73,14 @@ export class SignatureScanner {
       return results;
     }
 
-    // Decode buffer using ISO-8859-1 (latin1) to guarantee 1-to-1 byte to character code mapping.
-    // This allows us to perform substring search and regular expression match.
-    const latin1Decoder = new TextDecoder('iso-8859-1');
-    const latin1String = latin1Decoder.decode(buffer);
+    // Decode buffer using a custom chunked String.fromCharCode loop to guarantee 1-to-1 byte to character code mapping.
+    // This avoids modern JS engines converting 'iso-8859-1' to Windows-1252 (which maps 0x80 to \u20ac).
+    let latin1String = '';
+    const chunkLimit = 1024;
+    for (let i = 0; i < buffer.length; i += chunkLimit) {
+      const chunk = buffer.subarray(i, i + chunkLimit);
+      latin1String += String.fromCharCode.apply(null, chunk as unknown as number[]);
+    }
 
     for (const rule of this.rules) {
       const matches: MatchInfo[] = [];

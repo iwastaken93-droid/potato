@@ -96,18 +96,23 @@ export function parseAddress(
     return parseInt(str, 10);
   }
   const lowerStr = str.toLowerCase();
-  if (symbols) {
-    const sym = symbols.find(s => s.name.toLowerCase() === lowerStr || s.name.toLowerCase().includes(lowerStr));
+  
+  const activeSymbols = symbols || (typeof AIBridge !== 'undefined' ? (AIBridge as any).getSymbols() : undefined);
+  if (activeSymbols) {
+    const sym = activeSymbols.find((s: Symbol) => s.name.toLowerCase() === lowerStr || s.name.toLowerCase().includes(lowerStr));
     if (sym) {
       return sym.address;
     }
   }
-  if (peImports) {
-    for (const impTable of peImports) {
+
+  const activePeImports = peImports || (typeof AIBridge !== 'undefined' ? (AIBridge as any).cachedPeImports : undefined);
+  const activeImageBase = imageBase || (typeof AIBridge !== 'undefined' ? (AIBridge as any).cachedImageBase : 0);
+  if (activePeImports) {
+    for (const impTable of activePeImports) {
       for (const entry of impTable.imports) {
         if (entry.name && entry.name.toLowerCase() === lowerStr) {
           if (entry.iatRva !== undefined) {
-            return imageBase + entry.iatRva;
+            return activeImageBase + entry.iatRva;
           }
         }
       }
@@ -215,7 +220,8 @@ export const TOOL_SCHEMAS = {
     parameters: {
       type: 'object',
       properties: {
-        data: { type: 'string', description: 'Hex or Base64 encoded original binary data.' },
+        data: { type: 'string', description: 'Hex or Base64 encoded original binary data. Optional if action is undo or redo.' },
+        action: { type: 'string', enum: ['patch', 'undo', 'redo'], description: 'Patch action to perform: "patch" to apply a new patch, "undo" to revert the last applied patch, or "redo" to re-apply the last undone patch. Default is "patch".' },
         offset: { type: 'number', description: 'Byte offset in the raw binary file where the patch should be applied.' },
         patchedBytes: { type: 'string', description: 'Hex or Base64 encoded replacement bytes.' },
         address: { type: 'number', description: 'Optional virtual address associated with the patch location for reference/logging.' },
@@ -234,8 +240,7 @@ export const TOOL_SCHEMAS = {
             required: ['offset', 'patchedBytes', 'address']
           }
         }
-      },
-      required: ['data']
+      }
     }
   },
   executeScript: {
@@ -540,7 +545,13 @@ export const TOOL_SCHEMAS = {
             required: ['offset', 'patchedBytes']
           }
         },
-        runUntil: { type: 'number', description: 'Virtual address/PC to run emulation until (breakpoint).' },
+        runUntil: {
+          anyOf: [
+            { type: 'number' },
+            { type: 'string' }
+          ],
+          description: 'Virtual address/PC to run emulation until (breakpoint).'
+        },
         maxSteps: { type: 'number', description: 'Maximum step limit for emulator execution. Default 1000.' }
       },
       required: ['patches']
@@ -579,7 +590,16 @@ export const TOOL_SCHEMAS = {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['run', 'setBreakpoints', 'clearBreakpoints'], description: 'Emulation action. "run": execute until breakpoint or halt. "setBreakpoints": configure breakpoint list.' },
-        breakpoints: { type: 'array', items: { type: 'number' }, description: 'List of virtual addresses to use as breakpoints.' },
+        breakpoints: {
+          type: 'array',
+          items: {
+            anyOf: [
+              { type: 'number' },
+              { type: 'string' }
+            ]
+          },
+          description: 'List of virtual addresses to use as breakpoints.'
+        },
         steps: { type: 'number', description: 'Maximum steps to execute in "run" (default 1000).' }
       },
       required: ['action']
@@ -1297,6 +1317,58 @@ function toASCII(blocks: BasicBlock[]): string {
 export class AIBridge {
   private static emulatorInstance: Emulator | null = null;
   private static loadedBinaryBytes: Uint8Array | null = null;
+  private static cachedSymbols: Symbol[] | null = null;
+  private static cachedPeImports: any[] | null = null;
+  private static cachedImageBase: number = 0;
+  private static patcherInstance: BinaryPatcher | null = null;
+
+  private static getSymbols(): Symbol[] {
+    if (this.cachedSymbols) return this.cachedSymbols;
+    if (!this.loadedBinaryBytes) return [];
+    const b = this.loadedBinaryBytes;
+    const symbols: Symbol[] = [];
+    if (b[0] === 0x7f && b[1] === 0x45 && b[2] === 0x4c && b[3] === 0x46) {
+      try {
+        const parsed = parseElf(b.buffer as ArrayBuffer);
+        if (parsed.symbols) {
+          for (const sym of parsed.symbols) {
+            symbols.push({
+              name: sym.name,
+              address: Number(sym.value),
+              binding: sym.bind?.toLowerCase() === 'local' ? 'local' : (sym.bind?.toLowerCase() === 'weak' ? 'weak' : 'global'),
+              type: sym.type === 'FUNC' ? 'function' : (sym.type === 'OBJECT' ? 'object' : 'none')
+            });
+          }
+        }
+      } catch (_) {}
+    } else if (b[0] === 0x4d && b[1] === 0x5a) {
+      try {
+        const parser = new PEParser(b.buffer as ArrayBuffer);
+        const parsed = parser.parse();
+        const imgBase = Number(parsed.optionalHeader.imageBase || 0);
+        this.cachedImageBase = imgBase;
+        if (parsed.imports) {
+          const peImports: any[] = [];
+          for (const impTable of parsed.imports) {
+            for (const entry of impTable.imports) {
+              if (entry.name && entry.iatRva !== undefined) {
+                symbols.push({
+                  name: entry.name,
+                  address: imgBase + entry.iatRva,
+                  binding: 'global',
+                  type: 'none'
+                });
+              }
+            }
+            peImports.push(impTable);
+          }
+          this.cachedPeImports = peImports;
+        }
+      } catch (_) {}
+    }
+    this.cachedSymbols = symbols;
+    return symbols;
+  }
 
   private static getEmulator(): Emulator {
     if (!this.emulatorInstance) {
@@ -1357,19 +1429,42 @@ export class AIBridge {
           throw new Error('No instructions provided for decompilation');
         }
 
-        const decompilerInsts = insts.map((inst: any) => ({
-          address: inst.address,
-          op: inst.op || inst.mnemonic || '',
-          args: inst.args || (inst.opStr ? inst.opStr.split(',').map((s: string) => s.trim()) : [])
+        const mappedInsts = insts.map((inst: any) => ({
+          address: Number(inst.address),
+          bytes: inst.bytes instanceof Uint8Array ? inst.bytes : new Uint8Array(),
+          mnemonic: inst.mnemonic || inst.op || '',
+          opStr: inst.opStr || (inst.args ? inst.args.join(', ') : ''),
+          operands: inst.operands || [],
+          size: Number(inst.size || 1),
+          args: inst.args,
+          op: inst.op
         }));
 
+        const cfgBlocks = buildCFG(mappedInsts);
+        const decompilerBlocks = cfgBlocks.map(block => ({
+          id: block.id,
+          instructions: block.instructions.map((inst: any) => ({
+            address: Number(inst.address),
+            op: inst.mnemonic || inst.op || '',
+            args: inst.args || (inst.opStr ? inst.opStr.split(',').map((s: string) => s.trim()) : [])
+          })),
+          successors: block.successors
+        }));
+
+        const entryAddrVal = (params.entryPoint !== undefined || params.address !== undefined || params.baseAddress !== undefined)
+          ? parseAddress(params.entryPoint ?? params.address ?? params.baseAddress)
+          : undefined;
+
+        let entryBlockId = cfgBlocks[0]?.id || 'entry';
+        if (entryAddrVal !== undefined) {
+          const found = cfgBlocks.find(b => b.startAddress <= entryAddrVal && entryAddrVal < b.endAddress);
+          if (found) {
+            entryBlockId = found.id;
+          }
+        }
+
         const decompiler = new Decompiler();
-        const blocks = [{
-          id: 'entry',
-          instructions: decompilerInsts,
-          successors: []
-        }];
-        const result = decompiler.decompile('func', [], blocks, 'entry');
+        const result = decompiler.decompile('func', [], decompilerBlocks, entryBlockId);
         return { success: true, decompiled: result };
       }
 
@@ -1447,30 +1542,52 @@ export class AIBridge {
       }
 
       case 'patchBinary': {
-        const bytes = toUint8Array(params.data);
-        const patcher = new BinaryPatcher(bytes);
-        const records = [];
-        if (params.offset !== undefined && params.patchedBytes !== undefined) {
-          const patBytes = toUint8Array(params.patchedBytes);
-          const offset = parseAddress(params.offset);
-          const addr = params.address !== undefined ? parseAddress(params.address) : offset;
-          const rec = patcher.applyPatch(offset, patBytes, addr, params.description || '');
-          records.push(rec);
-        } else if (params.patches && Array.isArray(params.patches)) {
-          for (const p of params.patches) {
-            const patBytes = toUint8Array(p.patchedBytes);
-            const offset = parseAddress(p.offset);
-            const addr = p.address !== undefined ? parseAddress(p.address) : offset;
-            const rec = patcher.applyPatch(offset, patBytes, addr, p.description || '');
-            records.push(rec);
+        const action = params.action || 'patch';
+        if (action === 'undo') {
+          AIBridge.patcherInstance?.undo();
+        } else if (action === 'redo') {
+          AIBridge.patcherInstance?.redo();
+        } else if (action === 'patch') {
+          if (!params.data) {
+            throw new Error('Missing "data" parameter for patch action.');
+          }
+          const bytes = toUint8Array(params.data);
+          const areBytesEqual = (a: Uint8Array, b: Uint8Array) => {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+              if (a[i] !== b[i]) return false;
+            }
+            return true;
+          };
+          const hasInstance = !!AIBridge.patcherInstance;
+          const bytesChanged = hasInstance && !areBytesEqual(bytes, AIBridge.patcherInstance!.getOriginalBinary());
+          if (!hasInstance || bytesChanged) {
+            AIBridge.patcherInstance = new BinaryPatcher(bytes);
+          }
+
+          if (params.offset !== undefined && params.patchedBytes !== undefined) {
+            const patBytes = toUint8Array(params.patchedBytes);
+            const offset = parseAddress(params.offset);
+            const addr = params.address !== undefined ? parseAddress(params.address) : offset;
+            AIBridge.patcherInstance!.applyPatch(offset, patBytes, addr, params.description || '');
+          } else if (params.patches && Array.isArray(params.patches)) {
+            for (const p of params.patches) {
+              const patBytes = toUint8Array(p.patchedBytes);
+              const offset = parseAddress(p.offset);
+              const addr = p.address !== undefined ? parseAddress(p.address) : offset;
+              AIBridge.patcherInstance!.applyPatch(offset, patBytes, addr, p.description || '');
+            }
+          } else {
+            throw new Error('Missing patch parameters: either specify top-level "offset" and "patchedBytes", or a "patches" array.');
           }
         } else {
-          throw new Error('Missing patch parameters: either specify top-level "offset" and "patchedBytes", or a "patches" array.');
+          throw new Error(`Unsupported action: ${action}`);
         }
+
         return {
           success: true,
-          patchedData: toHex(patcher.getPatchedBinary()),
-          records
+          patchedData: AIBridge.patcherInstance ? toHex(AIBridge.patcherInstance.getPatchedBinary()) : '',
+          records: AIBridge.patcherInstance ? AIBridge.patcherInstance.getHistory() : []
         };
       }
 
@@ -2409,7 +2526,7 @@ export class AIBridge {
             return 0;
           };
 
-          const startVA = params.startVA !== undefined ? Number(params.startVA) : getEntryPoint(bytes);
+          const startVA = params.startVA !== undefined ? parseAddress(params.startVA) : getEntryPoint(bytes);
           const resolved = resolveElfOrPe(bytes, startVA, undefined);
           const router = new DisassemblerRouter();
           const insts = router.disassemble(resolved.data, {
@@ -2476,6 +2593,10 @@ export class AIBridge {
           bytes = toUint8Array(params.data);
         }
         AIBridge.loadedBinaryBytes = bytes;
+        AIBridge.cachedSymbols = null;
+        AIBridge.cachedPeImports = null;
+        AIBridge.cachedImageBase = 0;
+        AIBridge.patcherInstance = null;
         
         let detected = 'unknown';
         if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
@@ -2606,8 +2727,10 @@ export class AIBridge {
         const patcher = new BinaryPatcher(bytes);
         if (params.patches && Array.isArray(params.patches)) {
           for (const p of params.patches) {
+            const offset = parseAddress(p.offset);
             const patBytes = toUint8Array(p.patchedBytes);
-            patcher.applyPatch(p.offset, patBytes, p.address || p.offset, p.description || '');
+            const addr = p.address !== undefined ? parseAddress(p.address) : offset;
+            patcher.applyPatch(offset, patBytes, addr, p.description || '');
           }
         }
         const patched = patcher.getPatchedBinary();
@@ -2615,7 +2738,7 @@ export class AIBridge {
         const emu = this.getEmulator();
         await this.executeQuery({ action: 'emulatorControl', params: { action: 'load', data: toHex(patched) } });
         
-        const runUntil = params.runUntil;
+        const runUntil = params.runUntil !== undefined ? parseAddress(params.runUntil) : undefined;
         const maxSteps = params.maxSteps || 1000;
         let steps = 0;
         let res = { success: true, halted: false, hitBreakpoint: false };
@@ -2892,7 +3015,7 @@ export class AIBridge {
           if (params.breakpoints && Array.isArray(params.breakpoints)) {
             emu.breakpoints.clear();
             for (const bp of params.breakpoints) {
-              emu.breakpoints.add(Number(bp));
+              emu.breakpoints.add(parseAddress(bp));
             }
           }
           return { success: true, breakpointCount: emu.breakpoints.size };
@@ -3594,7 +3717,7 @@ export class AIBridge {
         ]);
         for (const strObj of strings) {
           if (strObj && strObj.value && unsafeApiNames.has(strObj.value.toLowerCase().trim())) {
-            const exists = normalizedSymbols.some(s => s.name.toLowerCase() === strObj.value.toLowerCase().trim());
+            const exists = normalizedSymbols.some((s: any) => s.name.toLowerCase() === strObj.value.toLowerCase().trim());
             if (!exists) {
               normalizedSymbols.push({
                 name: strObj.value.trim(),

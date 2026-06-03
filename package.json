@@ -24,7 +24,7 @@
     "build": "tsc && vite build",
     "build:lib": "tsc",
     "test": "vitest run",
-    "pack:local": "npm run build:lib && npm pack"
+    "pack:local": "bun run build:lib && bun pm pack"
   },
   "keywords": [
     "reverse-engineering",

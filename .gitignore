@@ -25,7 +25,7 @@ dist/
 out/
 build/
 .yarn/
-.pnpm-store/
+.bun/
 
 # --- Python ---
 __pycache__/
@@ -83,5 +83,5 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
+bun-debug.log*
 lerna-debug.log*

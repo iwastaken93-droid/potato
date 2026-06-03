@@ -536,4 +536,49 @@ describe('Decompiler Core Analysis', () => {
     };
     expect(printer.render(statementNode)).toBe('ebx = eax + 4;');
   });
+
+  describe('C++ Symbol Demangling Support in Decompiler', () => {
+    it('should identify and demangle mangled call targets and annotate imports', () => {
+      const blocks = [
+        createBlock(
+          'Entry',
+          [],
+          [
+            { address: 0x1000, op: 'CALL', args: ['_Z3foov'] },
+            { address: 0x1004, op: 'CALL', args: ['?add@Math@@YAHHH@Z'] },
+            { address: 0x1008, op: 'CALL', args: ['__imp__ZN3foo3bar3bazEib'] },
+            { address: 0x100c, op: 'RET', args: [] },
+          ]
+        ),
+      ];
+
+      const decompiler = new Decompiler();
+      const decompiled = decompiler.decompile(
+        '_ZN3foo6helperEPiRKc',
+        [],
+        blocks,
+        'Entry'
+      );
+
+      // Verify the decompiled function name itself is demangled
+      expect(decompiled.pseudocode).toContain('function foo::helper(');
+
+      // Verify the annotations inside pseudocode
+      expect(decompiled.pseudocode).toContain('// Decompiled Imports:');
+      expect(decompiled.pseudocode).toContain('// - foo() (mangled: _Z3foov)');
+      expect(decompiled.pseudocode).toContain('// - int Math::add(int, int) (mangled: ?add@Math@@YAHHH@Z)');
+      expect(decompiled.pseudocode).toContain('// - foo::bar::baz(int, bool) (mangled: __imp__ZN3foo3bar3bazEib)');
+
+      // Verify the call arguments in instructions are demangled in-place
+      expect(decompiled.pseudocode).toContain('call(foo);');
+      expect(decompiled.pseudocode).toContain('call(Math::add);');
+      expect(decompiled.pseudocode).toContain('call(foo::bar::baz);');
+
+      // Verify returned imports array
+      expect(decompiled.imports).toBeDefined();
+      expect(decompiled.imports).toContain('foo() (mangled: _Z3foov)');
+      expect(decompiled.imports).toContain('int Math::add(int, int) (mangled: ?add@Math@@YAHHH@Z)');
+      expect(decompiled.imports).toContain('foo::bar::baz(int, bool) (mangled: __imp__ZN3foo3bar3bazEib)');
+    });
+  });
 });

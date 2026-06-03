@@ -159,6 +159,18 @@ export function extractStrings(
     } else if (isApiName(val)) {
       tags.push('api');
     }
+    if (isPgpKey(val)) {
+      tags.push('pgp-key');
+    }
+    if (isOAuthToken(val)) {
+      tags.push('oauth-token');
+    }
+    if (isJwt(val)) {
+      tags.push('jwt');
+    }
+    if (isApiKey(val)) {
+      tags.push('api-key');
+    }
     return tags;
   };
 
@@ -374,5 +386,88 @@ export function isRegistryKey(str: string): boolean {
  */
 export function isFormatString(str: string): boolean {
   return /%[0-9.-]*[sdfxXupgGcs]/i.test(str);
+}
+
+/**
+ * Detects if a string is a PGP Private or Public Key.
+ */
+export function isPgpKey(str: string): boolean {
+  return /-----BEGIN PGP (PRIVATE|PUBLIC) KEY BLOCK-----/i.test(str);
+}
+
+/**
+ * Detects if a string resembles an OAuth Token.
+ */
+export function isOAuthToken(str: string): boolean {
+  // Google OAuth Access Token
+  if (/^ya29\.[a-zA-Z0-9_\-]{20,}$/.test(str)) {
+    return getStringEntropy(str) >= 3.5;
+  }
+  // Slack Access Token
+  if (/^xox[baprs]-[a-zA-Z0-9\-]{10,60}$/.test(str)) {
+    return getStringEntropy(str) >= 3.0;
+  }
+  // GitHub Access Token / OAuth
+  if (/^gh[o-rs]_[a-zA-Z0-9]{36,40}$/.test(str)) {
+    return getStringEntropy(str) >= 3.0;
+  }
+  // Generic OAuth / Bearer Token pattern (20-128 chars, alphanumeric with high entropy)
+  if (/^[a-zA-Z0-9_\-\.\~]{20,128}$/.test(str)) {
+    const entropy = getStringEntropy(str);
+    if (entropy >= 4.5 && !isFilePath(str) && !isApiName(str) && !isUrl(str)) {
+      let categories = 0;
+      if (/[a-z]/.test(str)) categories++;
+      if (/[A-Z]/.test(str)) categories++;
+      if (/[0-9]/.test(str)) categories++;
+      if (categories >= 2) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Detects if a string is a JSON Web Token (JWT).
+ */
+export function isJwt(str: string): boolean {
+  if (!/^eyJ[a-zA-Z0-9_\-]{10,}\.[a-zA-Z0-9_\-]{10,}\.[a-zA-Z0-9_\-]{10,}$/.test(str)) {
+    return false;
+  }
+  return getStringEntropy(str) >= 4.0;
+}
+
+/**
+ * Detects if a string resembles an API Key (Google, AWS, Slack, etc.).
+ */
+export function isApiKey(str: string): boolean {
+  // Google API Key
+  if (/^AIzaSy[a-zA-Z0-9_\-]{33}$/.test(str)) return true;
+
+  // AWS Access Key ID
+  if (/^(AKIA|ASIA)[A-Z0-9]{16}$/.test(str)) return true;
+
+  // AWS Secret Access Key: 40 base64 chars with high entropy
+  if (/^[a-zA-Z0-9/+=]{40}$/.test(str)) {
+    const entropy = getStringEntropy(str);
+    if (entropy >= 4.5) return true;
+  }
+
+  // Slack App token
+  if (/^xapp-[0-9a-zA-Z-]{10,60}$/.test(str)) return true;
+
+  // Slack Webhook URL
+  if (/^https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}$/.test(str)) return true;
+
+  // Generic API keys (e.g. hex/base64 keys of typical lengths: 32, 64 characters)
+  if (/^[a-zA-Z0-9_\-]{32,64}$/.test(str)) {
+    const entropy = getStringEntropy(str);
+    if (entropy >= 4.5 && !isFilePath(str) && !isApiName(str) && !isUrl(str)) {
+      let categories = 0;
+      if (/[a-zA-Z]/.test(str)) categories++;
+      if (/[0-9]/.test(str)) categories++;
+      if (categories >= 2) return true;
+    }
+  }
+
+  return false;
 }
 

@@ -10,7 +10,7 @@ import { VulnScanner } from './vulnScanner.js';
 import { diffBytes, diffInstructions } from './diff.js';
 import { AIExplanationEngine } from './ai.js';
 import { Emulator } from '../emulator/emulator.js';
-import { extractStrings, isUrl, isFilePath, isRegistryKey, isFormatString, isBase64OrHighEntropy } from './strings.js';
+import { extractStrings, isUrl, isFilePath, isRegistryKey, isFormatString, isBase64OrHighEntropy, isPgpKey, isOAuthToken, isJwt, isApiKey } from './strings.js';
 import { calculateEntropy, findHighEntropyBlocks, mapSectionEntropy } from './entropy.js';
 import { XRefEngine } from './xrefs.js';
 import { buildCFG, BasicBlock, InstructionClassifier, getBranchTarget } from '../disassembler/cfg.js';
@@ -31,6 +31,17 @@ export function toUint8Array(input: any): Uint8Array {
     input = String(input || '');
   }
   const trimmed = input.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.data) {
+          return toUint8Array(parsed.data);
+        }
+      }
+    } catch (_) {}
+    throw new Error("Warning: data appears to be JSON text (starts with '{'), not binary. Expected PE magic 'MZ' or ELF magic '\\x7FELF'. Did you pass the parameter JSON instead of a file path? Use loadBinary({ filePath: '...' }) first.");
+  }
   if (trimmed.length > 20971520) {
     throw new Error('Input size exceeds 10MB limit');
   }
@@ -80,13 +91,76 @@ export function toHex(bytes: Uint8Array): string {
     .join('');
 }
 
-export function parseAddress(
+const WS2_32_ORD_MAP: Record<number, string> = {
+  1: 'accept',
+  2: 'bind',
+  3: 'closesocket',
+  4: 'connect',
+  5: 'getpeername',
+  6: 'getsockname',
+  7: 'getsockopt',
+  8: 'htonl',
+  9: 'htons',
+  10: 'ioctlsocket',
+  11: 'inet_addr',
+  12: 'inet_ntoa',
+  13: 'listen',
+  14: 'ntohl',
+  15: 'ntohs',
+  16: 'recv',
+  17: 'recvfrom',
+  18: 'select',
+  19: 'send',
+  20: 'sendto',
+  21: 'setsockopt',
+  22: 'shutdown',
+  23: 'socket',
+  51: 'gethostbyaddr',
+  52: 'gethostbyname',
+  53: 'getprotobyname',
+  54: 'getprotobynumber',
+  55: 'getservbyport',
+  56: 'getservbyname',
+  57: 'gethostname',
+  101: 'WSAAsyncSelect',
+  102: 'WSAAsyncGetHostByAddr',
+  103: 'WSAAsyncGetHostByName',
+  104: 'WSAAsyncGetProtoByName',
+  105: 'WSAAsyncGetProtoByNumber',
+  106: 'WSAAsyncGetServByPort',
+  107: 'WSAAsyncGetServByName',
+  108: 'WSACancelAsyncRequest',
+  109: 'WSASetBlockingHook',
+  110: 'WSAUnhookBlockingHook',
+  111: 'WSAGetLastError',
+  112: 'WSASetLastError',
+  113: 'WSACancelBlockingCall',
+  114: 'WSAIsBlocking',
+  115: 'WSAStartup',
+  116: 'WSACleanup',
+  151: '__WSAFDIsSet'
+};
+
+const ORDINAL_MAPPINGS: Record<string, Record<number, string>> = {
+  'ws2_32.dll': WS2_32_ORD_MAP,
+  'wsock32.dll': WS2_32_ORD_MAP
+};
+
+export function lookupOrdinal(dllName: string, ordinal: number): string | undefined {
+  const dllLower = dllName.toLowerCase();
+  if (ORDINAL_MAPPINGS[dllLower]) {
+    return ORDINAL_MAPPINGS[dllLower][ordinal];
+  }
+  return undefined;
+}
+
+export function parseAddressOptional(
   value: any,
   symbols?: Symbol[],
   peImports?: any[],
   imageBase: number = 0
-): number {
-  if (value === undefined || value === null) return 0;
+): number | undefined {
+  if (value === undefined || value === null) return undefined;
   if (typeof value === 'number') return value;
   const str = String(value).trim();
   if (str.startsWith('0x') || str.startsWith('0X')) {
@@ -97,7 +171,12 @@ export function parseAddress(
   }
   const lowerStr = str.toLowerCase();
   
-  const activeSymbols = symbols || (typeof AIBridge !== 'undefined' ? (AIBridge as any).getSymbols() : undefined);
+  let activeSymbols = symbols;
+  if (!activeSymbols || activeSymbols.length === 0) {
+    if (typeof AIBridge !== 'undefined' && typeof AIBridge.getSymbols === 'function') {
+      activeSymbols = AIBridge.getSymbols();
+    }
+  }
   if (activeSymbols) {
     const sym = activeSymbols.find((s: Symbol) => s.name.toLowerCase() === lowerStr || s.name.toLowerCase().includes(lowerStr));
     if (sym) {
@@ -119,21 +198,17 @@ export function parseAddress(
     }
   }
   const parsed = parseInt(str, 10);
-  return isNaN(parsed) ? 0 : parsed;
+  return isNaN(parsed) ? undefined : parsed;
 }
 
-export function parseAddressOptional(value: any): number | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === 'number') return value;
-  const str = String(value).trim();
-  if (str.startsWith('0x') || str.startsWith('0X')) {
-    return parseInt(str, 16);
-  }
-  if (/^-?\d+$/.test(str)) {
-    return parseInt(str, 10);
-  }
-  const parsed = parseInt(str, 10);
-  return isNaN(parsed) ? undefined : parsed;
+export function parseAddress(
+  value: any,
+  symbols?: Symbol[],
+  peImports?: any[],
+  imageBase: number = 0
+): number {
+  const parsed = parseAddressOptional(value, symbols, peImports, imageBase);
+  return parsed !== undefined ? parsed : 0;
 }
 
 export function parseBigInt(value: any): bigint {
@@ -389,7 +464,7 @@ export const TOOL_SCHEMAS = {
   },
   analyzeStrings: {
     name: 'analyzeStrings',
-    description: 'Scan binary data and extract printable strings, categorizing them into URLs, Windows/Linux file paths, registry keys (HKEY_...), base64/high-entropy strings, and format strings (%s, %d). Returns lists of categorized strings with their offsets and virtual addresses.',
+    description: 'Scan binary data and extract printable strings, categorizing them into URLs, Windows/Linux file paths, registry keys (HKEY_...), base64/high-entropy strings, format strings (%s, %d), PGP private/public keys, OAuth tokens, JSON Web Tokens (JWT), and API keys. Returns lists of categorized strings with their offsets and virtual addresses.',
     parameters: {
       type: 'object',
       properties: {
@@ -695,6 +770,46 @@ export const TOOL_SCHEMAS = {
         arch: { type: 'string', description: 'Target CPU architecture (e.g. "x86_64", "arm").' },
         baseAddress: { type: 'number', description: 'Virtual address offset at which to start disassembly.' }
       }
+    }
+  },
+  analyzeExports: {
+    name: 'analyzeExports',
+    description: 'Parse PE/ELF binary and extract all exported symbols (ordinals, names, addresses). Supports PE and ELF formats.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded executable binary. Optional if a binary is loaded in the session.' },
+        format: { type: 'string', enum: ['elf', 'pe', 'auto'], description: 'Format of the binary (defaults to "auto").' }
+      }
+    }
+  },
+  analyzeResources: {
+    name: 'analyzeResources',
+    description: 'Parse PE binary resources (.rsrc) and extract manifests, strings, and version headers. Supports PE format only.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded executable binary. Optional if a binary is loaded in the session.' }
+      }
+    }
+  },
+  importRiskAnalyzer: {
+    name: 'importRiskAnalyzer',
+    description: 'Analyze the imported APIs and instructions of a binary for potential security risks and process injection techniques, computing an overall risk score and returning detected risk combinations.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data to analyze. Optional if a binary is loaded in the session.' },
+        importNames: { type: 'array', items: { type: 'string' }, description: 'Optional list of import names to scan directly.' }
+      }
+    }
+  },
+  getSessionStatus: {
+    name: 'getSessionStatus',
+    description: 'Get the current session status, detailing any loaded binary, its format, architecture, file size, and entry point.',
+    parameters: {
+      type: 'object',
+      properties: {}
     }
   }
 };
@@ -1317,12 +1432,12 @@ function toASCII(blocks: BasicBlock[]): string {
 export class AIBridge {
   private static emulatorInstance: Emulator | null = null;
   private static loadedBinaryBytes: Uint8Array | null = null;
-  private static cachedSymbols: Symbol[] | null = null;
-  private static cachedPeImports: any[] | null = null;
-  private static cachedImageBase: number = 0;
-  private static patcherInstance: BinaryPatcher | null = null;
+  public static cachedSymbols: Symbol[] | null = null;
+  public static cachedPeImports: any[] | null = null;
+  public static cachedImageBase: number = 0;
+  public static patcherInstance: BinaryPatcher | null = null;
 
-  private static getSymbols(): Symbol[] {
+  public static getSymbols(): Symbol[] {
     if (this.cachedSymbols) return this.cachedSymbols;
     if (!this.loadedBinaryBytes) return [];
     const b = this.loadedBinaryBytes;
@@ -1381,8 +1496,8 @@ export class AIBridge {
     const { action, params } = query;
 
     if (params) {
-      if (!params.data && !params.dataA && !params.instructions && AIBridge.loadedBinaryBytes) {
-        if (action !== 'disassemble' && action !== 'hexDump') {
+      if (params.data === undefined && !params.dataA && !params.instructions && AIBridge.loadedBinaryBytes) {
+        if (action !== 'disassemble' && action !== 'hexDump' && action !== 'loadBinary') {
           params.data = toHex(AIBridge.loadedBinaryBytes);
         }
       }
@@ -1419,7 +1534,9 @@ export class AIBridge {
         let insts = params.instructions;
         if (!insts && params.data) {
           const bytes = toUint8Array(params.data);
-          const resolved = resolveElfOrPe(bytes, undefined, params.entryPoint ?? params.address ?? params.baseAddress);
+          const entryVal = params.entryPoint ?? params.address ?? params.baseAddress;
+          const entryAddrVal = entryVal !== undefined ? parseAddress(entryVal) : undefined;
+          const resolved = resolveElfOrPe(bytes, undefined, entryAddrVal);
           const router = new DisassemblerRouter();
           insts = router.disassemble(resolved.data, {
             baseAddress: resolved.baseAddress
@@ -1429,24 +1546,28 @@ export class AIBridge {
           throw new Error('No instructions provided for decompilation');
         }
 
-        const mappedInsts = insts.map((inst: any) => ({
-          address: Number(inst.address),
-          bytes: inst.bytes instanceof Uint8Array ? inst.bytes : new Uint8Array(),
-          mnemonic: inst.mnemonic || inst.op || '',
-          opStr: inst.opStr || (inst.args ? inst.args.join(', ') : ''),
-          operands: inst.operands || [],
-          size: Number(inst.size || 1),
-          args: inst.args,
-          op: inst.op
-        }));
+        const mappedInsts = insts.map((inst: any) => {
+          const op = inst.op || inst.mnemonic || '';
+          const args = inst.args || (inst.opStr ? inst.opStr.split(',').map((s: string) => s.trim()) : []);
+          return {
+            address: Number(inst.address),
+            bytes: inst.bytes instanceof Uint8Array ? inst.bytes : new Uint8Array(),
+            mnemonic: inst.mnemonic || op,
+            opStr: inst.opStr || args.join(', '),
+            operands: inst.operands || [],
+            size: Number(inst.size || 1),
+            args,
+            op
+          };
+        });
 
         const cfgBlocks = buildCFG(mappedInsts);
         const decompilerBlocks = cfgBlocks.map(block => ({
           id: block.id,
           instructions: block.instructions.map((inst: any) => ({
             address: Number(inst.address),
-            op: inst.mnemonic || inst.op || '',
-            args: inst.args || (inst.opStr ? inst.opStr.split(',').map((s: string) => s.trim()) : [])
+            op: inst.op,
+            args: inst.args
           })),
           successors: block.successors
         }));
@@ -1756,6 +1877,147 @@ export class AIBridge {
         return { success: true, vulnerabilities: matches };
       }
 
+      case 'importRiskAnalyzer': {
+        let bytes: Uint8Array;
+        if (params && params.data) {
+          bytes = toUint8Array(params.data);
+        } else if (AIBridge.loadedBinaryBytes) {
+          bytes = AIBridge.loadedBinaryBytes;
+        } else {
+          throw new Error('No binary data provided and no binary loaded in session');
+        }
+
+        let detected = 'auto';
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+          detected = 'elf';
+        } else if (bytes[0] === 0x4d && bytes[1] === 0x5a) {
+          detected = 'pe';
+        } else if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) {
+          detected = 'macho';
+        }
+
+        let entryPoint = 0;
+        let sections: any[] = [];
+        let symbols: any[] = [];
+
+        if (detected === 'elf') {
+          try {
+            const parsed = parseElf(bytes.buffer as ArrayBuffer);
+            entryPoint = Number(parsed.header.entryPoint);
+            sections = parsed.sectionHeaders.map(s => ({
+              name: s.name,
+              virtualAddress: Number(s.addr),
+              virtualSize: Number(s.size),
+              fileOffset: Number(s.offset),
+              fileSize: Number(s.size),
+              flags: {
+                read: (Number(s.flags) & 4) !== 0 || true,
+                write: (Number(s.flags) & 1) !== 0,
+                execute: (Number(s.flags) & 2) !== 0
+              }
+            }));
+            symbols = parsed.symbols.map(sym => ({
+              name: sym.name,
+              address: Number(sym.value),
+              size: Number(sym.size),
+              type: sym.type === 'FUNC' ? 'function' : 'object',
+              binding: sym.bind === 'GLOBAL' ? 'global' : 'local'
+            }));
+          } catch (_) {}
+        } else if (detected === 'pe') {
+          try {
+            const parser = new PEParser(bytes.buffer as ArrayBuffer);
+            const parsed = parser.parse();
+            entryPoint = Number(parsed.optionalHeader.imageBase) + parsed.optionalHeader.addressOfEntryPoint;
+            sections = parsed.sections.map(s => ({
+              name: s.name,
+              virtualAddress: Number(parsed.optionalHeader.imageBase) + s.virtualAddress,
+              virtualSize: s.virtualSize,
+              fileOffset: s.pointerToRawData,
+              fileSize: s.sizeOfRawData,
+              flags: {
+                read: (s.characteristics & 0x40000000) !== 0,
+                write: (s.characteristics & 0x80000000) !== 0,
+                execute: (s.characteristics & 0x20000000) !== 0
+              }
+            }));
+            symbols = parsed.imports.flatMap(imp => imp.imports.map(i => ({ name: i.name || '', address: i.iatRva ? Number(parsed.optionalHeader.imageBase) + i.iatRva : 0 })));
+          } catch (_) {}
+        } else if (detected === 'macho') {
+          try {
+            const parser = new MachoParser(bytes);
+            const parsed = parser.parse();
+            entryPoint = 0;
+            sections = parsed.sections.map((s: any) => ({
+              name: s.sectname,
+              virtualAddress: Number(s.addr),
+              virtualSize: Number(s.size),
+              fileOffset: s.offset,
+              fileSize: Number(s.size),
+              flags: { read: true, write: true, execute: true }
+            }));
+            symbols = parsed.symbols.map((sym: any) => ({
+              name: sym.name,
+              address: Number(sym.value),
+              size: 0,
+              type: sym.symbolType,
+              binding: sym.binding
+            }));
+          } catch (_) {}
+        }
+
+        if (sections.length === 0) {
+          sections = [{ name: '.text', virtualAddress: 0, virtualSize: bytes.length, fileOffset: 0, fileSize: bytes.length, flags: { read: true, write: false, execute: true } }];
+        }
+
+        let instructions: any[] = [];
+        try {
+          const resolved = resolveElfOrPe(bytes, undefined, entryPoint);
+          const router = new DisassemblerRouter();
+          const insts = router.disassemble(resolved.data, {
+            baseAddress: resolved.baseAddress
+          });
+          instructions = insts.map(inst => ({
+            ...inst,
+            op: inst.mnemonic,
+            args: inst.opStr ? inst.opStr.split(',').map(s => s.trim()) : []
+          }));
+        } catch (_) {}
+
+        const scanner = new VulnScanner();
+        const matches = scanner.scan(
+          bytes,
+          sections,
+          symbols,
+          instructions,
+          { unsafeApi: true, bufferOverflow: true, integerOverflow: true }
+        );
+
+        const combos = matches.filter(m => 
+          m.description.toLowerCase().includes('combo') || 
+          m.description.toLowerCase().includes('combination')
+        );
+
+        let riskScore = 0;
+        for (const match of matches) {
+          if (match.severity === 'critical') riskScore += 40;
+          else if (match.severity === 'high') riskScore += 25;
+          else if (match.severity === 'medium') riskScore += 10;
+          else if (match.severity === 'low') riskScore += 3;
+        }
+        if (riskScore > 100) riskScore = 100;
+
+        return {
+          success: true,
+          combos,
+          evidence: matches,
+          riskScore
+        };
+      }
+
       case 'diffBinaries': {
         const bytesA = toUint8Array(params.dataA);
         const bytesB = toUint8Array(params.dataB);
@@ -2020,7 +2282,88 @@ export class AIBridge {
           utf16be: params.utf16be
         };
         const strings = extractStrings(bytes, options);
-        return { success: true, strings };
+
+        const xrefsMap = new Map<number, { address: number; functionName?: string }[]>();
+        try {
+          let sections: Section[] = [];
+          let detected = 'auto';
+          if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+          else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+
+          let imgBase = 0;
+          if (detected === 'pe') {
+            const pe = new PEParser(bytes.buffer as ArrayBuffer).parse();
+            imgBase = Number(pe.optionalHeader.imageBase || 0n);
+            sections = pe.sections.map(s => ({
+              name: s.name,
+              virtualAddress: imgBase + s.virtualAddress,
+              virtualSize: s.virtualSize,
+              fileOffset: s.pointerToRawData,
+              fileSize: s.sizeOfRawData,
+              flags: { read: true, write: false, execute: (s.characteristics & 0x20000000) !== 0 }
+            }));
+          } else if (detected === 'elf') {
+            const elf = parseElf(bytes.buffer as ArrayBuffer);
+            sections = elf.sectionHeaders.map(s => {
+              const flagsNum = Number(s.flags);
+              return {
+                name: s.name,
+                virtualAddress: Number(s.addr),
+                virtualSize: Number(s.size),
+                fileOffset: Number(s.offset),
+                fileSize: Number(s.size),
+                flags: { read: true, write: false, execute: (flagsNum & 4) !== 0 }
+              };
+            });
+          }
+
+          const codeSecs = sections.filter(s => s.flags.execute);
+          const router = new DisassemblerRouter();
+          
+          for (const sec of codeSecs) {
+            const sliceBytes = bytes.subarray(sec.fileOffset, sec.fileOffset + sec.fileSize);
+            const insts = router.disassemble(sliceBytes, { arch: params.arch || 'x86_64', baseAddress: sec.virtualAddress });
+            
+            let currentFunc: { start: number; name: string } | null = null;
+            for (let i = 0; i < insts.length; i++) {
+              const inst = insts[i];
+              const cleanMnemonic = inst.mnemonic.toLowerCase();
+              const isPrologue = cleanMnemonic === 'push' && (inst.opStr === 'rbp' || inst.opStr === 'ebp');
+              if (isPrologue) {
+                currentFunc = { start: inst.address, name: `sub_${inst.address.toString(16)}` };
+              }
+              
+              if (inst.operands) {
+                for (const op of inst.operands) {
+                  let targetVA = 0;
+                  if (op.type === 'mem' && op.mem && op.mem.disp !== undefined) {
+                    const dispVal = Number(op.mem.disp);
+                    targetVA = op.mem.base === 'rip' || op.mem.base === 'eip' ? inst.address + inst.size + dispVal : dispVal;
+                  } else if (op.type === 'imm') {
+                    targetVA = Number(op.imm);
+                  }
+                  
+                  if (targetVA > 0) {
+                    if (!xrefsMap.has(targetVA)) xrefsMap.set(targetVA, []);
+                    const list = xrefsMap.get(targetVA)!;
+                    const funcName = currentFunc ? currentFunc.name : undefined;
+                    const funcAddr = currentFunc ? currentFunc.start : inst.address;
+                    if (!list.some(x => x.address === funcAddr)) {
+                      list.push({ address: funcAddr, functionName: funcName });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        const stringsWithRefs = strings.map(s => ({
+          ...s,
+          refs: xrefsMap.get(s.virtualAddress) || []
+        }));
+
+        return { success: true, strings: stringsWithRefs };
       }
 
       case 'analyzeStrings': {
@@ -2039,6 +2382,10 @@ export class AIBridge {
         const registryKeys: any[] = [];
         const highEntropy: any[] = [];
         const formatStrings: any[] = [];
+        const pgpKeys: any[] = [];
+        const oauthTokens: any[] = [];
+        const jwts: any[] = [];
+        const apiKeys: any[] = [];
 
         for (const s of strings) {
           const val = s.value;
@@ -2050,7 +2397,24 @@ export class AIBridge {
             registryKeys.push(s);
           } else if (isFormatString(val)) {
             formatStrings.push(s);
-          } else if (isBase64OrHighEntropy(val)) {
+          }
+
+          if (isPgpKey(val)) {
+            pgpKeys.push(s);
+          }
+          if (isOAuthToken(val)) {
+            oauthTokens.push(s);
+          }
+          if (isJwt(val)) {
+            jwts.push(s);
+          }
+          if (isApiKey(val)) {
+            apiKeys.push(s);
+          }
+
+          if (!isUrl(val) && !isFilePath(val) && !isRegistryKey(val) && !isFormatString(val) &&
+              !isPgpKey(val) && !isOAuthToken(val) && !isJwt(val) && !isApiKey(val) &&
+              isBase64OrHighEntropy(val)) {
             highEntropy.push(s);
           }
         }
@@ -2061,7 +2425,11 @@ export class AIBridge {
           paths,
           registryKeys,
           highEntropy,
-          formatStrings
+          formatStrings,
+          pgpKeys,
+          oauthTokens,
+          jwts,
+          apiKeys
         };
       }
 
@@ -2372,6 +2740,22 @@ export class AIBridge {
                   if (imp.name && imp.iatRva !== undefined) {
                     peSymbols.push({
                       name: imp.name,
+                      address: imgBase + imp.iatRva,
+                      binding: 'global',
+                      type: 'none'
+                    });
+                  } else if (imp.ordinal !== undefined && imp.iatRva !== undefined) {
+                    const resolvedName = lookupOrdinal(impTable.dllName, imp.ordinal);
+                    if (resolvedName) {
+                      peSymbols.push({
+                        name: resolvedName,
+                        address: imgBase + imp.iatRva,
+                        binding: 'global',
+                        type: 'none'
+                      });
+                    }
+                    peSymbols.push({
+                      name: `Ordinal_${imp.ordinal}`,
                       address: imgBase + imp.iatRva,
                       binding: 'global',
                       type: 'none'
@@ -2832,6 +3216,22 @@ export class AIBridge {
                       binding: 'global',
                       type: 'none'
                     });
+                  } else if (imp.ordinal !== undefined && imp.iatRva !== undefined) {
+                    const resolvedName = lookupOrdinal(impTable.dllName, imp.ordinal);
+                    if (resolvedName) {
+                      peSymbols.push({
+                        name: resolvedName,
+                        address: imgBase + imp.iatRva,
+                        binding: 'global',
+                        type: 'none'
+                      });
+                    }
+                    peSymbols.push({
+                      name: `Ordinal_${imp.ordinal}`,
+                      address: imgBase + imp.iatRva,
+                      binding: 'global',
+                      type: 'none'
+                    });
                   }
                 }
               }
@@ -2976,6 +3376,21 @@ export class AIBridge {
                 const baseReg = op.mem.base;
                 const disp = op.mem.disp || 0;
                 if (baseReg && disp > 0) {
+                  const lowerBase = String(baseReg).toLowerCase();
+                  if (
+                    lowerBase === 'rsp' ||
+                    lowerBase === 'esp' ||
+                    lowerBase === 'sp' ||
+                    lowerBase === 'rbp' ||
+                    lowerBase === 'ebp' ||
+                    lowerBase === 'bp' ||
+                    lowerBase === 'rip' ||
+                    lowerBase === 'eip' ||
+                    lowerBase === 'ip' ||
+                    lowerBase === 'pc'
+                  ) {
+                    continue;
+                  }
                   if (!regs[baseReg]) regs[baseReg] = {};
                   const size = inst.size || 4;
                   const isWrite = i === 0 && (inst.mnemonic.toLowerCase().startsWith('mov') || inst.mnemonic.toLowerCase().startsWith('str'));
@@ -3521,9 +3936,11 @@ export class AIBridge {
 
         // Serialize loaded binary bytes
         const loadedBinaryHex = AIBridge.loadedBinaryBytes ? toHex(AIBridge.loadedBinaryBytes) : null;
+        const patcherState = AIBridge.patcherInstance ? AIBridge.patcherInstance.serializeState() : null;
 
         const sessionData = {
           loadedBinaryHex,
+          patcherState,
           cpuState,
           memory: {
             regions: memoryRegions,
@@ -3572,6 +3989,14 @@ export class AIBridge {
           AIBridge.loadedBinaryBytes = toUint8Array(sessionData.loadedBinaryHex);
         } else {
           AIBridge.loadedBinaryBytes = null;
+        }
+
+        // Restore patcherInstance state
+        if (sessionData.patcherState && AIBridge.loadedBinaryBytes) {
+          AIBridge.patcherInstance = new BinaryPatcher(AIBridge.loadedBinaryBytes);
+          AIBridge.patcherInstance.deserializeState(sessionData.patcherState);
+        } else {
+          AIBridge.patcherInstance = null;
         }
 
         const emu = this.getEmulator();
@@ -3978,6 +4403,317 @@ export class AIBridge {
         };
       }
 
+      case 'analyzeExports': {
+        let bytes: Uint8Array;
+        if (params && params.data) {
+          bytes = toUint8Array(params.data);
+        } else if (AIBridge.loadedBinaryBytes) {
+          bytes = AIBridge.loadedBinaryBytes;
+        } else {
+          throw new Error('No data provided and no binary loaded in session');
+        }
+
+        const format = (params && params.format) || 'auto';
+        let detected = format;
+        if (format === 'auto') {
+          if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+            detected = 'elf';
+          } else if (bytes[0] === 0x4d && bytes[1] === 0x5a) {
+            detected = 'pe';
+          } else {
+            detected = 'elf';
+          }
+        }
+
+        const exportsList: { ordinal?: number; name?: string; address: number; type?: string; binding?: string; size?: number; forwarder?: string }[] = [];
+
+        if (detected === 'pe') {
+          const parser = new PEParser(bytes.buffer as ArrayBuffer);
+          const parsed = parser.parse();
+          const imageBase = Number(parsed.optionalHeader.imageBase || 0n);
+          if (parsed.exports && parsed.exports.exports) {
+            for (const exp of parsed.exports.exports) {
+              exportsList.push({
+                ordinal: exp.ordinal,
+                name: exp.name,
+                address: imageBase + exp.address,
+                forwarder: exp.forwarder
+              });
+            }
+          }
+        } else if (detected === 'elf') {
+          const parsed = parseElf(bytes.buffer as ArrayBuffer);
+          if (parsed.symbols) {
+            for (const sym of parsed.symbols) {
+              const isGlobalOrWeak = sym.bind === 'GLOBAL' || sym.bind === 'WEAK';
+              const isDefined = sym.shndx !== 0;
+              if (isGlobalOrWeak && isDefined && sym.name) {
+                exportsList.push({
+                  name: sym.name,
+                  address: Number(sym.value),
+                  type: sym.type,
+                  binding: sym.bind,
+                  size: Number(sym.size)
+                });
+              }
+            }
+          }
+        } else {
+          throw new Error(`Unsupported binary format for analyzeExports: ${detected}`);
+        }
+
+        return {
+          success: true,
+          format: detected,
+          exports: exportsList
+        };
+      }
+
+      case 'analyzeResources': {
+        let bytes: Uint8Array;
+        if (params && params.data) {
+          bytes = toUint8Array(params.data);
+        } else if (AIBridge.loadedBinaryBytes) {
+          bytes = AIBridge.loadedBinaryBytes;
+        } else {
+          throw new Error('No data provided and no binary loaded in session');
+        }
+
+        if (!(bytes[0] === 0x4d && bytes[1] === 0x5a)) {
+          throw new Error('Invalid PE binary magic signature');
+        }
+
+        const parser = new PEParser(bytes.buffer as ArrayBuffer);
+        const parsed = parser.parse();
+
+        const manifests = parsed.resources?.manifests || [];
+        const strings = parsed.resources?.strings || {};
+        const versionHeaders: any[] = [];
+
+        if (parsed.resources && parsed.resources.all) {
+          const versionResources = parsed.resources.all.filter(r => r.type === 16);
+          for (const r of versionResources) {
+            const parsedVer = parseVersionInfo(r.data);
+            if (parsedVer) {
+              versionHeaders.push(parsedVer);
+            }
+          }
+        }
+
+        return {
+          success: true,
+          manifests,
+          strings,
+          versionHeaders
+        };
+      }
+
+      case 'importRiskAnalyzer': {
+        let bytes: Uint8Array | null = null;
+        let imports: string[] = [];
+
+        if (params && params.importNames && Array.isArray(params.importNames)) {
+          imports = params.importNames.map((name: string) => name.toLowerCase().trim());
+        }
+
+        if (imports.length === 0) {
+          if (params && params.data) {
+            bytes = toUint8Array(params.data);
+          } else if (AIBridge.loadedBinaryBytes) {
+            bytes = AIBridge.loadedBinaryBytes;
+          }
+
+          if (bytes) {
+            let detected = 'auto';
+            if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+            else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+
+            try {
+              if (detected === 'pe') {
+                const pe = new PEParser(bytes.buffer as ArrayBuffer).parse();
+                for (const impTable of pe.imports) {
+                  for (const imp of impTable.imports) {
+                    if (imp.name) {
+                      imports.push(imp.name.toLowerCase().trim());
+                    }
+                  }
+                }
+              } else if (detected === 'elf') {
+                const elf = parseElf(bytes.buffer as ArrayBuffer);
+                if (elf.symbols) {
+                  for (const sym of elf.symbols) {
+                    if (sym.shndx === 0 && sym.name && sym.name.trim() !== '') {
+                      imports.push(sym.name.toLowerCase().trim());
+                    }
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+        }
+
+        if (imports.length === 0 && !bytes) {
+          throw new Error('No data provided, no import names specified, and no binary loaded in session');
+        }
+
+        const groups = {
+          allocate: ['virtualalloc', 'virtualallocex', 'virtualprotect', 'virtualprotectex', 'mmap', 'mprotect', 'ntallocatevirtualmemory', 'zwallocatevirtualmemory'],
+          execute: ['system', 'exec', 'winexec', 'shellexecute', 'shellexecutea', 'shellexecutew', 'createprocess', 'createprocessa', 'createprocessw', 'createprocessinternalw', 'ntcreateuserprocess', 'zwcreateuserprocess'],
+          write_mem: ['writeprocessmemory', 'ntwritevirtualmemory', 'zwwritevirtualmemory'],
+          remote_thread: ['createremotethread', 'ntcreatethreadex', 'zwcreatethreadex', 'rtlcreatethread'],
+          antidebug: ['isdebuggerpresent', 'checkremotedebuggerpresent', 'ntqueryinformationprocess', 'zwqueryinformationprocess'],
+          terminate: ['terminateprocess', 'exitprocess', 'exit', 'ntterminateprocess', 'zwterminateprocess'],
+          network: ['internetopen', 'internetconnect', 'httpsendrequest', 'urldownloadtofile', 'urldownloadtofilea', 'urldownloadtofilew', 'socket', 'connect'],
+          registry: ['regopenkey', 'regopenkeyexa', 'regopenkeyexw', 'regsetvalue', 'regsetvalueexa', 'regsetvalueexw', 'regcreatekeyexa', 'regcreatekeyexw'],
+          safe_input: ['fgets', 'strncpy', 'snprintf', 'memcpy_s', 'memset_s', 'strncat']
+        };
+
+        const foundAllocate = imports.filter(name => groups.allocate.some(api => name.includes(api)));
+        const foundExecute = imports.filter(name => groups.execute.some(api => name.includes(api)));
+        const foundWriteMem = imports.filter(name => groups.write_mem.some(api => name.includes(api)));
+        const foundRemoteThread = imports.filter(name => groups.remote_thread.some(api => name.includes(api)));
+        const foundAntiDebug = imports.filter(name => groups.antidebug.some(api => name.includes(api)));
+        const foundTerminate = imports.filter(name => groups.terminate.some(api => name.includes(api)));
+        const foundNetwork = imports.filter(name => groups.network.some(api => name.includes(api)));
+        const foundRegistry = imports.filter(name => groups.registry.some(api => name.includes(api)));
+        const foundSafeInput = imports.filter(name => groups.safe_input.some(api => name.includes(api)));
+
+        const detectedCombos: { severity: string; combination: string; description: string; evidence: string[] }[] = [];
+        let score = 0;
+
+        if (foundAllocate.length > 0 && foundExecute.length > 0) {
+          detectedCombos.push({
+            severity: 'critical',
+            combination: 'Memory Allocation + Execution',
+            description: 'Potential shellcode launcher pattern (Memory Allocation + Code Execution)',
+            evidence: [...new Set([...foundAllocate, ...foundExecute])]
+          });
+          score += 40;
+        }
+
+        if (foundWriteMem.length > 0 && foundRemoteThread.length > 0) {
+          detectedCombos.push({
+            severity: 'high',
+            combination: 'Process Memory Writing + Remote Thread Creation',
+            description: 'Process injection pattern (WriteProcessMemory + Remote Thread Creation)',
+            evidence: [...new Set([...foundWriteMem, ...foundRemoteThread])]
+          });
+          score += 35;
+        }
+
+        if (foundAntiDebug.length > 0 && foundTerminate.length > 0) {
+          detectedCombos.push({
+            severity: 'high',
+            combination: 'Anti-Debugging + Process Termination',
+            description: 'Anti-debugging defense evasion with process termination',
+            evidence: [...new Set([...foundAntiDebug, ...foundTerminate])]
+          });
+          score += 30;
+        }
+
+        if (foundNetwork.length > 0 && (foundExecute.length > 0 || foundWriteMem.length > 0)) {
+          detectedCombos.push({
+            severity: 'high',
+            combination: 'Network Access + Code Execution/Process Writing',
+            description: 'Potential malware downloader / stager (Network Access + Code Execution/Process Writing)',
+            evidence: [...new Set([...foundNetwork, ...foundExecute, ...foundWriteMem])]
+          });
+          score += 30;
+        }
+
+        if (foundRegistry.length > 0 && foundExecute.length > 0) {
+          detectedCombos.push({
+            severity: 'medium',
+            combination: 'Registry Writing + Process Launching',
+            description: 'Potential persistence mechanism (Registry Writing + Process Launching)',
+            evidence: [...new Set([...foundRegistry, ...foundExecute])]
+          });
+          score += 15;
+        }
+
+        if (foundSafeInput.length > 0) {
+          detectedCombos.push({
+            severity: 'low',
+            combination: 'Safe Bounded Functions',
+            description: 'Use of safe bounded APIs',
+            evidence: [...new Set(foundSafeInput)]
+          });
+        }
+
+        for (const name of imports) {
+          if (groups.execute.some(api => name.includes(api))) score += 5;
+          if (groups.allocate.some(api => name.includes(api))) score += 3;
+          if (groups.write_mem.some(api => name.includes(api))) score += 5;
+          if (groups.remote_thread.some(api => name.includes(api))) score += 7;
+          if (groups.antidebug.some(api => name.includes(api))) score += 3;
+          if (groups.network.some(api => name.includes(api))) score += 4;
+        }
+
+        score = Math.min(100, Math.max(0, score));
+
+        let severity = 'low';
+        if (score >= 75) severity = 'critical';
+        else if (score >= 50) severity = 'high';
+        else if (score >= 25) severity = 'medium';
+
+        return {
+          success: true,
+          riskScore: score,
+          severity,
+          detectedCombos,
+          importsAnalyzed: imports
+        };
+      }
+
+      case 'getSessionStatus': {
+        if (!AIBridge.loadedBinaryBytes || AIBridge.loadedBinaryBytes.length === 0) {
+          return {
+            success: true,
+            loaded: false,
+            message: 'No binary is currently loaded in the session.'
+          };
+        }
+
+        const bytes = AIBridge.loadedBinaryBytes;
+        let detected = 'unknown';
+        if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
+        else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
+        else if (
+          (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+          (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+        ) detected = 'macho';
+
+        let entryPoint = 0;
+        let sectionCount = 0;
+        let arch = 'unknown';
+
+        if (detected === 'pe') {
+          try {
+            const pe = new PEParser(bytes.buffer as ArrayBuffer).parse();
+            entryPoint = Number(pe.optionalHeader.imageBase || 0n) + pe.optionalHeader.addressOfEntryPoint;
+            sectionCount = pe.sections.length;
+            arch = pe.coffHeader.machine === 0x8664 ? 'x86_64' : 'x86';
+          } catch (_) {}
+        } else if (detected === 'elf') {
+          try {
+            const elf = parseElf(bytes.buffer as ArrayBuffer);
+            entryPoint = Number(elf.header.entryPoint);
+            sectionCount = elf.sectionHeaders.length;
+            arch = Number(elf.header.machine) === 62 ? 'x86_64' : 'unknown';
+          } catch (_) {}
+        }
+
+        return {
+          success: true,
+          loaded: true,
+          format: detected,
+          size: bytes.length,
+          entryPoint,
+          sectionCount,
+          arch
+        };
+      }
+
       default:
         throw new Error(`Unsupported bridge action: ${action}`);
     }
@@ -4250,4 +4986,146 @@ function detectControlFlowFlattening(instructions: Instruction[]): any[] {
     }
   }
   return detected;
+}
+
+function parseVersionInfo(data: Uint8Array): any {
+  if (data.length < 40) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  
+  const wLength = view.getUint16(0, true);
+  const wValueLength = view.getUint16(2, true);
+  const wType = view.getUint16(4, true);
+  
+  let key = '';
+  for (let i = 0; i < 15; i++) {
+    if (6 + i * 2 + 2 > data.length) break;
+    const char = view.getUint16(6 + i * 2, true);
+    if (char === 0) break;
+    key += String.fromCharCode(char);
+  }
+  
+  if (key !== 'VS_VERSION_INFO') {
+    return null;
+  }
+  
+  let offset = 40;
+  
+  const result: any = {
+    length: wLength,
+    valueLength: wValueLength,
+    type: wType,
+    key
+  };
+  
+  if (wValueLength > 0 && offset + 52 <= data.length) {
+    const signature = view.getUint32(offset, true);
+    if (signature === 0xFEEF04BD) {
+      const fileVersionMS = view.getUint32(offset + 8, true);
+      const fileVersionLS = view.getUint32(offset + 12, true);
+      const productVersionMS = view.getUint32(offset + 16, true);
+      const productVersionLS = view.getUint32(offset + 20, true);
+      
+      const fileVersion = `${(fileVersionMS >> 16) & 0xFFFF}.${fileVersionMS & 0xFFFF}.${(fileVersionLS >> 16) & 0xFFFF}.${fileVersionLS & 0xFFFF}`;
+      const productVersion = `${(productVersionMS >> 16) & 0xFFFF}.${productVersionMS & 0xFFFF}.${(productVersionLS >> 16) & 0xFFFF}.${productVersionLS & 0xFFFF}`;
+      
+      result.fixedFileInfo = {
+        signature: '0x' + signature.toString(16),
+        structVersion: '0x' + view.getUint32(offset + 4, true).toString(16),
+        fileVersion,
+        productVersion,
+        fileFlagsMask: '0x' + view.getUint32(offset + 24, true).toString(16),
+        fileFlags: '0x' + view.getUint32(offset + 28, true).toString(16),
+        fileOS: '0x' + view.getUint32(offset + 32, true).toString(16),
+        fileType: '0x' + view.getUint32(offset + 36, true).toString(16),
+        fileSubtype: '0x' + view.getUint32(offset + 40, true).toString(16),
+        fileDate: (BigInt(view.getUint32(offset + 44, true)) << 32n | BigInt(view.getUint32(offset + 48, true))).toString()
+      };
+    }
+    offset += 52;
+  }
+  
+  offset = (offset + 3) & ~3;
+  
+  const stringFileInfo: Record<string, string> = {};
+  
+  while (offset + 6 <= data.length && offset < wLength) {
+    const childStart = offset;
+    const childLength = view.getUint16(offset, true);
+    const childValueLength = view.getUint16(offset + 2, true);
+    const childType = view.getUint16(offset + 4, true);
+    
+    if (childLength === 0) break;
+    
+    let childKey = '';
+    let keyOffset = offset + 6;
+    while (keyOffset + 2 <= data.length && keyOffset < childStart + childLength) {
+      const char = view.getUint16(keyOffset, true);
+      keyOffset += 2;
+      if (char === 0) break;
+      childKey += String.fromCharCode(char);
+    }
+    
+    let childValOffset = (keyOffset + 3) & ~3;
+    
+    if (childKey === 'StringFileInfo') {
+      let strTableOffset = childValOffset;
+      while (strTableOffset + 6 < childStart + childLength && strTableOffset < data.length) {
+        const tableStart = strTableOffset;
+        const tableLength = view.getUint16(strTableOffset, true);
+        
+        if (tableLength === 0) break;
+        
+        let tableKey = '';
+        let tableKeyOffset = strTableOffset + 6;
+        while (tableKeyOffset + 2 <= data.length && tableKeyOffset < tableStart + tableLength) {
+          const char = view.getUint16(tableKeyOffset, true);
+          tableKeyOffset += 2;
+          if (char === 0) break;
+          tableKey += String.fromCharCode(char);
+        }
+        
+        let stringOffset = (tableKeyOffset + 3) & ~3;
+        while (stringOffset + 6 < tableStart + tableLength && stringOffset < data.length) {
+          const stringStart = stringOffset;
+          const stringLength = view.getUint16(stringOffset, true);
+          const stringValueLength = view.getUint16(stringOffset + 2, true);
+          
+          if (stringLength === 0) break;
+          
+          let stringKey = '';
+          let stringKeyOffset = stringOffset + 6;
+          while (stringKeyOffset + 2 <= data.length && stringKeyOffset < stringStart + stringLength) {
+            const char = view.getUint16(stringKeyOffset, true);
+            stringKeyOffset += 2;
+            if (char === 0) break;
+            stringKey += String.fromCharCode(char);
+          }
+          
+          let valOffset = (stringKeyOffset + 3) & ~3;
+          if (stringValueLength > 0 && valOffset + stringValueLength * 2 <= data.length) {
+            let strVal = '';
+            for (let j = 0; j < stringValueLength; j++) {
+              if (valOffset + j * 2 + 2 > data.length) break;
+              const char = view.getUint16(valOffset + j * 2, true);
+              if (char === 0) break;
+              strVal += String.fromCharCode(char);
+            }
+            stringFileInfo[stringKey] = strVal;
+          }
+          
+          stringOffset = (stringStart + stringLength + 3) & ~3;
+        }
+        
+        strTableOffset = (tableStart + tableLength + 3) & ~3;
+      }
+    }
+    
+    offset = (childStart + childLength + 3) & ~3;
+  }
+  
+  if (Object.keys(stringFileInfo).length > 0) {
+    result.stringFileInfo = stringFileInfo;
+  }
+  
+  return result;
 }

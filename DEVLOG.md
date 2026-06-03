@@ -2520,7 +2520,13 @@ Run git diff to list unstaged modified files.
 - Fixed a ReferenceError in `callTree` case (re-declared `sections` and `symbols`).
 - Added unit tests in [tests/aiBridge.test.ts](file:///c/Users/NaThA/hacks/sbx/potato/tests/aiBridge.test.ts).
 
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+## [2026-06-03 21:36] - Enhance analyzeStrings with Advanced Pattern Detection
+- Created helper functions `isPgpKey`, `isOAuthToken`, `isJwt`, and `isApiKey` in [src/analyzer/strings.ts](file:///home/myname/projects/potato/src/analyzer/strings.ts).
+- Integrated new patterns into string tagging in `tagString` inside `strings.ts`.
+- Updated `analyzeStrings` schema description in [src/analyzer/aiBridge.ts](file:///home/myname/projects/potato/src/analyzer/aiBridge.ts).
+- Updated the `analyzeStrings` handler in `aiBridge.ts` to categorize strings into `pgpKeys`, `oauthTokens`, `jwts`, and `apiKeys` (using regexes and Shannon entropy thresholds).
+- Added comprehensive unit tests in [tests/strings.test.ts](file:///home/myname/projects/potato/tests/strings.test.ts) and [tests/aiBridge.test.ts](file:///home/myname/projects/potato/tests/aiBridge.test.ts).
+- Verified that all new tests pass successfully via Bun.
 
 ## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
 
@@ -2535,3 +2541,20 @@ Run git diff to list unstaged modified files.
 ## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
 
 ## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
+
+## [2026-06-03 21:50] - Implement Patcher State Persistence and Add Unit Tests
+- Added `serializeState` and `deserializeState` to `BinaryPatcher` in [src/analyzer/patcher.ts](file:///home/myname/projects/potato/src/analyzer/patcher.ts) to serialize patch history, transaction logs, and undo/redo stacks into JSON-safe formats.
+- Integrated `patcherState` serialization into `sessionSave` and deserialization into `sessionLoad` in [src/analyzer/aiBridge.ts](file:///home/myname/projects/potato/src/analyzer/aiBridge.ts).
+- Added comprehensive unit tests in [tests/aiBridge.test.ts](file:///home/myname/projects/potato/tests/aiBridge.test.ts) covering:
+  1. Standalone `importRiskAnalyzer` tool.
+  2. Standalone `analyzeExports` and `analyzeResources` tools.
+  3. String analyzer private/API keys upgrade (PGP, OAuth, JWT, API keys).
+  4. Patcher undo/redo persistence logic (saving session with patches, reloading it, and verifying undo/redo).
+  5. The new `getSessionStatus` tool (clearing loaded binary for state verification).
+- Ran all unit tests using Bun and verified 100% success on the AI bridge test suite.

@@ -7,6 +7,10 @@ import {
   isRegistryKey,
   isFormatString,
   isBase64OrHighEntropy,
+  isPgpKey,
+  isOAuthToken,
+  isJwt,
+  isApiKey,
 } from '../src/analyzer/strings.js';
 
 describe('String Analyzer Helper Tests', () => {
@@ -228,5 +232,58 @@ describe('String Extraction Core Tests', () => {
     expect(isBase64OrHighEntropy('aGVsbG93b3JsZDEyMzQ1Ng==')).toBe(true);
     expect(isBase64OrHighEntropy('0123456789abcdef0123456789abcdef')).toBe(true);
     expect(isBase64OrHighEntropy('short')).toBe(false);
+  });
+
+  it('should identify PGP keys correctly', () => {
+    const privateKey = `-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: GnuPG v2\n\nmQENBF1...`;
+    const publicKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----\nVersion: GnuPG v2\n\nmQENBF1...`;
+    expect(isPgpKey(privateKey)).toBe(true);
+    expect(isPgpKey(publicKey)).toBe(true);
+    expect(isPgpKey('not a pgp key')).toBe(false);
+  });
+
+  it('should identify OAuth tokens correctly', () => {
+    expect(isOAuthToken('ya29.a0AfB_byE8L1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z')).toBe(true);
+    expect(isOAuthToken('xoxb-' + '1234567890-' + '1234567890-' + 'abcdef1234567890abcdef1234')).toBe(true);
+    expect(isOAuthToken('gho_111122223333444455556666777788889999')).toBe(true);
+    expect(isOAuthToken('short')).toBe(false);
+  });
+
+  it('should identify JWTs correctly', () => {
+    const validJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    expect(isJwt(validJwt)).toBe(true);
+    expect(isJwt('invalid.jwt.value')).toBe(false);
+  });
+
+  it('should identify API keys correctly', () => {
+    expect(isApiKey('AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q')).toBe(true);
+    expect(isApiKey('AKIAIOSFODNN7EXAMPLE')).toBe(true);
+    expect(isApiKey('https://hooks.slack.com/' + 'services/T12345678/' + 'B12345678/' + 'a1b2c3d4e5f6g7h8i9j0k1l2')).toBe(true);
+    expect(isApiKey('short')).toBe(false);
+  });
+
+  it('should tag new classifications correctly', () => {
+    const encoder = new TextEncoder();
+    const pgpKey = encoder.encode('-----BEGIN PGP PUBLIC KEY BLOCK-----');
+    const googleApiKey = encoder.encode('AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q');
+    const validJwt = encoder.encode('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
+
+    const buffer = new Uint8Array(500);
+    buffer.set(pgpKey, 0);
+    buffer.set(googleApiKey, 100);
+    buffer.set(validJwt, 250);
+
+    const extracted = extractStrings(buffer, {
+      utf16le: false,
+      utf16be: false,
+    });
+
+    const pgpItem = extracted.find((e) => e.value.startsWith('-----BEGIN PGP'));
+    const apiItem = extracted.find((e) => e.value.startsWith('AIzaSy'));
+    const jwtItem = extracted.find((e) => e.value.startsWith('eyJhbGci'));
+
+    expect(pgpItem?.tags).toContain('pgp-key');
+    expect(apiItem?.tags).toContain('api-key');
+    expect(jwtItem?.tags).toContain('jwt');
   });
 });

@@ -15,6 +15,7 @@ export interface DecompiledFunction {
   args: string[];
   pseudocode: string;
   structs?: string[]; // Reconstructed struct definitions
+  imports?: string[]; // Demangled imports
 }
 
 // Data Type representation
@@ -46,6 +47,7 @@ import {
   ReturnNode,
 } from './ast.js';
 import { ASTPrinter } from './astPrinter.js';
+import { demangle } from '../analyzer/demangler.js';
 
 // Helper to represent parsed operands
 interface ParsedOperand {
@@ -78,6 +80,77 @@ export class Decompiler {
           inst.op = inst.op.toUpperCase();
         }
       }
+    }
+
+    const decompiledImports: string[] = [];
+    const seenMangled = new Set<string>();
+    const mangledReplacementMap = new Map<string, string>();
+
+    // First pass: find and demangle all mangled symbols in blocks
+    for (const b of blocks) {
+      for (const inst of b.instructions) {
+        for (const arg of inst.args) {
+          const mangledSymbols = this.findMangledSymbols(arg);
+          for (const sym of mangledSymbols) {
+            if (!seenMangled.has(sym)) {
+              seenMangled.add(sym);
+              let cleanSym = sym;
+              if (cleanSym.startsWith('__imp_')) {
+                cleanSym = cleanSym.slice(6);
+              } else if (cleanSym.startsWith('_imp_')) {
+                cleanSym = cleanSym.slice(5);
+              }
+              const demangledResult = demangle(cleanSym);
+              if (demangledResult.isMangled) {
+                decompiledImports.push(
+                  `${demangledResult.demangled} (mangled: ${sym})`
+                );
+                const namespacedName = [
+                  ...demangledResult.namespaces,
+                  demangledResult.className,
+                  demangledResult.name,
+                ]
+                  .filter(Boolean)
+                  .join('::');
+                mangledReplacementMap.set(sym, namespacedName);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Second pass: replace mangled symbols in instruction arguments
+    if (mangledReplacementMap.size > 0) {
+      for (const b of blocks) {
+        for (const inst of b.instructions) {
+          inst.args = inst.args.map((arg) => {
+            let replaced = arg;
+            for (const [mangled, clean] of mangledReplacementMap.entries()) {
+              replaced = replaced.split(mangled).join(clean);
+            }
+            return replaced;
+          });
+        }
+      }
+    }
+
+    let displayFunctionName = name;
+    let cleanFuncName = name;
+    if (cleanFuncName.startsWith('__imp_')) {
+      cleanFuncName = cleanFuncName.slice(6);
+    } else if (cleanFuncName.startsWith('_imp_')) {
+      cleanFuncName = cleanFuncName.slice(5);
+    }
+    const funcDemangled = demangle(cleanFuncName);
+    if (funcDemangled.isMangled) {
+      displayFunctionName = [
+        ...funcDemangled.namespaces,
+        funcDemangled.className,
+        funcDemangled.name,
+      ]
+        .filter(Boolean)
+        .join('::');
     }
 
     this.typeMap.clear();
@@ -172,10 +245,17 @@ export class Decompiler {
       .join(', ');
 
     let signature = '';
+    if (decompiledImports.length > 0) {
+      signature += `// Decompiled Imports:\n`;
+      for (const imp of decompiledImports) {
+        signature += `// - ${imp}\n`;
+      }
+      signature += `\n`;
+    }
     if (structDecls.length > 0) {
       signature += structDecls.join('\n\n') + '\n\n';
     }
-    signature += `function ${name}(${argList}) {\n`;
+    signature += `function ${displayFunctionName}(${argList}) {\n`;
     if (localVars.length > 0) {
       signature += localVars.join('\n') + '\n\n';
     }
@@ -187,6 +267,7 @@ export class Decompiler {
       args,
       pseudocode: signature,
       structs: structDecls,
+      imports: decompiledImports,
     };
   }
 
@@ -1251,4 +1332,20 @@ export class Decompiler {
 
     return { type: 'Block', statements };
   }
+
+  private findMangledSymbols(text: string): string[] {
+    const itaniumRegex = /(?:__imp_|_imp_)?_Z[a-zA-Z0-9_]+/g;
+    const msvcRegex = /(?:__imp_|_imp_)?\?[a-zA-Z0-9_@?]+/g;
+
+    const matches: string[] = [];
+    let match;
+    while ((match = itaniumRegex.exec(text)) !== null) {
+      matches.push(match[0]);
+    }
+    while ((match = msvcRegex.exec(text)) !== null) {
+      matches.push(match[0]);
+    }
+    return matches;
+  }
 }
+

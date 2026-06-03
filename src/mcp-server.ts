@@ -40,24 +40,60 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const fs = await import("fs");
     const path = await import("path");
     
+    const resolveWorkspacePath = (filePath: string): string => {
+      filePath = filePath.trim();
+      if (fs.existsSync(filePath) && fs.lstatSync(filePath).isFile()) {
+        return filePath;
+      }
+      try {
+        const resolvedPath = path.resolve(filePath);
+        if (fs.existsSync(resolvedPath) && fs.lstatSync(resolvedPath).isFile()) {
+          return resolvedPath;
+        }
+      } catch (_) {}
+
+      const parts = filePath.split(/[/\\]/).filter(p => p.length > 0);
+      const workspaceRoot = process.cwd();
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const suffix = parts.slice(i).join("/");
+        const testPath = path.join(workspaceRoot, suffix);
+        if (fs.existsSync(testPath) && fs.lstatSync(testPath).isFile()) {
+          return testPath;
+        }
+      }
+      return filePath;
+    };
+
     const resolveDataParam = (val: any): string => {
       if (typeof val === 'string' && val.trim().length > 0) {
+        const trimmed = val.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed && typeof parsed === 'object') {
+              if (parsed.filePath) {
+                return resolveDataParam(parsed.filePath);
+              }
+              if (parsed.data) {
+                return resolveDataParam(parsed.data);
+              }
+            }
+          } catch (e) {}
+        }
         try {
-          const resolvedPath = path.resolve(val.trim());
+          const resolvedPath = resolveWorkspacePath(trimmed);
           if (fs.existsSync(resolvedPath) && fs.lstatSync(resolvedPath).isFile()) {
             const stats = fs.statSync(resolvedPath);
             if (stats.size > 10485760) {
               throw new Error('Input size exceeds 10MB limit');
             }
             const buffer = fs.readFileSync(resolvedPath);
-            // Convert to hex representation since tools expect hex or base64 or utf8 bytes
             return buffer.toString("hex");
           }
         } catch (e: any) {
           if (e?.message === 'Input size exceeds 10MB limit') {
             throw e;
           }
-          // ignore resolving errors and treat as normal data string
         }
       }
       return val;

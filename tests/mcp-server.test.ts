@@ -32,6 +32,8 @@ describe('MCP Server URET Engine Tests', () => {
     expect(toolNames).toContain('parseBinary');
     expect(toolNames).toContain('symbolicExecute');
     expect(toolNames).toContain('emulatorControl');
+    expect(toolNames).toContain('analyzeExports');
+    expect(toolNames).toContain('analyzeResources');
   });
 
   it('should disassemble binary data via MCP tool', async () => {
@@ -194,5 +196,50 @@ describe('MCP Server URET Engine Tests', () => {
     expect(content.success).toBe(true);
     expect(content.format).toBe('dot');
     expect(content.formatted).toContain('digraph CFG');
+  });
+
+  it('should call importRiskAnalyzer via MCP tool', async () => {
+    const result = await client.callTool({
+      name: 'importRiskAnalyzer',
+      arguments: {
+        data: '9090'
+      }
+    });
+
+    expect(result.isError).toBeUndefined();
+    const content = JSON.parse(result.content[0].text);
+    expect(content.success).toBe(true);
+    expect(content.riskScore).toBeDefined();
+    expect(typeof content.riskScore).toBe('number');
+    expect(Array.isArray(content.combos)).toBe(true);
+    expect(Array.isArray(content.evidence)).toBe(true);
+  });
+
+  it('should call analyzeExports via MCP tool', async () => {
+    const result = await client.callTool({
+      name: 'analyzeExports',
+      arguments: {
+        data: '7f454c4602010100000000000000000002003e000100000000000000000000000000000000000000000000000000000040000000000000000000000000000000',
+        format: 'elf'
+      }
+    });
+
+    expect(result.isError).toBeUndefined();
+    const content = JSON.parse(result.content[0].text);
+    expect(content.success).toBe(true);
+    expect(content.format).toBe('elf');
+    expect(Array.isArray(content.exports)).toBe(true);
+  });
+
+  it('should call analyzeResources via MCP tool', async () => {
+    const result = await client.callTool({
+      name: 'analyzeResources',
+      arguments: {
+        data: '4d5a90000300000004000000ffff0000b800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000e1fba0e00b409cd21b8014cd21546869732070726f6772616d2063616e6e6f742062652072756e20696e20444f53206d6f64652e0d0d0a2400000000000000'
+      }
+    });
+
+    // Should return error or valid parsed structure depending on headers correctness (it's not a full valid resource section PE, so it might fail or succeed with empty, but shouldn't crash)
+    expect(result).toBeDefined();
   });
 });

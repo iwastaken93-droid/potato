@@ -325,4 +325,61 @@ export class BinaryPatcher {
     }
     return bytes;
   }
+
+  public serializeState(): any {
+    const toHexStr = (arr: Uint8Array) => {
+      let hex = '';
+      for (let i = 0; i < arr.length; i++) {
+        hex += arr[i].toString(16).padStart(2, '0');
+      }
+      return hex;
+    };
+
+    const serializePatchRecord = (p: PatchRecord) => ({
+      id: p.id,
+      address: p.address,
+      offset: p.offset,
+      originalBytes: toHexStr(p.originalBytes),
+      patchedBytes: toHexStr(p.patchedBytes),
+      timestamp: p.timestamp,
+      description: p.description,
+      active: p.active
+    });
+
+    return {
+      history: this.history.map(serializePatchRecord),
+      undoStack: this.undoStack.map(stack => stack.map(serializePatchRecord)),
+      redoStack: this.redoStack.map(stack => stack.map(serializePatchRecord)),
+      transactionLog: this.transactionLog
+    };
+  }
+
+  public deserializeState(state: any): void {
+    const fromHexStr = (hex: string) => {
+      if (!hex) return new Uint8Array(0);
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < hex.length; i += 2) {
+        bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+      }
+      return bytes;
+    };
+
+    const deserializePatchRecord = (p: any): PatchRecord => ({
+      id: p.id,
+      address: Number(p.address),
+      offset: Number(p.offset),
+      originalBytes: fromHexStr(p.originalBytes),
+      patchedBytes: fromHexStr(p.patchedBytes),
+      timestamp: Number(p.timestamp),
+      description: String(p.description),
+      active: Boolean(p.active)
+    });
+
+    this.history = (state.history || []).map(deserializePatchRecord);
+    this.undoStack = (state.undoStack || []).map((stack: any) => stack.map(deserializePatchRecord));
+    this.redoStack = (state.redoStack || []).map((stack: any) => stack.map(deserializePatchRecord));
+    this.transactionLog = state.transactionLog || [];
+    this.reapplyAll();
+  }
 }
+

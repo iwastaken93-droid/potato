@@ -174,4 +174,25 @@ describe('MCP Server URET Engine Tests', () => {
     expect(content.success).toBe(true);
     expect(content.patchedData).toBe('90ebfe90');
   });
+
+  it('should build Control Flow Graph via MCP tool', async () => {
+    const result = await client.callTool({
+      name: 'buildCFG',
+      arguments: {
+        instructions: [
+          { address: 0x1000, mnemonic: 'mov', opStr: 'rax, rbx', size: 3 },
+          { address: 0x1003, mnemonic: 'jmp', opStr: '0x100a', operands: [{ type: 'imm', imm: 0x100a }], size: 5 },
+          { address: 0x1008, mnemonic: 'nop', size: 1 },
+          { address: 0x100a, mnemonic: 'ret', size: 1 }
+        ],
+        format: 'dot'
+      }
+    });
+
+    expect(result.isError).toBeUndefined();
+    const content = JSON.parse(result.content[0].text);
+    expect(content.success).toBe(true);
+    expect(content.format).toBe('dot');
+    expect(content.formatted).toContain('digraph CFG');
+  });
 });

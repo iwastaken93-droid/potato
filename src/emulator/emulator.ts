@@ -26,6 +26,17 @@ export class Emulator {
   public isRunning: boolean = false;
   public syscallHandler?: SyscallHandler;
   public symbolicState: SymbolicState = new SymbolicState();
+  public trace: {
+    stepIndex: number;
+    rip: bigint;
+    instruction: {
+      address: number;
+      mnemonic: string;
+      opStr: string;
+      bytes?: Uint8Array;
+    };
+    registers: Record<string, bigint>;
+  }[] = [];
   private maxInstructions: number = 100000;
   private pcWritten: boolean = false;
 
@@ -73,6 +84,7 @@ export class Emulator {
   public reset(entryPoint: number = 0): void {
     this.cpu.reset();
     this.memory.clear();
+    this.trace = [];
     this.cpu.write('rip', BigInt(entryPoint));
     this.symbolicState = new SymbolicState();
 
@@ -175,6 +187,18 @@ export class Emulator {
         hitBreakpoint: false,
       };
     }
+
+    this.trace.push({
+      stepIndex: this.trace.length,
+      rip: BigInt(ripVal),
+      instruction: {
+        address: ripVal,
+        mnemonic: inst.mnemonic,
+        opStr: inst.opStr,
+        bytes: inst.bytes
+      },
+      registers: this.cpu.getState()
+    });
 
     try {
       const savedRip = this.cpu.read('rip');

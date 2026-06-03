@@ -10,11 +10,12 @@ import { VulnScanner } from './vulnScanner.js';
 import { diffBytes, diffInstructions } from './diff.js';
 import { AIExplanationEngine } from './ai.js';
 import { Emulator } from '../emulator/emulator.js';
-import { extractStrings } from './strings.js';
+import { extractStrings, isUrl, isFilePath, isRegistryKey, isFormatString, isBase64OrHighEntropy } from './strings.js';
 import { calculateEntropy, findHighEntropyBlocks, mapSectionEntropy } from './entropy.js';
 import { XRefEngine } from './xrefs.js';
-import { buildCFG } from '../disassembler/cfg.js';
+import { buildCFG, BasicBlock, InstructionClassifier, getBranchTarget } from '../disassembler/cfg.js';
 import { Section, Symbol, Instruction } from '../disassembler/types.js';
+import { ReportGenerator } from './reportGenerator.js';
 
 /**
  * Helper to convert Hex or Base64 string to Uint8Array
@@ -79,21 +80,98 @@ export function toHex(bytes: Uint8Array): string {
     .join('');
 }
 
+export function parseAddress(
+  value: any,
+  symbols?: Symbol[],
+  peImports?: any[],
+  imageBase: number = 0
+): number {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number') return value;
+  const str = String(value).trim();
+  if (str.startsWith('0x') || str.startsWith('0X')) {
+    return parseInt(str, 16);
+  }
+  if (/^-?\d+$/.test(str)) {
+    return parseInt(str, 10);
+  }
+  const lowerStr = str.toLowerCase();
+  if (symbols) {
+    const sym = symbols.find(s => s.name.toLowerCase() === lowerStr || s.name.toLowerCase().includes(lowerStr));
+    if (sym) {
+      return sym.address;
+    }
+  }
+  if (peImports) {
+    for (const impTable of peImports) {
+      for (const entry of impTable.imports) {
+        if (entry.name && entry.name.toLowerCase() === lowerStr) {
+          if (entry.iatRva !== undefined) {
+            return imageBase + entry.iatRva;
+          }
+        }
+      }
+    }
+  }
+  const parsed = parseInt(str, 10);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+export function parseAddressOptional(value: any): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'number') return value;
+  const str = String(value).trim();
+  if (str.startsWith('0x') || str.startsWith('0X')) {
+    return parseInt(str, 16);
+  }
+  if (/^-?\d+$/.test(str)) {
+    return parseInt(str, 10);
+  }
+  const parsed = parseInt(str, 10);
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+export function parseBigInt(value: any): bigint {
+  if (value === undefined || value === null) return 0n;
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number') return BigInt(value);
+  const str = String(value).trim();
+  if (str.startsWith('0x') || str.startsWith('0X')) {
+    try {
+      return BigInt(str);
+    } catch (_) {
+      return 0n;
+    }
+  }
+  if (/^-?\d+$/.test(str)) {
+    try {
+      return BigInt(str);
+    } catch (_) {
+      return 0n;
+    }
+  }
+  try {
+    return BigInt(str);
+  } catch (_) {
+    return 0n;
+  }
+}
+
+
 /**
  * Standard tool / function definitions for external LLMs
  */
 export const TOOL_SCHEMAS = {
   disassemble: {
     name: 'disassemble',
-    description: 'Disassemble raw machine code or executable binary (supports ELF, PE, Mach-O, and raw shellcode) into structured assembly instructions. Parses target sections automatically or uses provided base virtual address. Supported architectures: x86_64, arm, riscv, thumb, wasm, dex, z80, etc. Example: disassembly of a function payload at base address 0x1000.',
+    description: 'Disassemble raw machine code or executable binary (supports ELF, PE, Mach-O, and raw shellcode) into structured assembly instructions. Parses target sections automatically or uses provided base virtual address. If data is omitted, automatically falls back to the session-loaded binary and starts disassembly at the `.text` entry point by default. Supported architectures: x86_64, arm, riscv, thumb, wasm, dex, z80, etc.',
     parameters: {
       type: 'object',
       properties: {
-        data: { type: 'string', description: 'Hex or Base64 encoded binary/machine code to disassemble. Example: "9090" (NOPs).' },
+        data: { type: 'string', description: 'Hex or Base64 encoded binary/machine code to disassemble. Example: "9090" (NOPs). Optional if a binary is loaded in the session.' },
         arch: { type: 'string', description: 'Target CPU architecture. Supported: "x86_64", "x86", "arm", "arm64", "riscv", "thumb", "wasm", "dex", "z80". Default is x86_64.' },
         baseAddress: { type: 'number', description: 'Virtual address offset at which to start disassembly. Defaults to 0 or binary section address.' }
-      },
-      required: ['data']
+      }
     }
   },
   decompile: {
@@ -304,6 +382,19 @@ export const TOOL_SCHEMAS = {
       required: ['data']
     }
   },
+  analyzeStrings: {
+    name: 'analyzeStrings',
+    description: 'Scan binary data and extract printable strings, categorizing them into URLs, Windows/Linux file paths, registry keys (HKEY_...), base64/high-entropy strings, and format strings (%s, %d). Returns lists of categorized strings with their offsets and virtual addresses.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data.' },
+        minLength: { type: 'number', description: 'Minimum number of characters to constitute a string (default 4).' },
+        baseAddress: { type: 'number', description: 'Base virtual address used to calculate absolute string offsets in memory.' }
+      },
+      required: ['data']
+    }
+  },
   getSections: {
     name: 'getSections',
     description: 'Retrieve details (names, virtual addresses, virtual sizes, permissions, entropy) of sections present in an executable binary. Supports ELF, PE, and Mach-O formats. Format can be specified or auto-detected.',
@@ -332,17 +423,17 @@ export const TOOL_SCHEMAS = {
   },
   hexDump: {
     name: 'hexDump',
-    description: 'Generate a classic formatted hex dump of the binary data, similar to hexdump or xxd. Shows offset address, hex representation of bytes, and ASCII representation. Useful for human verification of binary payloads.',
+    description: 'Generate a classic formatted hex dump of the binary data, similar to hexdump or xxd. Shows offset address, hex representation of bytes, and ASCII representation. Useful for human verification of binary payloads. Falls back to session-loaded binary when data is omitted, and supports section-name queries.',
     parameters: {
       type: 'object',
       properties: {
-        data: { type: 'string', description: 'Hex or Base64 encoded binary data.' },
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data. Optional if a binary is loaded in the session.' },
         offset: { type: 'number', description: 'Start byte offset within binary data (default 0).' },
         limit: { type: 'number', description: 'Number of bytes to dump (alias for length).' },
         length: { type: 'number', description: 'Total number of bytes to dump (defaults to remaining bytes).' },
-        bytesPerLine: { type: 'number', description: 'Number of bytes to display per line (default 16).' }
-      },
-      required: ['data']
+        bytesPerLine: { type: 'number', description: 'Number of bytes to display per line (default 16).' },
+        section: { type: 'string', description: 'Optional section name (e.g., ".text") to automatically load offset and size of that section from the session binary.' }
+      }
     }
   },
   findXRefs: {
@@ -390,9 +481,11 @@ export const TOOL_SCHEMAS = {
             },
             required: ['address', 'mnemonic', 'size']
           }
-        }
-      },
-      required: ['instructions']
+        },
+        startVA: { type: 'number', description: 'Optional virtual address/offset inside the loaded binary to begin disassembling if instructions are not provided.' },
+        format: { type: 'string', enum: ['json', 'dot', 'ascii'], description: 'Optional visualization format output.' },
+        arch: { type: 'string', description: 'Optional target CPU architecture (e.g. x86_64, arm). Default is x86_64.' }
+      }
     }
   },
   loadBinary: {
@@ -511,6 +604,77 @@ export const TOOL_SCHEMAS = {
         }
       },
       required: ['pipeline']
+    }
+  },
+  findFunctions: {
+    name: 'findFunctions',
+    description: 'Scan binary data (ELF, PE, Mach-O, or raw) to detect function entry points using prologue signature scanning and return function boundary details.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data to scan.' },
+        section: { type: 'string', description: 'Optional name of specific section to scan (e.g., ".text").' },
+        arch: { type: 'string', description: 'Optional target CPU architecture context.' }
+      }
+    }
+  },
+  sessionSave: {
+    name: 'sessionSave',
+    description: 'Save the current URET analysis/emulator session state (loaded binary bytes, register values, virtual memory mappings, execution trace logs, and breakpoint list) to a JSON file on disk.',
+    parameters: {
+      type: 'object',
+      properties: {
+        filePath: { type: 'string', description: 'Absolute or relative local file path where the session JSON should be saved.' }
+      },
+      required: ['filePath']
+    }
+  },
+  sessionLoad: {
+    name: 'sessionLoad',
+    description: 'Restore a saved URET session from a JSON file on disk, reloading the binary bytes, emulator registers, virtual memory pages, traces, and breakpoints.',
+    parameters: {
+      type: 'object',
+      properties: {
+        filePath: { type: 'string', description: 'Absolute or relative local file path from where the session JSON should be loaded.' }
+      },
+      required: ['filePath']
+    }
+  },
+  generateReport: {
+    name: 'generateReport',
+    description: 'Execute a sequence of analysis tools (loadBinary, parseBinary, extractStrings, entropyAnalysis, yaraScan, vulnScan, exportToIda) to generate a comprehensive JSON and Markdown report of the binary.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data (optional if binary is already loaded).' },
+        filePath: { type: 'string', description: 'Local path of binary to load (optional).' },
+        rules: { type: 'string', description: 'Optional YARA rule string to compile and scan against. If not provided, a default rule searching for suspicious strings is used.' },
+        fileName: { type: 'string', description: 'Optional file name to use in the report metadata.' }
+      }
+    }
+  },
+  deobfuscate: {
+    name: 'deobfuscate',
+    description: 'Scan binary function instructions for common obfuscation patterns: XOR key-decryption loops, stack-string construction (successive moves of character constants into stack offsets), and Control Flow Flattening (switch-state loops). Returns detected patterns and suggestions on how to deobfuscate them.',
+    parameters: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Hex or Base64 encoded binary data containing the function instructions.' },
+        instructions: {
+          type: 'array',
+          description: 'Optional list of pre-disassembled structured instructions to analyze.',
+          items: {
+            type: 'object',
+            properties: {
+              address: { type: 'number', description: 'Virtual address of the instruction.' },
+              op: { type: 'string', description: 'Mnemonic/opcode name (e.g., "mov", "jmp").' },
+              args: { type: 'array', items: { type: 'string' }, description: 'Operands/arguments of the instruction.' }
+            }
+          }
+        },
+        arch: { type: 'string', description: 'Target CPU architecture (e.g. "x86_64", "arm").' },
+        baseAddress: { type: 'number', description: 'Virtual address offset at which to start disassembly.' }
+      }
     }
   }
 };
@@ -835,10 +999,12 @@ interface ResolvedBinaryInfo {
 
 function resolveElfOrPe(
   bytes: Uint8Array,
-  providedBaseAddress?: number,
-  providedEntryPoint?: number
+  providedBaseAddress?: number | string,
+  providedEntryPoint?: number | string
 ): ResolvedBinaryInfo {
-  const baseAddr = providedBaseAddress !== undefined ? providedBaseAddress : providedEntryPoint;
+  const parsedBase = parseAddressOptional(providedBaseAddress);
+  const parsedEntry = parseAddressOptional(providedEntryPoint);
+  const baseAddr = parsedBase !== undefined ? parsedBase : parsedEntry;
   
   // Check if ELF
   if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
@@ -960,10 +1126,169 @@ function resolveElfOrPe(
     }
   }
 
+  // Check if Mach-O
+  const isMacho =
+    (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && (bytes[3] === 0xce || bytes[3] === 0xcf)) ||
+    ((bytes[0] === 0xce || bytes[0] === 0xcf) && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe) ||
+    (bytes[0] === 0xca && bytes[1] === 0xfe && bytes[2] === 0xba && bytes[3] === 0xbe);
+  if (isMacho) {
+    try {
+      const macho = new MachoParser(bytes).parse();
+      let sliceBytes = bytes;
+      let resolvedBase = baseAddr;
+
+      if (resolvedBase === undefined || resolvedBase === null) {
+        // Try __text section first
+        const textSec = macho.sections.find(s => s.sectname === '__text' || s.sectname === '.text');
+        if (textSec) {
+          sliceBytes = bytes.subarray(textSec.offset, textSec.offset + Number(textSec.size));
+          resolvedBase = Number(textSec.addr);
+        } else {
+          // Fallback to entry point
+          let entryPoint = 0;
+          const lcMain = macho.loadCommands.find(lc => lc.cmd === 0x80000028);
+          if (lcMain && lcMain.payload && typeof (lcMain.payload as any).entryoff === 'number') {
+            entryPoint = (lcMain.payload as any).entryoff;
+          }
+          const textSegment = macho.segments.find(seg => seg.segname === '__TEXT');
+          const imageBase = textSegment ? Number(textSegment.vmaddr) : 0;
+          resolvedBase = imageBase + entryPoint;
+
+          // Find section containing the entry point address
+          const rBase = resolvedBase;
+          const sec = macho.sections.find(s => {
+            const sAddr = Number(s.addr);
+            const sSize = Number(s.size);
+            return rBase !== undefined && rBase >= sAddr && rBase < sAddr + sSize;
+          });
+          if (sec && rBase !== undefined) {
+            const offset = sec.offset + (rBase - Number(sec.addr));
+            sliceBytes = bytes.subarray(offset, sec.offset + Number(sec.size));
+          }
+        }
+      } else {
+        // Base address or entrypoint provided
+        const vaddr = resolvedBase;
+        const sec = macho.sections.find(s => {
+          const sAddr = Number(s.addr);
+          const sSize = Number(s.size);
+          return vaddr >= sAddr && vaddr < sAddr + sSize;
+        });
+        if (sec) {
+          const offset = sec.offset + (vaddr - Number(sec.addr));
+          sliceBytes = bytes.subarray(offset, sec.offset + Number(sec.size));
+        }
+      }
+
+      return { data: sliceBytes, baseAddress: resolvedBase ?? 0 };
+    } catch (e) {
+      // ignore
+    }
+  }
+
   return {
     data: bytes,
     baseAddress: baseAddr ?? 0
   };
+}
+
+function toDOT(blocks: BasicBlock[]): string {
+  let dot = 'digraph CFG {\n';
+  dot += '  node [shape=box, fontname="Courier", fontsize=10];\n';
+  for (const block of blocks) {
+    const instLines = block.instructions.map(inst => {
+      const addrHex = '0x' + inst.address.toString(16);
+      const opStr = inst.opStr ? ' ' + inst.opStr : '';
+      return `${addrHex}: ${inst.mnemonic}${opStr}`;
+    });
+    const label = `${block.id}\\n` + instLines.join('\\n');
+    dot += `  ${block.id} [label="${label}"];\n`;
+  }
+  for (const block of blocks) {
+    for (const succ of block.successors) {
+      dot += `  ${block.id} -> ${succ};\n`;
+    }
+  }
+  dot += '}';
+  return dot;
+}
+
+function toASCII(blocks: BasicBlock[]): string {
+  if (blocks.length === 0) return '';
+  
+  const blockMap = new Map<string, BasicBlock>();
+  const inDegree = new Map<string, number>();
+  
+  for (const block of blocks) {
+    blockMap.set(block.id, block);
+    inDegree.set(block.id, 0);
+  }
+  
+  for (const block of blocks) {
+    for (const succ of block.successors) {
+      inDegree.set(succ, (inDegree.get(succ) || 0) + 1);
+    }
+  }
+  
+  let roots = blocks.filter(b => (inDegree.get(b.id) || 0) === 0);
+  if (roots.length === 0) {
+    const minBlock = blocks.reduce((min, b) => b.startAddress < min.startAddress ? b : min, blocks[0]);
+    roots = [minBlock];
+  }
+  
+  const visited = new Set<string>();
+  const lines: string[] = [];
+  
+  function formatBlockInstructions(block: BasicBlock, indent: string): string[] {
+    return block.instructions.map(inst => {
+      const addrHex = '0x' + inst.address.toString(16);
+      const opStr = inst.opStr ? ' ' + inst.opStr : '';
+      return `${indent}${addrHex}: ${inst.mnemonic}${opStr}`;
+    });
+  }
+  
+  function printTree(blockId: string, prefix: string, isLast: boolean) {
+    const block = blockMap.get(blockId);
+    if (!block) return;
+    
+    const connector = isLast ? '└── ' : '├── ';
+    lines.push(`${prefix}${connector}${block.id} (0x${block.startAddress.toString(16)} - 0x${block.endAddress.toString(16)})`);
+    
+    const nextPrefix = prefix + (isLast ? '    ' : '│   ');
+    
+    const instLines = formatBlockInstructions(block, nextPrefix + '  ');
+    lines.push(...instLines);
+    
+    if (visited.has(blockId)) {
+      lines.push(`${nextPrefix}  [already visited / loop back]`);
+      return;
+    }
+    visited.add(blockId);
+    
+    const successors = block.successors.filter(s => blockMap.has(s));
+    for (let i = 0; i < successors.length; i++) {
+      const succId = successors[i];
+      const isLastSucc = i === successors.length - 1;
+      printTree(succId, nextPrefix, isLastSucc);
+    }
+  }
+  
+  for (let i = 0; i < roots.length; i++) {
+    const root = roots[i];
+    printTree(root.id, '', i === roots.length - 1);
+  }
+  
+  const unvisited = blocks.filter(b => !visited.has(b.id));
+  if (unvisited.length > 0) {
+    lines.push('');
+    lines.push('Disconnected / Unreachable Blocks:');
+    for (let i = 0; i < unvisited.length; i++) {
+      const block = unvisited[i];
+      printTree(block.id, '', i === unvisited.length - 1);
+    }
+  }
+  
+  return lines.join('\n');
 }
 
 /**
@@ -985,7 +1310,9 @@ export class AIBridge {
 
     if (params) {
       if (!params.data && !params.dataA && !params.instructions && AIBridge.loadedBinaryBytes) {
-        params.data = toHex(AIBridge.loadedBinaryBytes);
+        if (action !== 'disassemble' && action !== 'hexDump') {
+          params.data = toHex(AIBridge.loadedBinaryBytes);
+        }
       }
       if (!params.dataA && AIBridge.loadedBinaryBytes) {
         params.dataA = toHex(AIBridge.loadedBinaryBytes);
@@ -994,11 +1321,18 @@ export class AIBridge {
 
     switch (action) {
       case 'disassemble': {
-        const bytes = toUint8Array(params.data);
-        const resolved = resolveElfOrPe(bytes, params.baseAddress ?? params.address, undefined);
+        let bytes: Uint8Array;
+        if (params && params.data) {
+          bytes = toUint8Array(params.data);
+        } else if (AIBridge.loadedBinaryBytes) {
+          bytes = AIBridge.loadedBinaryBytes;
+        } else {
+          throw new Error('No data provided and no binary loaded in session');
+        }
+        const resolved = resolveElfOrPe(bytes, params ? (params.baseAddress ?? params.address) : undefined, undefined);
         const router = new DisassemblerRouter();
         const insts = router.disassemble(resolved.data, {
-          arch: params.arch,
+          arch: params ? params.arch : undefined,
           baseAddress: resolved.baseAddress
         });
         const mappedInsts = insts.map(inst => ({
@@ -1118,12 +1452,16 @@ export class AIBridge {
         const records = [];
         if (params.offset !== undefined && params.patchedBytes !== undefined) {
           const patBytes = toUint8Array(params.patchedBytes);
-          const rec = patcher.applyPatch(params.offset, patBytes, params.address || params.offset, params.description || '');
+          const offset = parseAddress(params.offset);
+          const addr = params.address !== undefined ? parseAddress(params.address) : offset;
+          const rec = patcher.applyPatch(offset, patBytes, addr, params.description || '');
           records.push(rec);
         } else if (params.patches && Array.isArray(params.patches)) {
           for (const p of params.patches) {
             const patBytes = toUint8Array(p.patchedBytes);
-            const rec = patcher.applyPatch(p.offset, patBytes, p.address || p.offset, p.description || '');
+            const offset = parseAddress(p.offset);
+            const addr = p.address !== undefined ? parseAddress(p.address) : offset;
+            const rec = patcher.applyPatch(offset, patBytes, addr, p.description || '');
             records.push(rec);
           }
         } else {
@@ -1328,7 +1666,8 @@ export class AIBridge {
 
       case 'symbolicExecute': {
         const executor = new SymbolicExecutor();
-        const result = executor.execute(params.instructions, params.inputs, params.targetAddress);
+        const targetAddress = parseAddress(params.targetAddress);
+        const result = executor.execute(params.instructions, params.inputs, targetAddress);
         return { ...result };
       }
 
@@ -1365,7 +1704,7 @@ export class AIBridge {
             });
             emu.loadInstructions(mapped);
           }
-          emu.reset(params.entryPoint || 0);
+          emu.reset(params.entryPoint !== undefined ? parseAddress(params.entryPoint) : 0);
           return { success: true, cpuState: { rip: emu.cpu.read('rip').toString(), rsp: emu.cpu.read('rsp').toString() } };
         } else if (action === 'step') {
           const steps = params.steps || 1;
@@ -1420,7 +1759,7 @@ export class AIBridge {
         } else if (action === 'writeReg') {
           if (params.registers) {
             for (const [r, val] of Object.entries(params.registers)) {
-              emu.cpu.write(r, BigInt(val as string));
+              emu.cpu.write(r, parseBigInt(val));
             }
           }
           return { success: true };
@@ -1428,7 +1767,7 @@ export class AIBridge {
           const results = [];
           if (params.memory) {
             for (const m of params.memory) {
-              const addr = BigInt(m.address);
+              const addr = parseBigInt(m.address);
               const size = m.size || 4;
               const buf = emu.memory.readBuffer(addr, size);
               results.push({ address: m.address, hex: toHex(buf) });
@@ -1438,7 +1777,7 @@ export class AIBridge {
         } else if (action === 'writeMem') {
           if (params.memory) {
             for (const m of params.memory) {
-              const addr = BigInt(m.address);
+              const addr = parseBigInt(m.address);
               const data = toUint8Array(m.value);
               try {
                 emu.memory.writeBuffer(addr, data);
@@ -1534,7 +1873,7 @@ export class AIBridge {
               }
             }
           } else {
-            entryPoint = params.entryPoint || 0;
+            entryPoint = params.entryPoint !== undefined ? parseAddress(params.entryPoint) : 0;
             emu.reset(entryPoint);
             emu.memory.map(BigInt(entryPoint), bytes.length);
             emu.memory.writeBuffer(BigInt(entryPoint), bytes);
@@ -1558,13 +1897,55 @@ export class AIBridge {
         const bytes = toUint8Array(params.data);
         const options = {
           minLength: params.minLength,
-          baseAddress: params.baseAddress,
+          baseAddress: params.baseAddress !== undefined ? parseAddress(params.baseAddress) : undefined,
           ascii: params.ascii,
           utf16le: params.utf16le,
           utf16be: params.utf16be
         };
         const strings = extractStrings(bytes, options);
         return { success: true, strings };
+      }
+
+      case 'analyzeStrings': {
+        const bytes = toUint8Array(params.data);
+        const options = {
+          minLength: params.minLength,
+          baseAddress: params.baseAddress !== undefined ? parseAddress(params.baseAddress) : undefined,
+          ascii: true,
+          utf16le: true,
+          utf16be: true
+        };
+        const strings = extractStrings(bytes, options);
+
+        const urls: any[] = [];
+        const paths: any[] = [];
+        const registryKeys: any[] = [];
+        const highEntropy: any[] = [];
+        const formatStrings: any[] = [];
+
+        for (const s of strings) {
+          const val = s.value;
+          if (isUrl(val)) {
+            urls.push(s);
+          } else if (isFilePath(val)) {
+            paths.push(s);
+          } else if (isRegistryKey(val)) {
+            registryKeys.push(s);
+          } else if (isFormatString(val)) {
+            formatStrings.push(s);
+          } else if (isBase64OrHighEntropy(val)) {
+            highEntropy.push(s);
+          }
+        }
+
+        return {
+          success: true,
+          urls,
+          paths,
+          registryKeys,
+          highEntropy,
+          formatStrings
+        };
       }
 
       case 'getSections': {
@@ -1675,14 +2056,85 @@ export class AIBridge {
       }
 
       case 'hexDump': {
-        const bytes = toUint8Array(params.data);
-        const offset = params.offset || 0;
-        const limit = params.limit !== undefined ? params.limit : params.length;
-        const length = limit !== undefined ? limit : bytes.length - offset;
-        const bytesPerLine = params.bytesPerLine || 16;
+        let bytes: Uint8Array;
+        if (params && params.data) {
+          bytes = toUint8Array(params.data);
+        } else if (AIBridge.loadedBinaryBytes) {
+          bytes = AIBridge.loadedBinaryBytes;
+        } else {
+          throw new Error('No data provided and no binary loaded in session');
+        }
+
+        let offset = params ? parseAddress(params.offset) : 0;
+        let limit = params ? (params.limit !== undefined ? params.limit : params.length) : undefined;
+        let length = limit !== undefined ? limit : undefined;
+
+        if (params && params.section && AIBridge.loadedBinaryBytes) {
+          const sectionName = params.section;
+          const sessionBytes = AIBridge.loadedBinaryBytes;
+          let detected = 'unknown';
+          if (sessionBytes[0] === 0x7f && sessionBytes[1] === 0x45 && sessionBytes[2] === 0x4c && sessionBytes[3] === 0x46) {
+            detected = 'elf';
+          } else if (sessionBytes[0] === 0x4d && sessionBytes[1] === 0x5a) {
+            detected = 'pe';
+          } else if (
+            (sessionBytes[0] === 0xfe && sessionBytes[1] === 0xed && sessionBytes[2] === 0xfa && (sessionBytes[3] === 0xce || sessionBytes[3] === 0xcf)) ||
+            ((sessionBytes[0] === 0xce || sessionBytes[0] === 0xcf) && sessionBytes[1] === 0xfa && sessionBytes[2] === 0xed && sessionBytes[3] === 0xfe) ||
+            (sessionBytes[0] === 0xca && sessionBytes[1] === 0xfe && sessionBytes[2] === 0xba && sessionBytes[3] === 0xbe)
+          ) {
+            detected = 'macho';
+          }
+
+          let found = false;
+          if (detected === 'elf') {
+            try {
+              const parsed = parseElf(sessionBytes.buffer as ArrayBuffer);
+              const sec = parsed.sectionHeaders.find(s => s.name === sectionName);
+              if (sec) {
+                offset = Number(sec.offset);
+                length = Number(sec.size);
+                found = true;
+              }
+            } catch (_) {}
+          } else if (detected === 'pe') {
+            try {
+              const parser = new PEParser(sessionBytes.buffer as ArrayBuffer);
+              const parsed = parser.parse();
+              const sec = parsed.sections.find(s => s.name === sectionName);
+              if (sec) {
+                offset = sec.pointerToRawData;
+                length = sec.sizeOfRawData;
+                found = true;
+              }
+            } catch (_) {}
+          } else if (detected === 'macho') {
+            try {
+              const parser = new MachoParser(sessionBytes);
+              const parsed = parser.parse();
+              const normalizedSectionName = sectionName.startsWith('.') ? sectionName : `.${sectionName}`;
+              const sec = parsed.sections.find(s => 
+                s.sectname === sectionName || 
+                s.sectname === `__${sectionName.replace(/^\./, '')}` ||
+                s.sectname === normalizedSectionName
+              );
+              if (sec) {
+                offset = sec.offset;
+                length = Number(sec.size);
+                found = true;
+              }
+            } catch (_) {}
+          }
+
+          if (!found) {
+            throw new Error(`Section "${sectionName}" not found in session binary`);
+          }
+        }
+
+        const finalLength = length !== undefined ? length : (bytes.length - offset);
+        const bytesPerLine = (params && params.bytesPerLine) || 16;
 
         const startOffset = Math.max(0, Math.min(offset, bytes.length));
-        const endOffset = Math.max(startOffset, Math.min(startOffset + length, bytes.length));
+        const endOffset = Math.max(startOffset, Math.min(startOffset + finalLength, bytes.length));
         const sub = bytes.subarray(startOffset, endOffset);
         const lines: string[] = [];
 
@@ -1726,7 +2178,15 @@ export class AIBridge {
         const bytes = toUint8Array(params.data);
         let sections: Section[] = [];
         let symbols: Symbol[] = [];
-        let baseAddress = params.baseAddress ?? params.address ?? 0;
+        let baseAddress = 0;
+        if (params.baseAddress !== undefined) {
+          baseAddress = parseAddress(params.baseAddress, []);
+        } else if (params.address !== undefined) {
+          const addrStr = String(params.address).trim();
+          if (addrStr.startsWith('0x') || /^\d+$/.test(addrStr)) {
+            baseAddress = parseAddress(params.address, []);
+          }
+        }
 
         let detected = 'auto';
         if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
@@ -1764,7 +2224,9 @@ export class AIBridge {
               type: sym.type === 'FUNC' ? 'function' : sym.type === 'OBJECT' ? 'object' : 'none',
               binding: sym.bind === 'GLOBAL' ? 'global' : sym.bind === 'WEAK' ? 'weak' : 'local'
             }));
-            baseAddress = Number(elf.header.entryPoint);
+            if (baseAddress === 0) {
+              baseAddress = Number(elf.header.entryPoint);
+            }
           } catch (_) {
             // fallback
           }
@@ -1786,7 +2248,37 @@ export class AIBridge {
                 flags: { read: isReadable, write: isWritable, execute: isExecutable }
               };
             });
-            baseAddress = imgBase + pe.optionalHeader.addressOfEntryPoint;
+            const peSymbols: Symbol[] = [];
+            if (pe.imports) {
+              for (const impTable of pe.imports) {
+                for (const imp of impTable.imports) {
+                  if (imp.name && imp.iatRva !== undefined) {
+                    peSymbols.push({
+                      name: imp.name,
+                      address: imgBase + imp.iatRva,
+                      binding: 'global',
+                      type: 'none'
+                    });
+                  }
+                }
+              }
+            }
+            if (pe.exports && pe.exports.exports) {
+              for (const exp of pe.exports.exports) {
+                if (exp.name) {
+                  peSymbols.push({
+                    name: exp.name,
+                    address: imgBase + exp.address,
+                    binding: 'global',
+                    type: 'none'
+                  });
+                }
+              }
+            }
+            symbols = peSymbols;
+            if (baseAddress === 0) {
+              baseAddress = imgBase + pe.optionalHeader.addressOfEntryPoint;
+            }
           } catch (_) {
             // fallback
           }
@@ -1869,28 +2361,99 @@ export class AIBridge {
         const engine = new XRefEngine();
         engine.analyze(allInstructions, sections, symbols, bytes, baseAddress);
 
-        const targetAddr = Number(params.address);
+        const targetAddr = parseAddress(params.address, symbols);
         const incoming = engine.getXRefsTo(targetAddr);
         const outgoing = engine.getXRefsFrom(targetAddr);
 
         return { success: true, incoming, outgoing };
       }
-
       case 'buildCFG': {
-        const insts: any[] = params.instructions;
-        if (!insts || !Array.isArray(insts)) {
-          throw new Error('Instructions array is required');
+        let mappedInsts: any[] = [];
+        if (!params.instructions || !Array.isArray(params.instructions)) {
+          if (!AIBridge.loadedBinaryBytes) {
+            throw new Error('Instructions array is required when no binary is loaded in session cache');
+          }
+          const bytes = AIBridge.loadedBinaryBytes;
+          
+          const getEntryPoint = (b: Uint8Array): number => {
+            if (b[0] === 0x7f && b[1] === 0x45 && b[2] === 0x4c && b[3] === 0x46) {
+              try {
+                const parsed = parseElf(b.buffer as ArrayBuffer);
+                return Number(parsed.header.entryPoint || 0);
+              } catch (_) {}
+            }
+            if (b[0] === 0x4d && b[1] === 0x5a) {
+              try {
+                const parser = new PEParser(b.buffer as ArrayBuffer);
+                const parsed = parser.parse();
+                return Number(parsed.optionalHeader.imageBase || 0) + (parsed.optionalHeader.addressOfEntryPoint || 0);
+              } catch (_) {}
+            }
+            if (
+              (b[0] === 0xfe && b[1] === 0xed && b[2] === 0xfa && b[3] === 0xcf) ||
+              (b[0] === 0xcf && b[1] === 0xfa && b[2] === 0xed && b[3] === 0xfe)
+            ) {
+              try {
+                const parser = new MachoParser(b);
+                const parsed = parser.parse();
+                let entryPoint = 0;
+                const lcMain = parsed.loadCommands.find(lc => lc.cmd === 0x80000028);
+                if (lcMain && lcMain.payload && typeof (lcMain.payload as any).entryoff === 'number') {
+                  entryPoint = (lcMain.payload as any).entryoff;
+                }
+                const textSegment = parsed.segments.find(seg => seg.segname === '__TEXT');
+                const imageBase = textSegment ? Number(textSegment.vmaddr) : 0;
+                return imageBase + entryPoint;
+              } catch (_) {}
+            }
+            return 0;
+          };
+
+          const startVA = params.startVA !== undefined ? Number(params.startVA) : getEntryPoint(bytes);
+          const resolved = resolveElfOrPe(bytes, startVA, undefined);
+          const router = new DisassemblerRouter();
+          const insts = router.disassemble(resolved.data, {
+            arch: params.arch || 'x86_64',
+            baseAddress: resolved.baseAddress
+          });
+          mappedInsts = insts.map(inst => ({
+            address: Number(inst.address),
+            bytes: inst.bytes instanceof Uint8Array ? inst.bytes : new Uint8Array(),
+            mnemonic: inst.mnemonic || '',
+            opStr: inst.opStr || '',
+            operands: inst.operands || [],
+            size: Number(inst.size || 1)
+          }));
+        } else {
+          const insts: any[] = params.instructions;
+          mappedInsts = insts.map((inst: any) => ({
+            address: Number(inst.address),
+            bytes: inst.bytes instanceof Uint8Array ? inst.bytes : new Uint8Array(),
+            mnemonic: inst.mnemonic || inst.op || '',
+            opStr: inst.opStr || (inst.args ? inst.args.join(', ') : ''),
+            operands: inst.operands || [],
+            size: Number(inst.size || 1)
+          }));
         }
-        const mappedInsts = insts.map((inst: any) => ({
-          address: Number(inst.address),
-          bytes: inst.bytes instanceof Uint8Array ? inst.bytes : new Uint8Array(),
-          mnemonic: inst.mnemonic || inst.op || '',
-          opStr: inst.opStr || (inst.args ? inst.args.join(', ') : ''),
-          operands: inst.operands || [],
-          size: Number(inst.size || 1)
-        }));
+
         const blocks = buildCFG(mappedInsts);
-        return { success: true, blocks };
+        
+        const format = params.format || 'json';
+        let formatted: string | undefined = undefined;
+        if (format === 'dot') {
+          formatted = toDOT(blocks);
+        } else if (format === 'ascii') {
+          formatted = toASCII(blocks);
+        } else if (format === 'json') {
+          formatted = JSON.stringify(blocks, null, 2);
+        }
+
+        return {
+          success: true,
+          blocks,
+          format,
+          formatted
+        };
       }
 
       case 'loadBinary': {
@@ -2088,10 +2651,17 @@ export class AIBridge {
         const bytes = toUint8Array(params.data);
         const target = params.target.toLowerCase();
         
-        let entryPoint = 0;
+        let baseAddress = 0;
         let sections: Section[] = [];
         let symbols: Symbol[] = [];
-        let baseAddress = params.baseAddress ?? params.address ?? 0;
+        if (params.baseAddress !== undefined) {
+          baseAddress = parseAddress(params.baseAddress, []);
+        } else if (params.address !== undefined) {
+          const addrStr = String(params.address).trim();
+          if (addrStr.startsWith('0x') || /^\d+$/.test(addrStr)) {
+            baseAddress = parseAddress(params.address, []);
+          }
+        }
 
         let detected = 'auto';
         if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
@@ -2113,7 +2683,9 @@ export class AIBridge {
               flags: { read: true, write: false, execute: (Number(s.flags) & 4) !== 0 }
             }));
             symbols = elf.symbols.map(sym => ({ name: sym.name, address: Number(sym.value), binding: 'global', type: sym.type === 'FUNC' ? 'function' : 'none' }));
-            baseAddress = Number(elf.header.entryPoint);
+            if (baseAddress === 0) {
+              baseAddress = Number(elf.header.entryPoint);
+            }
           } else if (detected === 'pe') {
             const parser = new PEParser(bytes.buffer as ArrayBuffer);
             const pe = parser.parse();
@@ -2126,7 +2698,57 @@ export class AIBridge {
               fileSize: s.sizeOfRawData,
               flags: { read: true, write: false, execute: (s.characteristics & 0x20000000) !== 0 }
             }));
-            baseAddress = imgBase + pe.optionalHeader.addressOfEntryPoint;
+            const peSymbols: Symbol[] = [];
+            if (pe.imports) {
+              for (const impTable of pe.imports) {
+                for (const imp of impTable.imports) {
+                  if (imp.name && imp.iatRva !== undefined) {
+                    peSymbols.push({
+                      name: imp.name,
+                      address: imgBase + imp.iatRva,
+                      binding: 'global',
+                      type: 'none'
+                    });
+                  }
+                }
+              }
+            }
+            if (pe.exports && pe.exports.exports) {
+              for (const exp of pe.exports.exports) {
+                if (exp.name) {
+                  peSymbols.push({
+                    name: exp.name,
+                    address: imgBase + exp.address,
+                    binding: 'global',
+                    type: 'none'
+                  });
+                }
+              }
+            }
+            symbols = peSymbols;
+            if (baseAddress === 0) {
+              baseAddress = imgBase + pe.optionalHeader.addressOfEntryPoint;
+            }
+          } else if (detected === 'macho') {
+            const parser = new MachoParser(bytes);
+            const macho = parser.parse();
+            sections = macho.sections.map(s => {
+              const isText = s.sectname === '__text' || s.segname === '__TEXT';
+              return {
+                name: s.sectname,
+                virtualAddress: Number(s.addr),
+                virtualSize: Number(s.size),
+                fileOffset: s.offset,
+                fileSize: Number(s.size),
+                flags: { read: true, write: s.segname === '__DATA', execute: isText }
+              };
+            });
+            symbols = macho.symbols.map(sym => ({
+              name: sym.name,
+              address: Number(sym.value),
+              binding: 'global',
+              type: 'none'
+            }));
           }
         } catch (_) {}
 
@@ -2153,17 +2775,9 @@ export class AIBridge {
         const xrefEngine = new XRefEngine();
         xrefEngine.analyze(allInstructions, sections, symbols, bytes, baseAddress);
 
-        let targetAddr = 0;
-        if (target.startsWith('0x')) {
-          targetAddr = parseInt(target, 16);
-        } else if (/^\d+$/.test(target)) {
-          targetAddr = parseInt(target, 10);
-        } else {
-          const sym = symbols.find(s => s.name.toLowerCase().includes(target));
-          if (sym) targetAddr = sym.address;
-        }
+        const targetAddr = parseAddress(params.target, symbols);
 
-        if (targetAddr === 0) {
+        if (targetAddr === 0 && params.target !== 0 && params.target !== '0' && params.target !== '0x0') {
           throw new Error(`Could not resolve target symbol or address: ${params.target}`);
         }
 
@@ -2174,13 +2788,7 @@ export class AIBridge {
         for (const inst of funcInsts) {
           if (inst.mnemonic.toLowerCase() === 'call' || inst.mnemonic.toLowerCase().startsWith('jmp')) {
             const dest = inst.opStr.trim();
-            let destAddr = 0;
-            if (dest.startsWith('0x')) destAddr = parseInt(dest, 16);
-            else if (/^\d+$/.test(dest)) destAddr = parseInt(dest, 10);
-            else {
-              const sym = symbols.find(s => s.name.toLowerCase().includes(dest.toLowerCase()));
-              if (sym) destAddr = sym.address;
-            }
+            const destAddr = parseAddress(dest, symbols);
             if (destAddr > 0) {
               callees.push({ calleeAddress: destAddr, instruction: `${inst.mnemonic} ${inst.opStr}` });
             }
@@ -2192,10 +2800,10 @@ export class AIBridge {
 
       case 'typeStructRecovery': {
         const bytes = toUint8Array(params.data);
-        const address = params.address;
+        const address = parseAddress(params.address);
         
         let sections: Section[] = [];
-        let baseAddress = params.baseAddress ?? params.address ?? 0;
+        let baseAddress = params.baseAddress !== undefined ? parseAddress(params.baseAddress) : address;
         let detected = 'auto';
         if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) detected = 'elf';
         else if (bytes[0] === 0x4d && bytes[1] === 0x5a) detected = 'pe';
@@ -2333,8 +2941,9 @@ export class AIBridge {
         
         const resolvePlaceholders = (val: any, stepIdx: number): any => {
           if (typeof val === 'string') {
-            if (val.startsWith('$$') && val.endsWith('$$')) {
-              const expr = val.substring(2, val.length - 2).trim();
+            const exactMatch = /^\$\$(.+?)\$\$$/.exec(val);
+            if (exactMatch) {
+              const expr = exactMatch[1].trim();
               if (expr === 'prev' || expr === 'prev.result') {
                 return results.length > 0 ? results[results.length - 1] : undefined;
               }
@@ -2343,11 +2952,52 @@ export class AIBridge {
                   prev: results.length > 0 ? results[results.length - 1] : undefined,
                   results: results
                 };
-                const fn = new Function('context', `return context.${expr}`);
+                const fn = new Function('context', `const { prev, results } = context; return ${expr};`);
                 return fn(context);
               } catch (_) {
                 return undefined;
               }
+            }
+
+            if (val.includes('$$')) {
+              let replaced = val;
+              const regex = /\$\$(.+?)\$\$/g;
+              let match;
+              while ((match = regex.exec(val)) !== null) {
+                const placeholder = match[0];
+                const expr = match[1].trim();
+                let resolvedVal: any;
+                if (expr === 'prev' || expr === 'prev.result') {
+                  resolvedVal = results.length > 0 ? results[results.length - 1] : undefined;
+                } else {
+                  try {
+                    const context = {
+                      prev: results.length > 0 ? results[results.length - 1] : undefined,
+                      results: results
+                    };
+                    const fn = new Function('context', `const { prev, results } = context; return ${expr};`);
+                    resolvedVal = fn(context);
+                  } catch (_) {
+                    resolvedVal = undefined;
+                  }
+                }
+
+                let stringVal = '';
+                if (resolvedVal === undefined || resolvedVal === null) {
+                  stringVal = '';
+                } else if (typeof resolvedVal === 'object') {
+                  if (resolvedVal instanceof Uint8Array) {
+                    stringVal = toHex(resolvedVal);
+                  } else {
+                    stringVal = JSON.stringify(resolvedVal);
+                  }
+                } else {
+                  stringVal = String(resolvedVal);
+                }
+
+                replaced = replaced.split(placeholder).join(stringVal);
+              }
+              return replaced;
             }
           } else if (val && typeof val === 'object') {
             if (Array.isArray(val)) {
@@ -2373,8 +3023,1108 @@ export class AIBridge {
         return { success: true, pipelineResults: results };
       }
 
+      case 'findFunctions': {
+        const bytes = toUint8Array(params.data);
+        const format = params.format || 'auto';
+        const targetSectionName = params.section;
+        const arch = params.arch;
+
+        // Detect format
+        let detected = format;
+        if (format === 'auto') {
+          if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+            detected = 'elf';
+          } else if (bytes[0] === 0x4d && bytes[1] === 0x5a) {
+            detected = 'pe';
+          } else if (
+            (bytes[0] === 0xfe && bytes[1] === 0xed && bytes[2] === 0xfa && bytes[3] === 0xcf) ||
+            (bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe)
+          ) {
+            detected = 'macho';
+          } else {
+            detected = 'raw';
+          }
+        }
+
+        let entryPoint = 0;
+        let sections: any[] = [];
+        let symbols: any[] = [];
+
+        if (detected === 'elf') {
+          try {
+            const parsed = parseElf(bytes.buffer as ArrayBuffer);
+            entryPoint = Number(parsed.header.entryPoint);
+            sections = parsed.sectionHeaders.map(s => {
+              const flagsNum = Number(s.flags);
+              const isWritable = (flagsNum & 1) !== 0;
+              const isAlloc = (flagsNum & 2) !== 0;
+              const isExecutable = (flagsNum & 4) !== 0;
+              return {
+                name: s.name,
+                virtualAddress: Number(s.addr),
+                virtualSize: Number(s.size),
+                fileOffset: Number(s.offset),
+                fileSize: Number(s.size),
+                flags: { read: isAlloc, write: isWritable, execute: isExecutable }
+              };
+            });
+            symbols = parsed.symbols.map(sym => ({
+              name: sym.name,
+              address: Number(sym.value),
+              size: Number(sym.size),
+              type: sym.type === 'FUNC' ? 'function' : sym.type === 'OBJECT' ? 'object' : 'none',
+              binding: sym.bind === 'GLOBAL' ? 'global' : sym.bind === 'WEAK' ? 'weak' : 'local'
+            }));
+          } catch (_) {}
+        } else if (detected === 'pe') {
+          try {
+            const parser = new PEParser(bytes.buffer as ArrayBuffer);
+            const parsed = parser.parse();
+            const imgBase = Number(parsed.optionalHeader.imageBase);
+            entryPoint = imgBase + parsed.optionalHeader.addressOfEntryPoint;
+            sections = parsed.sections.map(s => {
+              const isExecutable = (s.characteristics & 0x20000000) !== 0;
+              const isReadable = (s.characteristics & 0x40000000) !== 0;
+              const isWritable = (s.characteristics & 0x80000000) !== 0;
+              return {
+                name: s.name,
+                virtualAddress: imgBase + s.virtualAddress,
+                virtualSize: s.virtualSize,
+                fileOffset: s.pointerToRawData,
+                fileSize: s.sizeOfRawData,
+                flags: { read: isReadable, write: isWritable, execute: isExecutable }
+              };
+            });
+            if (parsed.exports && parsed.exports.exports) {
+              symbols = parsed.exports.exports.map(e => ({
+                name: e.name || '',
+                address: imgBase + e.address,
+                binding: 'global',
+                type: 'function'
+              }));
+            }
+          } catch (_) {}
+        } else if (detected === 'macho') {
+          try {
+            const parser = new MachoParser(bytes);
+            const parsed = parser.parse();
+            const textSegment = parsed.segments.find(seg => seg.segname === '__TEXT');
+            const imgBase = textSegment ? Number(textSegment.vmaddr) : 0;
+            const lcMain = parsed.loadCommands.find(lc => lc.cmd === 0x80000028);
+            if (lcMain && lcMain.payload && typeof (lcMain.payload as any).entryoff === 'number') {
+              entryPoint = imgBase + (lcMain.payload as any).entryoff;
+            }
+            sections = parsed.sections.map((s: any) => {
+              const isText = s.sectname === '__text' || s.segname === '__TEXT';
+              return {
+                name: s.sectname,
+                virtualAddress: Number(s.addr),
+                virtualSize: Number(s.size),
+                fileOffset: s.offset,
+                fileSize: Number(s.size),
+                flags: { read: true, write: s.segname === '__DATA', execute: isText }
+              };
+            });
+            symbols = parsed.symbols.map((sym: any) => ({
+              name: sym.name,
+              address: Number(sym.value),
+              binding: 'global',
+              type: 'none'
+            }));
+          } catch (_) {}
+        }
+
+        if (sections.length === 0) {
+          sections = [{
+            name: '.text',
+            virtualAddress: 0,
+            virtualSize: bytes.length,
+            fileOffset: 0,
+            fileSize: bytes.length,
+            flags: { read: true, write: false, execute: true }
+          }];
+        }
+
+        let sectionsToScan = sections;
+        if (targetSectionName) {
+          sectionsToScan = sections.filter(s => s.name === targetSectionName);
+        } else {
+          sectionsToScan = sections.filter(s => s.flags.execute && s.fileSize > 0);
+        }
+
+        if (sectionsToScan.length === 0 && targetSectionName) {
+          return { success: true, boundaries: [] };
+        }
+
+        const router = new DisassemblerRouter();
+        const detectedArch = arch || DisassemblerRouter.detectArchitecture(bytes);
+        const allBoundaries: { startVA: number; endVA: number; estimatedName: string }[] = [];
+
+        for (const sec of sectionsToScan) {
+          if (sec.fileSize === 0) continue;
+          const secBytes = bytes.subarray(sec.fileOffset, sec.fileOffset + sec.fileSize);
+          let insts: Instruction[] = [];
+          try {
+            insts = router.disassemble(secBytes, {
+              arch: detectedArch as any,
+              baseAddress: sec.virtualAddress
+            });
+          } catch (_) {
+            continue;
+          }
+
+          if (insts.length === 0) continue;
+
+          const entryPoints = new Set<number>();
+
+          if (entryPoint >= sec.virtualAddress && entryPoint < sec.virtualAddress + sec.virtualSize) {
+            entryPoints.add(entryPoint);
+          }
+
+          for (const sym of symbols) {
+            if (sym.address >= sec.virtualAddress && sym.address < sec.virtualAddress + sec.virtualSize) {
+              entryPoints.add(sym.address);
+            }
+          }
+
+          for (let i = 0; i < insts.length; i++) {
+            const inst = insts[i];
+            const mnemonic = inst.mnemonic ? inst.mnemonic.toLowerCase() : '';
+            const opStr = inst.opStr ? inst.opStr.toLowerCase() : '';
+
+            // Pattern A: push rbp; mov rbp, rsp
+            if (mnemonic === 'push' && (opStr === 'rbp' || opStr === 'ebp')) {
+              if (i + 1 < insts.length) {
+                const nextInst = insts[i + 1];
+                const nextMnemonic = nextInst.mnemonic ? nextInst.mnemonic.toLowerCase() : '';
+                const nextOpStr = nextInst.opStr ? nextInst.opStr.toLowerCase() : '';
+                if (nextMnemonic === 'mov') {
+                  const cleaned = nextOpStr.replace(/\s+/g, '');
+                  if (cleaned === 'rbp,rsp' || cleaned === 'ebp,esp') {
+                    entryPoints.add(inst.address);
+                  }
+                }
+              }
+            }
+
+            // Pattern B: push rdi; push rsi
+            if (mnemonic === 'push' && (opStr === 'rdi' || opStr === 'rsi' || opStr === 'rbx' || opStr === 'r12' || opStr === 'r13' || opStr === 'r14' || opStr === 'r15')) {
+              if (i + 1 < insts.length) {
+                const nextInst = insts[i + 1];
+                const nextMnemonic = nextInst.mnemonic ? nextInst.mnemonic.toLowerCase() : '';
+                const nextOpStr = nextInst.opStr ? nextInst.opStr.toLowerCase() : '';
+                if (nextMnemonic === 'push' && (nextOpStr === 'rsi' || nextOpStr === 'rdi' || nextOpStr === 'rbx' || nextOpStr === 'r12' || nextOpStr === 'r13' || nextOpStr === 'r14' || nextOpStr === 'r15')) {
+                  entryPoints.add(inst.address);
+                }
+              }
+            }
+
+            // Pattern C: sub rsp, imm
+            if (mnemonic === 'sub' && (opStr.startsWith('rsp') || opStr.startsWith('esp') || opStr.startsWith('sp'))) {
+              let isLikelyStart = false;
+              if (i === 0) {
+                isLikelyStart = true;
+              } else {
+                const prevInst = insts[i - 1];
+                const prevMnemonic = prevInst.mnemonic ? prevInst.mnemonic.toLowerCase() : '';
+                if (prevMnemonic === 'ret' || prevMnemonic === 'jmp' || prevMnemonic === 'hlt') {
+                  isLikelyStart = true;
+                }
+              }
+              if (isLikelyStart) {
+                entryPoints.add(inst.address);
+              }
+            }
+
+            // ARM patterns
+            if (detectedArch === 'arm' || detectedArch === 'arm64') {
+              if (mnemonic === 'push' && opStr.includes('lr')) {
+                entryPoints.add(inst.address);
+              }
+              if (mnemonic === 'stp' && opStr.startsWith('x29, x30')) {
+                entryPoints.add(inst.address);
+              }
+            }
+          }
+
+          // Heuristic 4: Call targets within this section
+          for (const inst of insts) {
+            const mnemonic = inst.mnemonic ? inst.mnemonic.toLowerCase() : '';
+            if (mnemonic === 'call' || mnemonic === 'bl') {
+              const opStr = inst.opStr ? inst.opStr.trim() : '';
+              let destAddr = 0;
+              if (opStr.startsWith('0x')) {
+                destAddr = parseInt(opStr, 16);
+              } else if (/^\d+$/.test(opStr)) {
+                destAddr = parseInt(opStr, 10);
+              }
+              if (destAddr >= sec.virtualAddress && destAddr < sec.virtualAddress + sec.virtualSize) {
+                entryPoints.add(destAddr);
+              }
+            }
+          }
+
+          const sortedEPs = Array.from(entryPoints).sort((a, b) => a - b);
+          if (sortedEPs.length === 0) {
+            sortedEPs.push(sec.virtualAddress);
+          }
+
+          const addrToIdx = new Map<number, number>();
+          for (let idx = 0; idx < insts.length; idx++) {
+            addrToIdx.set(insts[idx].address, idx);
+          }
+
+          for (let idx = 0; idx < sortedEPs.length; idx++) {
+            const startVA = sortedEPs[idx];
+            const nextStartVA = idx + 1 < sortedEPs.length ? sortedEPs[idx + 1] : sec.virtualAddress + sec.virtualSize;
+
+            const instIdx = addrToIdx.get(startVA);
+            let endVA = nextStartVA;
+
+            if (instIdx !== undefined) {
+              let lastTerminalAddr = -1;
+              let lastTerminalSize = 0;
+
+              for (let k = instIdx; k < insts.length; k++) {
+                const checkInst = insts[k];
+                if (checkInst.address >= nextStartVA) break;
+
+                const checkMnemonic = checkInst.mnemonic ? checkInst.mnemonic.toLowerCase() : '';
+                if (checkMnemonic === 'ret' || checkMnemonic === 'hlt') {
+                  lastTerminalAddr = checkInst.address;
+                  lastTerminalSize = checkInst.size;
+                } else if (checkMnemonic === 'jmp') {
+                  const checkOpStr = checkInst.opStr ? checkInst.opStr.trim() : '';
+                  let destAddr = 0;
+                  if (checkOpStr.startsWith('0x')) {
+                    destAddr = parseInt(checkOpStr, 16);
+                  } else if (/^\d+$/.test(checkOpStr)) {
+                    destAddr = parseInt(checkOpStr, 10);
+                  }
+                  if (destAddr > 0 && (destAddr < startVA || destAddr >= nextStartVA)) {
+                    lastTerminalAddr = checkInst.address;
+                    lastTerminalSize = checkInst.size;
+                  }
+                }
+              }
+
+              if (lastTerminalAddr !== -1) {
+                endVA = lastTerminalAddr + lastTerminalSize;
+              }
+            }
+
+            const matchingSym = symbols.find(s => s.address === startVA);
+            const estimatedName = matchingSym ? matchingSym.name : `func_0x${startVA.toString(16)}`;
+
+            allBoundaries.push({
+              startVA,
+              endVA,
+              estimatedName
+            });
+          }
+        }
+
+        return { success: true, boundaries: allBoundaries };
+      }
+
+      case 'sessionSave': {
+        const filePath = params.filePath;
+        if (!filePath) {
+          throw new Error('Missing "filePath" parameter');
+        }
+
+        const emu = this.getEmulator();
+        
+        // Serialize CPU state
+        const cpuState: Record<string, string> = {};
+        for (const [reg, val] of Object.entries(emu.cpu.getState())) {
+          cpuState[reg] = val.toString();
+        }
+
+        // Serialize Memory
+        const memoryRegions = emu.memory.getMemoryMap().map(region => ({
+          address: region.address.toString(),
+          size: region.size,
+          name: region.name,
+          permissions: { ...region.permissions }
+        }));
+
+        const memoryPages: Record<string, string> = {};
+        for (const [pageKey, pageData] of emu.memory.getPages().entries()) {
+          let isAllZero = true;
+          for (let i = 0; i < pageData.length; i++) {
+            if (pageData[i] !== 0) {
+              isAllZero = false;
+              break;
+            }
+          }
+          if (!isAllZero) {
+            memoryPages[pageKey.toString()] = toHex(pageData);
+          }
+        }
+
+        // Serialize Breakpoints
+        const breakpoints = Array.from(emu.breakpoints);
+
+        // Serialize Execution Traces
+        const trace = emu.trace.map(step => ({
+          stepIndex: step.stepIndex,
+          rip: step.rip.toString(),
+          instruction: {
+            address: step.instruction.address,
+            mnemonic: step.instruction.mnemonic,
+            opStr: step.instruction.opStr,
+            bytes: step.instruction.bytes ? toHex(step.instruction.bytes) : undefined
+          },
+          registers: Object.fromEntries(
+            Object.entries(step.registers).map(([reg, val]) => [reg, val.toString()])
+          )
+        }));
+
+        // Serialize instructions cache
+        const instructions = Array.from(emu.instructions.entries()).map(([addr, inst]) => ({
+          address: addr,
+          bytes: inst.bytes ? toHex(inst.bytes) : undefined,
+          mnemonic: inst.mnemonic,
+          opStr: inst.opStr,
+          operands: inst.operands ? inst.operands.map(op => {
+            if (op.type === 'imm' && typeof op.imm === 'bigint') {
+              return { ...op, imm: op.imm.toString() };
+            }
+            return op;
+          }) : undefined,
+          size: inst.size
+        }));
+
+        // Serialize loaded binary bytes
+        const loadedBinaryHex = AIBridge.loadedBinaryBytes ? toHex(AIBridge.loadedBinaryBytes) : null;
+
+        const sessionData = {
+          loadedBinaryHex,
+          cpuState,
+          memory: {
+            regions: memoryRegions,
+            pages: memoryPages
+          },
+          breakpoints,
+          trace,
+          instructions
+        };
+
+        const fs = await import('fs');
+        const path = await import('path');
+        const absolutePath = path.resolve(filePath);
+        const dir = path.dirname(absolutePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        
+        fs.writeFileSync(absolutePath, JSON.stringify(sessionData, null, 2), 'utf-8');
+
+        return {
+          success: true,
+          message: `Session saved successfully to ${filePath}`
+        };
+      }
+
+      case 'sessionLoad': {
+        const filePath = params.filePath;
+        if (!filePath) {
+          throw new Error('Missing "filePath" parameter');
+        }
+
+        const fs = await import('fs');
+        const path = await import('path');
+        const absolutePath = path.resolve(filePath);
+        
+        if (!fs.existsSync(absolutePath)) {
+          throw new Error(`Session file not found: ${filePath}`);
+        }
+
+        const content = fs.readFileSync(absolutePath, 'utf-8');
+        const sessionData = JSON.parse(content);
+
+        // Restore loaded binary bytes
+        if (sessionData.loadedBinaryHex) {
+          AIBridge.loadedBinaryBytes = toUint8Array(sessionData.loadedBinaryHex);
+        } else {
+          AIBridge.loadedBinaryBytes = null;
+        }
+
+        const emu = this.getEmulator();
+
+        // Restore CPU State
+        if (sessionData.cpuState) {
+          emu.cpu.reset();
+          for (const [reg, val] of Object.entries(sessionData.cpuState)) {
+            emu.cpu.writeGPR(reg as any, BigInt(val as string));
+          }
+        }
+
+        // Restore Breakpoints
+        emu.breakpoints.clear();
+        if (sessionData.breakpoints && Array.isArray(sessionData.breakpoints)) {
+          for (const bp of sessionData.breakpoints) {
+            emu.breakpoints.add(Number(bp));
+          }
+        }
+
+        // Restore Memory Regions and Pages
+        if (sessionData.memory) {
+          const regions = (sessionData.memory.regions || []).map((r: any) => ({
+            address: BigInt(r.address),
+            size: Number(r.size),
+            name: String(r.name),
+            permissions: {
+              read: Boolean(r.permissions?.read),
+              write: Boolean(r.permissions?.write),
+              execute: Boolean(r.permissions?.execute)
+            }
+          }));
+
+          const pagesMap = new Map<bigint, Uint8Array>();
+          if (sessionData.memory.pages) {
+            for (const [key, hexVal] of Object.entries(sessionData.memory.pages)) {
+              pagesMap.set(BigInt(key), toUint8Array(hexVal as string));
+            }
+          }
+          emu.memory.clearAndLoad(regions, pagesMap);
+        }
+
+        // Restore Trace
+        emu.trace = [];
+        if (sessionData.trace && Array.isArray(sessionData.trace)) {
+          emu.trace = sessionData.trace.map((step: any) => ({
+            stepIndex: Number(step.stepIndex),
+            rip: BigInt(step.rip),
+            instruction: {
+              address: Number(step.instruction.address),
+              mnemonic: String(step.instruction.mnemonic),
+              opStr: String(step.instruction.opStr),
+              bytes: step.instruction.bytes ? toUint8Array(step.instruction.bytes) : new Uint8Array()
+            },
+            registers: Object.fromEntries(
+              Object.entries(step.registers || {}).map(([reg, val]) => [reg, BigInt(val as string)])
+            )
+          }));
+        }
+
+        // Restore instructions cache
+        emu.instructions.clear();
+        if (sessionData.instructions && Array.isArray(sessionData.instructions)) {
+          for (const inst of sessionData.instructions) {
+            emu.instructions.set(inst.address, {
+              address: inst.address,
+              bytes: inst.bytes ? toUint8Array(inst.bytes) : new Uint8Array(),
+              mnemonic: inst.mnemonic,
+              opStr: inst.opStr,
+              operands: inst.operands ? inst.operands.map((op: any) => {
+                if (op.type === 'imm' && op.imm !== undefined) {
+                  return { ...op, imm: BigInt(op.imm) };
+                }
+                return op;
+              }) : undefined,
+              size: inst.size
+            });
+          }
+        }
+
+        return {
+          success: true,
+          message: `Session loaded successfully from ${filePath}`
+        };
+      }
+
+      case 'generateReport': {
+        // Step 1: loadBinary if data or filePath is provided
+        if (params.data || params.filePath) {
+          await AIBridge.executeQuery({
+            action: 'loadBinary',
+            params: { data: params.data, filePath: params.filePath }
+          });
+        }
+
+        const bytes = AIBridge.loadedBinaryBytes;
+        if (!bytes) {
+          throw new Error('No binary loaded. Provide "data" or "filePath", or load a binary first.');
+        }
+
+        // Step 2: parseBinary
+        let parsed: any;
+        try {
+          parsed = await AIBridge.executeQuery({
+            action: 'parseBinary',
+            params: { data: toHex(bytes), format: 'auto' }
+          });
+        } catch (e: any) {
+          parsed = {
+            success: false,
+            format: 'unknown',
+            sections: [],
+            symbols: [],
+            entryPoint: 0,
+            entryPointAddress: 0
+          };
+        }
+
+        // Step 3: extractStrings
+        let strings: any[] = [];
+        try {
+          const stringsResult = await AIBridge.executeQuery({
+            action: 'extractStrings',
+            params: { data: toHex(bytes), minLength: 4, ascii: true, utf16le: true }
+          });
+          strings = stringsResult.strings || [];
+        } catch (_) {}
+
+        const normalizedSymbols = (parsed.symbols || []).map((sym: any) => {
+          const address = sym.address !== undefined ? Number(sym.address) : (sym.value !== undefined ? Number(sym.value) : 0);
+          const size = sym.size !== undefined ? Number(sym.size) : 0;
+          return {
+            name: sym.name || '',
+            address,
+            size,
+            binding: sym.binding || sym.bind || 'global',
+            type: sym.type || 'unknown'
+          };
+        });
+
+        const unsafeApiNames = new Set([
+          'strcpy', 'strcat', 'sprintf', 'gets', 'system', 'exec', 'popen'
+        ]);
+        for (const strObj of strings) {
+          if (strObj && strObj.value && unsafeApiNames.has(strObj.value.toLowerCase().trim())) {
+            const exists = normalizedSymbols.some(s => s.name.toLowerCase() === strObj.value.toLowerCase().trim());
+            if (!exists) {
+              normalizedSymbols.push({
+                name: strObj.value.trim(),
+                address: strObj.address || 0,
+                size: 0,
+                binding: 'global',
+                type: 'function'
+              });
+            }
+          }
+        }
+
+        // Step 4: entropyAnalysis
+        let entropyResult: any = { overall: 0, highEntropyBlocks: [] };
+        try {
+          const entRes = await AIBridge.executeQuery({
+            action: 'entropyAnalysis',
+            params: { data: toHex(bytes) }
+          });
+          if (entRes.success) {
+            entropyResult = entRes;
+          }
+        } catch (_) {}
+
+        // Step 5: yaraScan
+        const defaultYaraRules = `
+          rule SuspiciousStrings {
+            meta:
+              description = "Default URET rule searching for typical suspicious strings"
+            strings:
+              $cmd = "cmd.exe" ascii nocase
+              $ps = "powershell.exe" ascii nocase
+              $sh = "/bin/sh" ascii nocase
+              $bash = "/bin/bash" ascii nocase
+            condition:
+              any of them
+          }
+        `;
+        const rulesToUse = params.rules || defaultYaraRules;
+        let yaraMatches: any[] = [];
+        try {
+          const yaraResult = await AIBridge.executeQuery({
+            action: 'yaraScan',
+            params: { data: toHex(bytes), rules: rulesToUse }
+          });
+          yaraMatches = yaraResult.matches || [];
+        } catch (_) {}
+
+        // Step 6: disassemble and vulnScan
+        let instructions: any[] = [];
+        try {
+          const disasmRes = await AIBridge.executeQuery({
+            action: 'disassemble',
+            params: {
+              data: toHex(bytes),
+              baseAddress: parsed.entryPointAddress || undefined
+            }
+          });
+          if (disasmRes.success) {
+            instructions = disasmRes.instructions || [];
+          }
+        } catch (_) {}
+
+        let vulnerabilities: any[] = [];
+        try {
+          const vulnResult = await AIBridge.executeQuery({
+            action: 'vulnScan',
+            params: {
+              data: toHex(bytes),
+              sections: parsed.sections || [],
+              symbols: normalizedSymbols,
+              instructions: instructions
+            }
+          });
+          vulnerabilities = vulnResult.vulnerabilities || [];
+        } catch (_) {}
+
+        // Step 7: exportToIda
+        let idaScript = '';
+        try {
+          const idaResult = await AIBridge.executeQuery({
+            action: 'exportToIda',
+            params: { data: toHex(bytes) }
+          });
+          idaScript = idaResult.script || '';
+        } catch (_) {}
+
+        // Normalize sections & symbols for ReportGenerator
+        const normalizedSections = (parsed.sections || []).map((s: any) => {
+          const virtualAddress = s.virtualAddress !== undefined ? Number(s.virtualAddress) : (s.addr !== undefined ? Number(s.addr) : 0);
+          const virtualSize = s.virtualSize !== undefined ? Number(s.virtualSize) : (s.size !== undefined ? Number(s.size) : 0);
+          const fileOffset = s.fileOffset !== undefined ? Number(s.fileOffset) : (s.offset !== undefined ? Number(s.offset) : 0);
+          const fileSize = s.fileSize !== undefined ? Number(s.fileSize) : (s.size !== undefined ? Number(s.size) : 0);
+          
+          let flags = s.flags || { read: true, write: false, execute: false };
+          if (typeof s.flags === 'bigint' || typeof s.flags === 'number') {
+            const fNum = Number(s.flags);
+            flags = {
+              read: true,
+              write: (fNum & 1) !== 0 || (fNum & 0x80000000) !== 0,
+              execute: (fNum & 4) !== 0 || (fNum & 2) !== 0 || (fNum & 0x20000000) !== 0
+            };
+          }
+
+          let entropy = s.entropy;
+          if (entropy === undefined && bytes && fileOffset >= 0 && fileSize > 0 && fileOffset + fileSize <= bytes.length) {
+            try {
+              const secBytes = bytes.subarray(fileOffset, fileOffset + fileSize);
+              entropy = calculateEntropy(secBytes);
+            } catch (_) {}
+          }
+
+          return {
+            name: s.name || s.sectname || '',
+            virtualAddress,
+            virtualSize,
+            fileOffset,
+            fileSize,
+            entropy,
+            flags
+          };
+        });
+
+        // Build ReportData
+        const reportFileName = params.fileName || (params.filePath ? params.filePath.split(/[\\/]/).pop() : null) || 'loaded_binary';
+        const reportData: any = {
+          fileName: reportFileName,
+          fileSize: bytes.length,
+          architecture: parsed.format === 'pe' ? 'x86_64' : (parsed.format === 'macho' ? 'x86_64' : 'x86_64'),
+          entryPoint: parsed.entryPointAddress || parsed.entryPoint || 0,
+          sections: normalizedSections,
+          symbols: normalizedSymbols,
+          signatures: [],
+          entropy: {
+            overall: entropyResult.overall || 0,
+            highEntropyBlocks: entropyResult.highEntropyBlocks || []
+          },
+          strings: strings,
+          binaryData: bytes
+        };
+
+        // Construct JSON report
+        const jsonReportObj = JSON.parse(ReportGenerator.generateJSON(reportData));
+        jsonReportObj.yaraMatches = yaraMatches;
+        jsonReportObj.vulnerabilities = vulnerabilities;
+        jsonReportObj.idaScript = idaScript;
+
+        // Construct Markdown report
+        let markdownReport = ReportGenerator.generateMarkdown(reportData);
+
+        // Append YARA matches section
+        markdownReport += `\n## 🛡️ YARA Scan Results\n\n`;
+        if (yaraMatches && yaraMatches.length > 0) {
+          markdownReport += `| Rule Name | Matched | Matches Count |\n`;
+          markdownReport += `|---|---|---|\n`;
+          for (const match of yaraMatches) {
+            markdownReport += `| **${match.ruleName}** | \`${match.matched}\` | ${match.matches?.length || 0} |\n`;
+          }
+        } else {
+          markdownReport += `No YARA signatures matched.\n`;
+        }
+        markdownReport += `\n`;
+
+        // Append Vulnerabilities section
+        markdownReport += `\n## ⚠️ Vulnerability / Unsafe API Scan Results\n\n`;
+        if (vulnerabilities && vulnerabilities.length > 0) {
+          markdownReport += `| Category | Severity | Description | Evidence | Address |\n`;
+          markdownReport += `|---|---|---|---|---|\n`;
+          for (const vuln of vulnerabilities) {
+            const addrStr = vuln.address !== undefined ? `0x${vuln.address.toString(16).toUpperCase()}` : 'N/A';
+            markdownReport += `| \`${vuln.category}\` | \`${vuln.severity}\` | ${vuln.description} | \`${vuln.evidence}\` | ${addrStr} |\n`;
+          }
+        } else {
+          markdownReport += `No vulnerabilities detected.\n`;
+        }
+        markdownReport += `\n`;
+
+        // Append IDA script
+        markdownReport += `\n## 🔌 IDA Pro / Ghidra Export Script\n\n`;
+        if (idaScript) {
+          markdownReport += `\`\`\`cpp\n${idaScript}\n\`\`\`\n`;
+        } else {
+          markdownReport += `No IDA script generated.\n`;
+        }
+        markdownReport += `\n`;
+
+        return {
+          success: true,
+          jsonReport: jsonReportObj,
+          markdownReport: markdownReport
+        };
+      }
+
+      case 'deobfuscate': {
+        let insts = params.instructions;
+        if (!insts && params.data) {
+          const bytes = toUint8Array(params.data);
+          const resolved = resolveElfOrPe(bytes, undefined, params.entryPoint ?? params.address ?? params.baseAddress);
+          const router = new DisassemblerRouter();
+          insts = router.disassemble(resolved.data, {
+            arch: params.arch || 'x86_64',
+            baseAddress: resolved.baseAddress
+          });
+        }
+        if (!insts || insts.length === 0) {
+          throw new Error('No instructions provided for analysis');
+        }
+
+        const normalizedInsts = insts.map((inst: any) => {
+          const address = typeof inst.address === 'number' ? inst.address : Number(inst.address || 0);
+          const mnemonic = (inst.mnemonic || inst.op || '').toLowerCase().trim();
+          const opStr = inst.opStr || (inst.args ? inst.args.join(', ') : '');
+          const size = typeof inst.size === 'number' ? inst.size : 4;
+          
+          let operands = inst.operands;
+          if (!operands || operands.length === 0) {
+            const args = inst.args || (opStr ? opStr.split(',').map((s: string) => s.trim()) : []);
+            operands = args.map((arg: string) => {
+              const clean = arg.trim();
+              if (clean.startsWith('0x') || clean.startsWith('0X') || /^-?\d+$/.test(clean) || clean.startsWith('#')) {
+                let numStr = clean;
+                if (numStr.startsWith('#')) numStr = numStr.substring(1).trim();
+                try {
+                  return { type: 'imm', imm: BigInt(numStr) };
+                } catch (_) {
+                  return { type: 'imm', imm: 0n };
+                }
+              }
+              if (clean.includes('[') || clean.includes(']')) {
+                const match = clean.match(/([er]?sp|fp|[er]?bp|[a-z0-9]+)/i);
+                return { type: 'mem', mem: { base: match ? match[1] : clean } };
+              }
+              return { type: 'reg', reg: clean };
+            });
+          }
+          
+          const bytes = inst.bytes || new Uint8Array();
+          return {
+            address,
+            mnemonic,
+            opStr,
+            size,
+            operands,
+            bytes
+          };
+        });
+
+        const xorLoops = detectXorLoops(normalizedInsts);
+        const stackStrings = detectStackStrings(normalizedInsts);
+        const flattening = detectControlFlowFlattening(normalizedInsts);
+
+        const detectedPatterns = [...xorLoops, ...stackStrings, ...flattening];
+
+        return {
+          success: true,
+          detected: detectedPatterns.length > 0,
+          patterns: detectedPatterns
+        };
+      }
+
       default:
         throw new Error(`Unsupported bridge action: ${action}`);
     }
   }
+}
+
+function detectXorLoops(instructions: Instruction[]): any[] {
+  const detected: any[] = [];
+  const sortedInsts = [...instructions].sort((a, b) => a.address - b.address);
+  const addrToInst = new Map<number, Instruction>();
+  for (const inst of sortedInsts) {
+    addrToInst.set(inst.address, inst);
+  }
+  for (const inst of sortedInsts) {
+    const mnemonic = inst.mnemonic.toLowerCase();
+    const isJump = InstructionClassifier.isConditionalJump(inst.mnemonic) || 
+                   InstructionClassifier.isUnconditionalJump(inst.mnemonic) ||
+                   mnemonic.startsWith('b') || 
+                   mnemonic.startsWith('j') || 
+                   mnemonic === 'loop';
+    if (!isJump) continue;
+    let target: number | null = null;
+    if (inst.operands) {
+      target = getBranchTarget(inst);
+    }
+    if (target === null && inst.opStr) {
+      const parts = inst.opStr.split(',').map(p => p.trim());
+      for (const part of parts) {
+        if (part.startsWith('0x') || part.startsWith('0X')) {
+          const val = parseInt(part, 16);
+          if (!isNaN(val)) target = val;
+        } else if (/^\d+$/.test(part)) {
+          const val = parseInt(part, 10);
+          if (!isNaN(val)) target = val;
+        }
+      }
+    }
+    if (target !== null && target <= inst.address) {
+      if (!addrToInst.has(target)) continue;
+      for (const loopInst of sortedInsts) {
+        if (loopInst.address >= target && loopInst.address < inst.address) {
+          const loopMnemonic = loopInst.mnemonic.toLowerCase();
+          if (loopMnemonic === 'xor' || loopMnemonic === 'eor') {
+            const ops = loopInst.opStr.split(',').map(s => s.trim().toLowerCase());
+            const isSelfXor = ops.length >= 2 && ops[0] === ops[1];
+            if (!isSelfXor) {
+              let key: string | undefined = undefined;
+              if (ops.length >= 2) {
+                const second = ops[1];
+                if (second.startsWith('0x') || second.startsWith('0X') || /^\d+$/.test(second)) {
+                  key = second;
+                }
+              }
+              detected.push({
+                pattern: 'XOR key-decryption loop',
+                loopStart: target,
+                loopEnd: inst.address,
+                xorAddress: loopInst.address,
+                xorInstruction: `${loopInst.mnemonic} ${loopInst.opStr}`,
+                key,
+                description: `Detected a potential decryption loop starting at 0x${target.toString(16)} and ending with a backward jump at 0x${inst.address.toString(16)}. It contains a non-self XOR instruction at 0x${loopInst.address.toString(16)}: "${loopInst.mnemonic} ${loopInst.opStr}".`,
+                suggestion: `Suggestions for deobfuscation:\n` +
+                  `1. Statically decrypt the data by extracting the encrypted payload from the binary, applying XOR with key ${key || 'detected in loop'}, and patching it back using URET's 'patchBinary' tool.\n` +
+                  `2. Dynamically execute the loop using the 'emulatorControl' or 'patchAndRun' tool to let the loop execute and decrypt the memory automatically, then dump the memory.`
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  return detected;
+}
+
+function detectStackStrings(instructions: Instruction[]): any[] {
+  const detected: any[] = [];
+  const sortedInsts = [...instructions].sort((a, b) => a.address - b.address);
+  
+  function checkIsStackWrite(inst: Instruction): boolean {
+    const mnemonic = inst.mnemonic.toLowerCase();
+    const isMovOrStr = mnemonic.startsWith('mov') || mnemonic.startsWith('str');
+    if (!isMovOrStr) return false;
+    const parts = inst.opStr.split(',').map(p => p.trim());
+    if (parts.length < 2) return false;
+    const dest = parts[0];
+    const src = parts[1];
+    const hasStackReg = /([er]?sp|fp|[er]?bp)/i.test(dest);
+    if (!hasStackReg) return false;
+    const isImm = src.startsWith('0x') || src.startsWith('0X') || /^-?\d+$/.test(src) || src.startsWith('#');
+    return isImm;
+  }
+  
+  function getStackWriteInfo(inst: Instruction): { offset: number; value: bigint; size: number } | null {
+    const parts = inst.opStr.split(',').map(p => p.trim());
+    const dest = parts[0];
+    const src = parts[1];
+    let offset = 0;
+    const offsetMatch = dest.match(/([+-])\s*(0x[0-9a-fA-F]+|\d+)/);
+    if (offsetMatch) {
+      const sign = offsetMatch[1] === '-' ? -1 : 1;
+      const valStr = offsetMatch[2];
+      const val = valStr.startsWith('0x') || valStr.startsWith('0X') ? parseInt(valStr, 16) : parseInt(valStr, 10);
+      offset = sign * val;
+    }
+    let cleanSrc = src;
+    if (src.startsWith('#')) {
+      cleanSrc = src.substring(1).trim();
+    }
+    let value = 0n;
+    if (cleanSrc.startsWith('0x') || cleanSrc.startsWith('0X')) {
+      value = BigInt(cleanSrc);
+    } else if (/^-?\d+$/.test(cleanSrc)) {
+      value = BigInt(cleanSrc);
+    } else {
+      return null;
+    }
+    let size = 1;
+    const destLower = dest.toLowerCase();
+    if (destLower.includes('byte') || inst.mnemonic.toLowerCase() === 'strb') size = 1;
+    else if (destLower.includes('word') && !destLower.includes('dword') || inst.mnemonic.toLowerCase() === 'strh') size = 2;
+    else if (destLower.includes('dword') || inst.mnemonic.toLowerCase() === 'str') size = 4;
+    else if (destLower.includes('qword')) size = 8;
+    else {
+      if (value > 0xffffffffn) size = 8;
+      else if (value > 0xffffn) size = 4;
+      else if (value > 0xffn) size = 2;
+    }
+    return { offset, value, size };
+  }
+  
+  let currentGroup: Instruction[] = [];
+  let gapCount = 0;
+  
+  for (const inst of sortedInsts) {
+    if (checkIsStackWrite(inst)) {
+      currentGroup.push(inst);
+      gapCount = 0;
+    } else {
+      if (currentGroup.length > 0) {
+        gapCount++;
+        if (gapCount > 2) {
+          if (currentGroup.length >= 3) {
+            processGroup(currentGroup);
+          }
+          currentGroup = [];
+          gapCount = 0;
+        }
+      }
+    }
+  }
+  if (currentGroup.length >= 3) {
+    processGroup(currentGroup);
+  }
+  
+  function processGroup(group: Instruction[]) {
+    const stackWrites = group.filter(checkIsStackWrite);
+    if (stackWrites.length < 3) return;
+    const offsetToByte = new Map<number, number>();
+    for (const inst of stackWrites) {
+      const info = getStackWriteInfo(inst);
+      if (info) {
+        const { offset, value, size } = info;
+        let temp = value;
+        for (let i = 0; i < size; i++) {
+          offsetToByte.set(offset + i, Number(temp & 0xffn));
+          temp >>= 8n;
+        }
+      }
+    }
+    const sortedOffsets = Array.from(offsetToByte.keys()).sort((a, b) => a - b);
+    let reconstructed = '';
+    let printableCount = 0;
+    for (const off of sortedOffsets) {
+      const b = offsetToByte.get(off)!;
+      if (b >= 32 && b <= 126) {
+        reconstructed += String.fromCharCode(b);
+        printableCount++;
+      } else if (b === 0) {
+        reconstructed += '\\0';
+      } else {
+        reconstructed += `\\x${b.toString(16).padStart(2, '0')}`;
+      }
+    }
+    if (printableCount >= 3) {
+      detected.push({
+        pattern: 'Stack-string construction',
+        startAddress: stackWrites[0].address,
+        endAddress: stackWrites[stackWrites.length - 1].address + stackWrites[stackWrites.length - 1].size,
+        reconstructedString: reconstructed,
+        instructionsCount: stackWrites.length,
+        description: `Detected successive moves of character constants into stack offsets from address 0x${stackWrites[0].address.toString(16)} to 0x${stackWrites[stackWrites.length - 1].address.toString(16)}.`,
+        suggestion: `Suggestions for deobfuscation:\n` +
+          `1. Reconstructed stack-string value: "${reconstructed}".\n` +
+          `2. Replace the sequence of character assignments with a single string allocation or comment the reconstructed string value above the instructions.`
+      });
+    }
+  }
+  return detected;
+}
+
+function detectControlFlowFlattening(instructions: Instruction[]): any[] {
+  const detected: any[] = [];
+  const blocks = buildCFG(instructions);
+  if (blocks.length < 3) return [];
+  const inDegree = new Map<string, number>();
+  for (const b of blocks) {
+    inDegree.set(b.id, 0);
+  }
+  for (const b of blocks) {
+    for (const succ of b.successors) {
+      inDegree.set(succ, (inDegree.get(succ) || 0) + 1);
+    }
+  }
+  const dispatchers = blocks.filter(b => (inDegree.get(b.id) || 0) >= 3);
+  if (dispatchers.length === 0) return [];
+  
+  const cmpStateStats = new Map<string, Set<string>>();
+  const movStateStats = new Map<string, Set<string>>();
+  
+  for (const inst of instructions) {
+    const mnemonic = inst.mnemonic.toLowerCase();
+    if (mnemonic === 'cmp') {
+      const parts = inst.opStr.split(',').map(s => s.trim());
+      if (parts.length === 2) {
+        const op1 = parts[0];
+        const op2 = parts[1];
+        if (op2.startsWith('0x') || op2.startsWith('0X') || /^-?\d+$/.test(op2) || op2.startsWith('#')) {
+          let cleanOp2 = op2;
+          if (cleanOp2.startsWith('#')) cleanOp2 = cleanOp2.substring(1).trim();
+          if (!cmpStateStats.has(op1)) {
+            cmpStateStats.set(op1, new Set());
+          }
+          cmpStateStats.get(op1)!.add(cleanOp2);
+        }
+      }
+    } else if (mnemonic === 'mov' || mnemonic === 'ldr' || mnemonic === 'str') {
+      const parts = inst.opStr.split(',').map(s => s.trim());
+      if (parts.length === 2) {
+        const op1 = parts[0];
+        const op2 = parts[1];
+        if (op2.startsWith('0x') || op2.startsWith('0X') || /^-?\d+$/.test(op2) || op2.startsWith('#')) {
+          let cleanOp2 = op2;
+          if (cleanOp2.startsWith('#')) cleanOp2 = cleanOp2.substring(1).trim();
+          if (!movStateStats.has(op1)) {
+            movStateStats.set(op1, new Set());
+          }
+          movStateStats.get(op1)!.add(cleanOp2);
+        }
+      }
+    }
+  }
+  for (const [stateVar, cmpVals] of cmpStateStats.entries()) {
+    const movVals = movStateStats.get(stateVar) || new Set<string>();
+    const allVals = new Set([...cmpVals, ...movVals]);
+    if (allVals.size >= 3) {
+      for (const disp of dispatchers) {
+        detected.push({
+          pattern: 'Control Flow Flattening',
+          dispatcherAddress: disp.startAddress,
+          dispatcherBlockId: disp.id,
+          inDegree: inDegree.get(disp.id),
+          stateVariable: stateVar,
+          stateConstants: Array.from(allVals),
+          description: `Detected Control Flow Flattening with dispatcher block at 0x${disp.startAddress.toString(16)} (in-degree ${inDegree.get(disp.id)}). The control flow is driven by state variable "${stateVar}" which has ${allVals.size} unique states.`,
+          suggestion: `Suggestions for deobfuscation:\n` +
+            `1. Trace state transitions dynamically using URET's 'emulatorControl' to execute basic blocks and record the sequence of state variables.\n` +
+            `2. Use symbolic execution ('symbolicExecute') to determine which state values trigger which target blocks, bypassing the dispatcher entirely and reconstructing a clean CFG.`
+        });
+      }
+    }
+  }
+  return detected;
 }

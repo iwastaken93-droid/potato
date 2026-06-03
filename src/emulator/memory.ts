@@ -97,6 +97,18 @@ export class Memory {
     return this.regions;
   }
 
+  getPages(): Map<bigint, Uint8Array> {
+    return this.pages;
+  }
+
+  clearAndLoad(regions: MemoryRegion[], pagesMap: Map<bigint, Uint8Array>): void {
+    this.clear();
+    this.regions = regions;
+    for (const [key, val] of pagesMap.entries()) {
+      this.pages.set(key, val);
+    }
+  }
+
   /**
    * Find a mapped region containing the given virtual address.
    */

@@ -4,6 +4,9 @@ import {
   isFilePath,
   isApiName,
   isUrl,
+  isRegistryKey,
+  isFormatString,
+  isBase64OrHighEntropy,
 } from '../src/analyzer/strings.js';
 
 describe('String Analyzer Helper Tests', () => {
@@ -206,5 +209,24 @@ describe('String Extraction Core Tests', () => {
     expect(apiItem?.tags).toContain('api');
     expect(pathItem?.tags).toContain('filepath');
     expect(plainItem?.tags).toEqual([]);
+  });
+
+  it('should identify registry keys correctly', () => {
+    expect(isRegistryKey('HKEY_LOCAL_MACHINE\\Software\\Microsoft')).toBe(true);
+    expect(isRegistryKey('HKCU\\Console')).toBe(true);
+    expect(isRegistryKey('HKEY_CLASSES_ROOT\\.txt')).toBe(true);
+    expect(isRegistryKey('not_a_registry_key')).toBe(false);
+  });
+
+  it('should identify format strings correctly', () => {
+    expect(isFormatString('Hello %s, count %d')).toBe(true);
+    expect(isFormatString('%x')).toBe(true);
+    expect(isFormatString('no format specifiers here')).toBe(false);
+  });
+
+  it('should identify base64 or high-entropy strings correctly', () => {
+    expect(isBase64OrHighEntropy('aGVsbG93b3JsZDEyMzQ1Ng==')).toBe(true);
+    expect(isBase64OrHighEntropy('0123456789abcdef0123456789abcdef')).toBe(true);
+    expect(isBase64OrHighEntropy('short')).toBe(false);
   });
 });

@@ -19,7 +19,7 @@ DISSECT is designed as a modular, high-performance static and dynamic analysis t
 - [**📊 Static Analyzers (Entropy, Signatures, Search)**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/analyzers.md)
   Details on Shannon entropy calculations, sliding-window signatures (compilers/cryptography/packers), string extraction rules, and xref (cross-reference) analysis.
 - [**💻 Developer Setup & Engineering Guidelines**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/developer_setup.md)
-  Guide on environment prerequisites (`pnpm`), CLI operations, running the test suites (`vitest`), formatting standards (`prettier`), and production packaging (`vite`).
+  Guide on environment prerequisites (`npm`), CLI operations, running the test suites (`vitest`), formatting standards (`prettier`), and production packaging (`vite`).
 
 ---
 

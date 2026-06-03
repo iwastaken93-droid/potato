@@ -781,4 +781,79 @@ describe('VulnScanner Core Tests', () => {
     expect(matches.length).toBe(1);
     expect(matches[0].evidence).toBe('system');
   });
+
+  // Extra Test 45: Process Injection combination (Critical)
+  test('detects critical process injection combination (VirtualAlloc + WriteProcessMemory + CreateRemoteThread)', () => {
+    const symbols: Symbol[] = [
+      { name: 'VirtualAlloc', address: 0x1000, binding: 'global', type: 'function' },
+      { name: 'WriteProcessMemory', address: 0x2000, binding: 'global', type: 'function' },
+      { name: 'CreateRemoteThread', address: 0x3000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
+    const combo = matches.find(m => m.severity === 'critical' && m.description.includes('Process Injection'));
+    expect(combo).toBeDefined();
+    expect(combo!.evidence).toContain('VirtualAlloc');
+    expect(combo!.evidence).toContain('WriteProcessMemory');
+    expect(combo!.evidence).toContain('CreateRemoteThread');
+  });
+
+  // Extra Test 46: Process Injection combination (High)
+  test('detects high process injection combination (VirtualAlloc + WriteProcessMemory)', () => {
+    const symbols: Symbol[] = [
+      { name: 'VirtualAlloc', address: 0x1000, binding: 'global', type: 'function' },
+      { name: 'WriteProcessMemory', address: 0x2000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
+    const combo = matches.find(m => m.severity === 'high' && m.description.includes('Memory Allocation/Protection API'));
+    expect(combo).toBeDefined();
+  });
+
+  // Extra Test 47: Anti-debugging/evasion + Process termination (High)
+  test('detects high severity anti-debugging evasion + process termination combination', () => {
+    const symbols: Symbol[] = [
+      { name: 'IsDebuggerPresent', address: 0x1000, binding: 'global', type: 'function' },
+      { name: 'ExitProcess', address: 0x2000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
+    const combo = matches.find(m => m.severity === 'high' && m.description.includes('Anti-Debugging/Evasion'));
+    expect(combo).toBeDefined();
+    expect(combo!.evidence).toContain('IsDebuggerPresent');
+    expect(combo!.evidence).toContain('ExitProcess');
+  });
+
+  // Extra Test 48: Dynamic library loading + Symbol resolution (High)
+  test('detects high severity dynamic library loading + symbol resolution combination', () => {
+    const symbols: Symbol[] = [
+      { name: 'LoadLibraryA', address: 0x1000, binding: 'global', type: 'function' },
+      { name: 'GetProcAddress', address: 0x2000, binding: 'global', type: 'function' },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], symbols, [], {
+      unsafeApi: true,
+    });
+    const combo = matches.find(m => m.severity === 'high' && m.description.includes('Dynamic Library Loading'));
+    expect(combo).toBeDefined();
+    expect(combo!.evidence).toContain('LoadLibraryA');
+    expect(combo!.evidence).toContain('GetProcAddress');
+  });
+
+  // Extra Test 49: Combo detection via instructions calls
+  test('detects combinations when APIs are called within instructions', () => {
+    const instructions: Instruction[] = [
+      { address: 0x1000, mnemonic: 'call', opStr: 'VirtualAllocEx', size: 5 },
+      { address: 0x1005, mnemonic: 'call', opStr: 'CreateRemoteThreadEx', size: 5 },
+    ];
+    const matches = scanner.scan(new Uint8Array(0), [], [], instructions, {
+      unsafeApi: true,
+    });
+    const combo = matches.find(m => m.severity === 'critical' && m.description.includes('Process Injection'));
+    expect(combo).toBeDefined();
+    expect(combo!.evidence).toContain('VirtualAllocEx');
+    expect(combo!.evidence).toContain('CreateRemoteThreadEx');
+  });
 });

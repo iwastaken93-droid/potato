@@ -307,3 +307,72 @@ export function extractStrings(
 
   return results;
 }
+
+/**
+ * Calculates Shannon entropy of a string.
+ */
+export function getStringEntropy(str: string): number {
+  const len = str.length;
+  if (len === 0) return 0;
+  const counts = new Map<string, number>();
+  for (let i = 0; i < len; i++) {
+    const char = str[i];
+    counts.set(char, (counts.get(char) ?? 0) + 1);
+  }
+  let entropy = 0;
+  for (const count of counts.values()) {
+    const p = count / len;
+    entropy -= p * Math.log2(p);
+  }
+  return entropy;
+}
+
+/**
+ * Detects if a string is base64 or has high entropy.
+ */
+export function isBase64OrHighEntropy(str: string): boolean {
+  if (str.length < 12) return false;
+  
+  const entropy = getStringEntropy(str);
+  
+  // Base64 check
+  const isBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(str);
+  if (isBase64 && str.length >= 16) {
+    let categories = 0;
+    if (/[a-z]/.test(str)) categories++;
+    if (/[A-Z]/.test(str)) categories++;
+    if (/[0-9]/.test(str)) categories++;
+    if (/[+/=]/.test(str)) categories++;
+    if (categories >= 3 && entropy >= 3.5) {
+      return true;
+    }
+  }
+  
+  // Hex key check
+  const isHex = /^[0-9a-fA-F]+$/.test(str);
+  if (isHex && str.length >= 16 && entropy >= 3.0) {
+    return true;
+  }
+  
+  // General high entropy
+  if (str.length >= 16 && entropy >= 4.5) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Detects if a string is a registry key starting with HKEY_... (or HK...)
+ */
+export function isRegistryKey(str: string): boolean {
+  return /^(HKEY_LOCAL_MACHINE|HKEY_CURRENT_USER|HKEY_CLASSES_ROOT|HKEY_USERS|HKEY_CURRENT_CONFIG|HKLM|HKCU|HKCR|HKU|HKCC)(\\[a-zA-Z0-9_\-\s.]+)*$/i.test(str) || /^HKEY_/i.test(str);
+}
+
+/**
+ * Detects if a string is a format string containing %s, %d, or other format specifiers.
+ */
+export function isFormatString(str: string): boolean {
+  return /%[0-9.-]*[sdfxXupgGcs]/i.test(str);
+}
+

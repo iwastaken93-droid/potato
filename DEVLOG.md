@@ -2440,12 +2440,10 @@ Run git diff to list unstaged modified files.
 - Checked git status.
 - Found unstaged changes in [DEVLOG.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/DEVLOG.md).
 
-
 ## [2026-06-02T16:19:32+10:00] Verification
 - Verify no configuration files have unstaged changes.
 - Result: Confirmed. No configuration file has unstaged changes.
 
- 
 ## [2026-06-02 16:20:18] Subagent Finish  
 - Staging and committing [DEVLOG.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/DEVLOG.md). 
 
@@ -2453,12 +2451,6 @@ Run git diff to list unstaged modified files.
 - Run git status.
 - No tracked source code files modified.
 - Only [DEVLOG.md](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/DEVLOG.md) modified.
-
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
-
-## [2026-05-31 07:46:00] - Implemented Z80 and 6502 retro instruction decoders
-
 
 ## [${now}] - Session 22 Handoff prep & Verification
 - Verified Java class parser LineNumberTable and LocalVariableTable parsing in src/parser/javaClass.ts.
@@ -2514,5 +2506,16 @@ Run git diff to list unstaged modified files.
 - Update DEVLOG.md with session summary.
 - Git commit command failed due to local CLI runner permission restrictions.
 
+## [2026-06-02 21:50] - Implement analyzeStrings Classifier
+- Defined `analyzeStrings` tool in `TOOL_SCHEMAS` in [src/analyzer/aiBridge.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/aiBridge.ts)
+- Created helper functions `isRegistryKey`, `isFormatString`, `getStringEntropy`, and `isBase64OrHighEntropy` in [src/analyzer/strings.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/strings.ts)
+- Implemented `analyzeStrings` case in `aiBridge.ts` to categorize extracted strings into URLs, Windows/Linux file paths, registry keys, base64/high-entropy strings, and format strings
+- Added unit tests in [tests/strings.test.ts](file:///c/Users/NaThA/hacks/sbx/potato/tests/strings.test.ts) and [tests/aiBridge.test.ts](file:///c/Users/NaThA/hacks/sbx/potato/tests/aiBridge.test.ts)
+- Verified all tests pass successfully
 
-
+## [2026-06-03 03:05] - Implement findFunctions Boundary Detection
+- Defined `findFunctions` tool in `TOOL_SCHEMAS` in [src/analyzer/aiBridge.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/aiBridge.ts) accepting optional `section` and `arch`.
+- Implemented prologue signature scanner (stack frameworks like push rbp; mov rbp, rsp; push rdi/rsi; sub rsp, imm, etc.) for both x86/x86_64 and ARM.
+- Formulated function boundaries `{ startVA, endVA, estimatedName }` by scanning and matching instructions.
+- Fixed a ReferenceError in `callTree` case (re-declared `sections` and `symbols`).
+- Added unit tests in [tests/aiBridge.test.ts](file:///c/Users/NaThA/hacks/sbx/potato/tests/aiBridge.test.ts).

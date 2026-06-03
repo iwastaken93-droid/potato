@@ -16,8 +16,8 @@ export interface VulnMatch {
     | 'buffer_overflow'
     | 'integer_overflow'
     | 'format_string';
-  /** Severity: 'high' | 'medium' | 'low' */
-  severity: 'high' | 'medium' | 'low';
+  /** Severity: 'critical' | 'high' | 'medium' | 'low' */
+  severity: 'critical' | 'high' | 'medium' | 'low';
   /** Human readable description */
   description: string;
   /** Address where the vulnerability was detected, if applicable */
@@ -43,7 +43,7 @@ export class VulnScanner {
    */
   private static UNSAFE_APIS = new Map<
     string,
-    { severity: 'high' | 'medium'; desc: string }
+    { severity: 'critical' | 'high' | 'medium'; desc: string }
   >([
     [
       'strcpy',
@@ -371,41 +371,106 @@ export class VulnScanner {
     }
 
     // 4. API Combination Risk Scoring
-    const cleanSymNames = new Set(symbols.map(s => this.cleanSymbolName(s.name)));
+    const detectedApis = new Set<string>();
+    for (const sym of symbols) {
+      detectedApis.add(this.cleanSymbolName(sym.name));
+    }
+    for (const inst of instructions) {
+      const isCall =
+        inst.mnemonic.toLowerCase() === 'call' ||
+        inst.mnemonic.toLowerCase().startsWith('jmp');
+      if (isCall && inst.opStr) {
+        const dest = inst.opStr.trim();
+        detectedApis.add(this.cleanSymbolName(dest));
+      }
+    }
 
-    const hasMemAlloc = cleanSymNames.has('VirtualAlloc') || cleanSymNames.has('VirtualProtect') || cleanSymNames.has('VirtualAllocEx');
-    const hasExecution = cleanSymNames.has('system') || cleanSymNames.has('CreateProcess') || cleanSymNames.has('CreateProcessA') || cleanSymNames.has('CreateProcessW') || cleanSymNames.has('ShellExecute') || cleanSymNames.has('ShellExecuteA') || cleanSymNames.has('ShellExecuteW') || cleanSymNames.has('CreateRemoteThread') || cleanSymNames.has('WriteProcessMemory') || cleanSymNames.has('execve');
+    const allocApis = new Set(['VirtualAlloc', 'VirtualAllocEx', 'NtAllocateVirtualMemory', 'VirtualProtect', 'VirtualProtectEx', 'NtProtectVirtualMemory']);
+    const writeApis = new Set(['WriteProcessMemory', 'NtWriteVirtualMemory']);
+    const executeApis = new Set(['CreateRemoteThread', 'CreateRemoteThreadEx', 'NtCreateThreadEx', 'RtlCreateUserThread', 'QueueUserAPC']);
+    const genericExecApis = new Set(['system', 'CreateProcess', 'CreateProcessA', 'CreateProcessW', 'ShellExecute', 'ShellExecuteA', 'ShellExecuteW', 'execve', 'WinExec']);
 
-    if (hasMemAlloc && hasExecution) {
+    const foundAlloc = Array.from(detectedApis).filter(name => allocApis.has(name));
+    const foundWrite = Array.from(detectedApis).filter(name => writeApis.has(name));
+    const foundExecute = Array.from(detectedApis).filter(name => executeApis.has(name));
+    const foundGenericExec = Array.from(detectedApis).filter(name => genericExecApis.has(name));
+
+    // Case A: Full Injection / Memory Write & Remote Execution (Critical)
+    if (foundAlloc.length > 0 && foundWrite.length > 0 && foundExecute.length > 0) {
+      matches.push({
+        category: 'unsafe_api',
+        severity: 'critical',
+        description: `Critical Process Injection Combo: Memory Allocation/Protection API (${foundAlloc.join('/')}) + Writing Memory API (${foundWrite.join('/')}) + Thread Execution API (${foundExecute.join('/')}) detected. Indicative of code/shellcode injection.`,
+        evidence: [...foundAlloc, ...foundWrite, ...foundExecute].join(', ')
+      });
+    }
+    // Case B: Memory Allocation & Remote Thread Execution (Critical)
+    else if (foundAlloc.length > 0 && foundExecute.length > 0) {
+      matches.push({
+        category: 'unsafe_api',
+        severity: 'critical',
+        description: `Critical Process Injection Combo: Memory Allocation/Protection API (${foundAlloc.join('/')}) + Thread Execution API (${foundExecute.join('/')}) detected. Indicative of dynamic remote thread execution.`,
+        evidence: [...foundAlloc, ...foundExecute].join(', ')
+      });
+    }
+    // Case C: Memory Allocation & Writing Memory (High)
+    else if (foundAlloc.length > 0 && foundWrite.length > 0) {
       matches.push({
         category: 'unsafe_api',
         severity: 'high',
-        description: 'Dangerous API combination: Memory allocation/protection API (VirtualAlloc/VirtualProtect) + Execution/Injection API (system/CreateProcess/CreateRemoteThread/WriteProcessMemory) detected. Often indicative of dynamic shellcode loading and execution.',
-        evidence: Array.from(cleanSymNames).filter(name => ['VirtualAlloc', 'VirtualProtect', 'VirtualAllocEx', 'system', 'CreateProcess', 'CreateProcessA', 'CreateProcessW', 'ShellExecute', 'ShellExecuteA', 'ShellExecuteW', 'CreateRemoteThread', 'WriteProcessMemory', 'execve'].includes(name)).join(', ')
+        description: `High risk combination: Memory Allocation/Protection API (${foundAlloc.join('/')}) + Writing Memory API (${foundWrite.join('/')}) detected. Often used for setting up dynamic execution payloads.`,
+        evidence: [...foundAlloc, ...foundWrite].join(', ')
+      });
+    }
+    // Case D: Writing Memory & Thread Execution (High)
+    else if (foundWrite.length > 0 && foundExecute.length > 0) {
+      matches.push({
+        category: 'unsafe_api',
+        severity: 'high',
+        description: `High risk combination: Writing Memory API (${foundWrite.join('/')}) + Thread Execution API (${foundExecute.join('/')}) detected. Often used to execute payloads in remote processes.`,
+        evidence: [...foundWrite, ...foundExecute].join(', ')
       });
     }
 
-    const hasAntiDebug = cleanSymNames.has('IsDebuggerPresent') || cleanSymNames.has('CheckRemoteDebuggerPresent') || cleanSymNames.has('NtQueryInformationProcess') || cleanSymNames.has('ptrace');
-    const hasExit = cleanSymNames.has('TerminateProcess') || cleanSymNames.has('ExitProcess') || cleanSymNames.has('exit') || cleanSymNames.has('_exit');
-
-    if (hasAntiDebug && hasExit) {
+    // Case E: Memory Allocation & Generic Execution / Process Creation (High)
+    if (foundAlloc.length > 0 && foundGenericExec.length > 0) {
       matches.push({
         category: 'unsafe_api',
-        severity: 'medium',
-        description: 'Suspicious API combination: Anti-debugging/evasion API (IsDebuggerPresent/NtQueryInformationProcess/ptrace) + Process termination API (TerminateProcess/ExitProcess/exit) detected. Often indicative of anti-analysis or VM evasion checks.',
-        evidence: Array.from(cleanSymNames).filter(name => ['IsDebuggerPresent', 'CheckRemoteDebuggerPresent', 'NtQueryInformationProcess', 'ptrace', 'TerminateProcess', 'ExitProcess', 'exit', '_exit'].includes(name)).join(', ')
+        severity: 'high',
+        description: `High risk combination: Memory Allocation/Protection API (${foundAlloc.join('/')}) + Process Execution/Creation API (${foundGenericExec.join('/')}) detected. Often used for process hollowing or dynamic payload execution.`,
+        evidence: [...foundAlloc, ...foundGenericExec].join(', ')
       });
     }
 
-    const hasLoadLib = cleanSymNames.has('LoadLibrary') || cleanSymNames.has('LoadLibraryA') || cleanSymNames.has('LoadLibraryW') || cleanSymNames.has('dlopen');
-    const hasGetProc = cleanSymNames.has('GetProcAddress') || cleanSymNames.has('dlsym');
+    // Case F: Anti-Debugging / Evasion + Process Termination (High)
+    const antiDebugApis = new Set(['IsDebuggerPresent', 'CheckRemoteDebuggerPresent', 'NtQueryInformationProcess', 'ptrace', 'FindWindow', 'FindWindowA', 'FindWindowW', 'GetSystemMetrics']);
+    const exitApis = new Set(['TerminateProcess', 'ExitProcess', 'exit', '_exit', 'abort']);
 
-    if (hasLoadLib && hasGetProc) {
+    const foundAntiDebug = Array.from(detectedApis).filter(name => antiDebugApis.has(name));
+    const foundExit = Array.from(detectedApis).filter(name => exitApis.has(name));
+
+    if (foundAntiDebug.length > 0 && foundExit.length > 0) {
       matches.push({
         category: 'unsafe_api',
-        severity: 'medium',
-        description: 'Evasive API combination: Dynamic library load API (LoadLibrary/dlopen) + Symbol resolution API (GetProcAddress/dlsym) detected. Often used to dynamically resolve and call API functions to evade static analysis.',
-        evidence: Array.from(cleanSymNames).filter(name => ['LoadLibrary', 'LoadLibraryA', 'LoadLibraryW', 'dlopen', 'GetProcAddress', 'dlsym'].includes(name)).join(', ')
+        severity: 'high',
+        description: `High risk combination: Anti-Debugging/Evasion API (${foundAntiDebug.join('/')}) + Process Termination API (${foundExit.join('/')}) detected. Indicative of anti-analysis or sandbox evasion execution paths.`,
+        evidence: [...foundAntiDebug, ...foundExit].join(', ')
+      });
+    }
+
+    // Case G: Dynamic Library Loading + Symbol Resolution (High)
+    const loadLibApis = new Set(['LoadLibrary', 'LoadLibraryA', 'LoadLibraryW', 'LoadLibraryEx', 'LoadLibraryExA', 'LoadLibraryExW', 'dlopen']);
+    const getProcApis = new Set(['GetProcAddress', 'dlsym']);
+
+    const foundLoadLib = Array.from(detectedApis).filter(name => loadLibApis.has(name));
+    const foundGetProc = Array.from(detectedApis).filter(name => getProcApis.has(name));
+
+    if (foundLoadLib.length > 0 && foundGetProc.length > 0) {
+      matches.push({
+        category: 'unsafe_api',
+        severity: 'high',
+        description: `High risk combination: Dynamic Library Loading API (${foundLoadLib.join('/')}) + Symbol Resolution API (${foundGetProc.join('/')}) detected. Often used to dynamically resolve functions to evade static analysis.`,
+        evidence: [...foundLoadLib, ...foundGetProc].join(', ')
       });
     }
 

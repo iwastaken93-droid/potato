@@ -67,7 +67,7 @@ graph TD
 
 ## 💻 1. CPU Register Banks & Sub-Register Aliasing
 
-The [CPU](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L125) class manages x86_64 general-purpose registers (GPRs) and flag states. In x86_64 architecture, smaller registers map directly to sub-sections of larger 64-bit registers. DISSECT models this structure with precise bit-masking and bit-shifting.
+The [CPU](file:///home/myname/projects/potato/src/emulator/cpu.ts#L125) class manages x86_64 general-purpose registers (GPRs) and flag states. In x86_64 architecture, smaller registers map directly to sub-sections of larger 64-bit registers. DISSECT models this structure with precise bit-masking and bit-shifting.
 
 ### Sub-Register Aliasing Layout
 
@@ -119,7 +119,7 @@ The following table documents how sub-registers map to their parent 64-bit GPR, 
 
 ### Register Write Rules & Bitwise Manipulation Formulas
 
-When writing to a register, the [CPU.write()](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L185) method processes writes using these rules:
+When writing to a register, the [CPU.write()](file:///home/myname/projects/potato/src/emulator/cpu.ts#L185) method processes writes using these rules:
 
 1. **64-bit Writes**:
    The value is masked to 64 bits and directly written to the register slot.
@@ -128,7 +128,7 @@ When writing to a register, the [CPU.write()](file:///c/Users/NaThA/hacks/sbx/po
 2. **32-bit Writes (Zero-Extension Rule)**:
    In x86_64, any write to a 32-bit register (such as `eax` or `r8d`) automatically clears the upper 32 bits of the parent register.
    $$\text{Reg}[\text{parent}] = \text{value} \ \& \ \text{0xFFFFFFFFN}$$
-   *(Note: The `zeroExtend` flag is set to `true` for 32-bit sub-registers in [SUB_REG_MAP](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L51)).*
+   *(Note: The `zeroExtend` flag is set to `true` for 32-bit sub-registers in [SUB_REG_MAP](file:///home/myname/projects/potato/src/emulator/cpu.ts#L51)).*
 
 3. **16-bit and 8-bit Writes (Preservation Rule)**:
    Writing to a 16-bit register (e.g. `ax`), an 8-bit low register (e.g. `al`), or an 8-bit high register (e.g. `ah`) preserves all other bits of the 64-bit parent register.
@@ -141,7 +141,7 @@ When writing to a register, the [CPU.write()](file:///c/Users/NaThA/hacks/sbx/po
 
 ### The `rflags` Status Flags
 
-The [RFlag](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L30) enum maps specific bits within the 64-bit `rflags` register:
+The [RFlag](file:///home/myname/projects/potato/src/emulator/cpu.ts#L30) enum maps specific bits within the 64-bit `rflags` register:
 
 | Flag Name | Enum Constant | Bit Position | Description |
 | :--- | :--- | :--- | :--- |
@@ -156,14 +156,14 @@ The [RFlag](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L30) enum
 | **Overflow Flag (OF)** | `OF = 1 << 11` | Bit 11 | Set if signed integer overflow occurred. |
 
 The flags are retrieved and modified using helper methods:
-- [CPU.getFlag(flag)](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L225): Retrieves if a specific flag is set via bitwise AND `(rflags & flag) !== 0`.
-- [CPU.setFlag(flag, value)](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L233): Sets or clears a flag using bitwise OR/AND operations.
+- [CPU.getFlag(flag)](file:///home/myname/projects/potato/src/emulator/cpu.ts#L225): Retrieves if a specific flag is set via bitwise AND `(rflags & flag) !== 0`.
+- [CPU.setFlag(flag, value)](file:///home/myname/projects/potato/src/emulator/cpu.ts#L233): Sets or clears a flag using bitwise OR/AND operations.
 
 ---
 
 ## 🧠 2. Page-Aligned Virtual Memory Model
 
-The [Memory](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts#L25) class implements page-based address translation and permission enforcement. Rather than allocating a single monolithic array, it splits virtual memory space into discrete pages.
+The [Memory](file:///home/myname/projects/potato/src/emulator/memory.ts#L25) class implements page-based address translation and permission enforcement. Rather than allocating a single monolithic array, it splits virtual memory space into discrete pages.
 
 ### Page Directory Map and Translation
 
@@ -198,7 +198,7 @@ Virtual Address (64-Bit)
 
 ### Memory Regions & Permissions Enforcement
 
-The emulator maintains a table of [MemoryRegion](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts#L3) metadata objects. Each region defines:
+The emulator maintains a table of [MemoryRegion](file:///home/myname/projects/potato/src/emulator/memory.ts#L3) metadata objects. Each region defines:
 - **`address`**: The virtual base address.
 - **`size`**: The total byte size.
 - **`name`**: The region/segment name (e.g., `.text`, `.data`, `[stack]`).
@@ -206,13 +206,13 @@ The emulator maintains a table of [MemoryRegion](file:///c/Users/NaThA/hacks/sbx
 
 #### Access Control Flow & Strict Mode
 
-Whenever a read, write, or fetch is issued, the [Memory.checkPermission(address, accessType)](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts#L149) method validates the request:
+Whenever a read, write, or fetch is issued, the [Memory.checkPermission(address, accessType)](file:///home/myname/projects/potato/src/emulator/memory.ts#L149) method validates the request:
 1. It calls `getRegionAt(address)` to find the mapped region enclosing the address.
 2. If a region is found:
    - It checks the region's permission flags for the requested `accessType` (`read`, `write`, or `execute`).
-   - If the flag is `false`, it throws a [MemoryAccessError](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts#L14).
+   - If the flag is `false`, it throws a [MemoryAccessError](file:///home/myname/projects/potato/src/emulator/memory.ts#L14).
 3. If no region is found containing the address:
-   - If `strictMode` is set to `true`, it immediately throws a [MemoryAccessError](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts#L14) (simulating a standard Unix **Segmentation Fault**).
+   - If `strictMode` is set to `true`, it immediately throws a [MemoryAccessError](file:///home/myname/projects/potato/src/emulator/memory.ts#L14) (simulating a standard Unix **Segmentation Fault**).
    - If `strictMode` is `false`, the operation is permitted (useful during relaxed analysis).
 
 ### Little-Endian Endianness
@@ -234,7 +234,7 @@ All multibyte read/write operations perform bitwise encoding/decoding as Little-
 
 ## ⚙️ 3. Instruction Interpreter & Execution Loop
 
-The [Emulator](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/emulator.ts) class runs the core fetch-decode-execute instruction interpreter cycle.
+The [Emulator](file:///home/myname/projects/potato/src/emulator/emulator.ts) class runs the core fetch-decode-execute instruction interpreter cycle.
 
 ### Operand Address Resolution
 

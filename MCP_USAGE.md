@@ -33,7 +33,7 @@ To register the URET MCP server with Claude Desktop, edit your `claude_desktop_c
 Add the server configuration under the `mcpServers` key:
 
 ### Option A: Using the Compiled JavaScript (Recommended)
-Make sure to replace `C:/Users/NaThA/hacks/antigravity_things/agy/test` with the absolute path of your workspace.
+Make sure to replace `/home/myname/projects/potato` with the absolute path of your workspace.
 
 ```json
 {
@@ -41,7 +41,7 @@ Make sure to replace `C:/Users/NaThA/hacks/antigravity_things/agy/test` with the
     "uret-server": {
       "command": "node",
       "args": [
-        "C:/Users/NaThA/hacks/antigravity_things/agy/test/dist/mcp-server.js"
+        "/home/myname/projects/potato/dist/mcp-server.js"
       ]
     }
   }
@@ -57,7 +57,7 @@ Make sure to replace `C:/Users/NaThA/hacks/antigravity_things/agy/test` with the
       "args": [
         "-y",
         "tsx",
-        "C:/Users/NaThA/hacks/antigravity_things/agy/test/src/mcp-server.ts"
+        "/home/myname/projects/potato/src/mcp-server.ts"
       ]
     }
   }
@@ -213,6 +213,27 @@ Execute a series of URET tools in sequence, passing outputs from one tool as inp
   * `pipeline` (array, required): Array of step objects:
     * `tool` (string, required): Name of the tool to execute.
     * `params` (object, required): Parameters for the tool, supporting `$$prev.property$$` placeholder resolution.
+
+### 20. `analyzeExports`
+Parse PE/ELF binary and extract all exported symbols (ordinals, names, addresses). Supports PE and ELF formats.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded executable binary. Optional if a binary is loaded in the session.
+  * `format` (string, optional): Format of the binary (`elf`, `pe`, `auto`, default: `auto`).
+
+### 21. `analyzeResources`
+Parse PE binary resources (.rsrc) and extract manifests, strings, and version headers. Supports PE format only.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded executable binary. Optional if a binary is loaded in the session.
+
+### 22. `importRiskAnalyzer`
+Analyze the imported APIs and instructions of a binary for potential security risks and process injection techniques, computing an overall risk score and returning detected risk combinations.
+* **Arguments:**
+  * `data` (string, optional): Hex or Base64 encoded binary data to analyze. Optional if a binary is loaded in the session.
+  * `importNames` (array of strings, optional): Optional list of import names to scan directly.
+
+### 23. `getSessionStatus`
+Get the current session status, detailing any loaded binary, its format, architecture, file size, and entry point.
+* **Arguments:** None.
 
 ---
 

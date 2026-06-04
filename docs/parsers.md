@@ -8,22 +8,22 @@ DISSECT implements zero-dependency, robust parsers for major executable formats 
 
 | Format | Module File | Description | Magic Numbers |
 | :--- | :--- | :--- | :--- |
-| **ELF** | [elf.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/elf.ts) | Executable and Linkable Format (Linux/BSD/Unix) | `7f 45 4c 46` (`\x7fELF`) |
-| **PE** | [pe.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/pe.ts) | Portable Executable (Windows PE32/PE32+) | `4d 5a` (`MZ` header) |
-| **Mach-O** | [macho.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/macho.ts) | Mach Object (macOS/iOS/Darwin Executable) | `fe ed fa ce`, `fe ed fa cf` |
-| **Java Class** | [javaClass.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/javaClass.ts) | Java Virtual Machine Class File Format | `ca fe ba be` |
-| **DEX** | [dex.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/dex.ts) | Dalvik Executable (Android bytecode) | `64 65 78 0a` (`dex\n`) |
-| **WASM** | [wasm.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/wasm.ts) | WebAssembly Binary Module | `00 61 73 6d` (`\x00asm`) |
+| **ELF** | [elf.ts](file:///home/myname/projects/potato/src/parser/elf.ts) | Executable and Linkable Format (Linux/BSD/Unix) | `7f 45 4c 46` (`\x7fELF`) |
+| **PE** | [pe.ts](file:///home/myname/projects/potato/src/parser/pe.ts) | Portable Executable (Windows PE32/PE32+) | `4d 5a` (`MZ` header) |
+| **Mach-O** | [macho.ts](file:///home/myname/projects/potato/src/parser/macho.ts) | Mach Object (macOS/iOS/Darwin Executable) | `fe ed fa ce`, `fe ed fa cf` |
+| **Java Class** | [javaClass.ts](file:///home/myname/projects/potato/src/parser/javaClass.ts) | Java Virtual Machine Class File Format | `ca fe ba be` |
+| **DEX** | [dex.ts](file:///home/myname/projects/potato/src/parser/dex.ts) | Dalvik Executable (Android bytecode) | `64 65 78 0a` (`dex\n`) |
+| **WASM** | [wasm.ts](file:///home/myname/projects/potato/src/parser/wasm.ts) | WebAssembly Binary Module | `00 61 73 6d` (`\x00asm`) |
 
 ### Specialized & Helper Parsers
 
-- **COFF Header Parser**: [coff.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/coff.ts) parses standalone Common Object File Format (COFF) objects.
-- **DWARF Debug Symbols**: [dwarfParser.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/dwarfParser.ts) decodes DWARF v2-v5 debug tables.
-- **.NET Metadata**: [dotnetMetadata.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/dotnetMetadata.ts) parses CLI headers, metadata tables, and streams.
-- **Mach-O Objective-C Metadata**: [machoObjc.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/machoObjc.ts) extracts classes, methods, and protocols.
-- **Mach-O Code Signature**: [machoSignature.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/machoSignature.ts) extracts and parses signature blobs.
-- **Static Archive Reader**: [archive.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/archive.ts) parses UNIX ar formats (e.g. `.a` static libraries).
-- **Intel Hex Loader**: [hexLoader.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/hexLoader.ts) parses standard hex dumps into byte arrays.
+- **COFF Header Parser**: [coff.ts](file:///home/myname/projects/potato/src/parser/coff.ts) parses standalone Common Object File Format (COFF) objects.
+- **DWARF Debug Symbols**: [dwarfParser.ts](file:///home/myname/projects/potato/src/parser/dwarfParser.ts) decodes DWARF v2-v5 debug tables.
+- **.NET Metadata**: [dotnetMetadata.ts](file:///home/myname/projects/potato/src/parser/dotnetMetadata.ts) parses CLI headers, metadata tables, and streams.
+- **Mach-O Objective-C Metadata**: [machoObjc.ts](file:///home/myname/projects/potato/src/parser/machoObjc.ts) extracts classes, methods, and protocols.
+- **Mach-O Code Signature**: [machoSignature.ts](file:///home/myname/projects/potato/src/parser/machoSignature.ts) extracts and parses signature blobs.
+- **Static Archive Reader**: [archive.ts](file:///home/myname/projects/potato/src/parser/archive.ts) parses UNIX ar formats (e.g. `.a` static libraries).
+- **Intel Hex Loader**: [hexLoader.ts](file:///home/myname/projects/potato/src/parser/hexLoader.ts) parses standard hex dumps into byte arrays.
 
 ---
 
@@ -179,7 +179,7 @@ graph TD
 
 ## 📜 Class & Method API Listings
 
-### ELF Parser ([elf.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/elf.ts))
+### ELF Parser ([elf.ts](file:///home/myname/projects/potato/src/parser/elf.ts))
 
 #### Functions
 - `parseElf(arrayBuffer: ArrayBuffer): ParsedElf`
@@ -265,7 +265,7 @@ export interface ParsedElf {
 }
 ```
 
-### PE Parser ([pe.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/pe.ts))
+### PE Parser ([pe.ts](file:///home/myname/projects/potato/src/parser/pe.ts))
 
 #### Classes
 - `PEParser`
@@ -368,7 +368,7 @@ export interface ParsedPE {
 }
 ```
 
-### Mach-O Parser ([macho.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/macho.ts))
+### Mach-O Parser ([macho.ts](file:///home/myname/projects/potato/src/parser/macho.ts))
 
 #### Classes
 - `MachoParser`
@@ -438,7 +438,7 @@ export interface ParsedMacho {
 }
 ```
 
-### Java Class Parser ([javaClass.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/javaClass.ts))
+### Java Class Parser ([javaClass.ts](file:///home/myname/projects/potato/src/parser/javaClass.ts))
 
 #### Functions
 - `parseJavaClass(arrayBuffer: ArrayBuffer): ParsedJavaClass`

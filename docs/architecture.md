@@ -73,7 +73,7 @@ graph TD
 
 ### 1. File Ingestion & Auto-Detection
 
-The user uploads a binary file (via drag-and-drop or select file). The coordinator ([main.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/main.ts)) reads the data as a `Uint8Array`. The raw array is sent directly to `DisassemblerRouter.detectArchitecture()` which inspects file header magic bytes to resolve the source format:
+The user uploads a binary file (via drag-and-drop or select file). The coordinator ([main.ts](file:///home/myname/projects/potato/src/main.ts)) reads the data as a `Uint8Array`. The raw array is sent directly to `DisassemblerRouter.detectArchitecture()` which inspects file header magic bytes to resolve the source format:
 
 - **ELF**: `\x7FELF`
 - **PE**: `MZ` header (with COFF signature check)
@@ -83,7 +83,7 @@ The user uploads a binary file (via drag-and-drop or select file). The coordinat
 
 ### 2. Format Parsing & Section Normalization
 
-Once the format is determined, the corresponding parser (such as [pe.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/pe.ts) or [macho.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/macho.ts)) executes:
+Once the format is determined, the corresponding parser (such as [pe.ts](file:///home/myname/projects/potato/src/parser/pe.ts) or [macho.ts](file:///home/myname/projects/potato/src/parser/macho.ts)) executes:
 
 - Reads headers, directories, load commands, or bytecode sections.
 - Populates a list of section metadata (virtual addresses, file offsets, raw bytes, read/write/execute permissions).
@@ -109,7 +109,7 @@ Concurrently, the raw executable undergoes static analysis in the background:
 
 If execution simulation is requested:
 
-- The parser sections are mapped into the virtual CPU's [Memory](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts) pages using configured permissions (R, W, X).
+- The parser sections are mapped into the virtual CPU's [Memory](file:///home/myname/projects/potato/src/emulator/memory.ts) pages using configured permissions (R, W, X).
 - The registers are initialized, including stack pointer (`rsp`) and program counter (`rip`).
 - The emulator executes commands sequentially, translating memory lookups, modifying flag bits (`ZF`, `CF`, `SF`, etc.), and enforcing memory bounds.
 
@@ -117,7 +117,7 @@ If execution simulation is requested:
 
 ## ⚡ 6. UI Panel Coordinator & Lazy-Loading Architecture
 
-The frontend of DISSECT is governed by the [PanelCoordinator](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelCoordinator.ts) class. In order to optimize application startup times, memory consumption, and execution cycles, the user interface features a robust lazy-loading architecture.
+The frontend of DISSECT is governed by the [PanelCoordinator](file:///home/myname/projects/potato/src/ui/panelCoordinator.ts) class. In order to optimize application startup times, memory consumption, and execution cycles, the user interface features a robust lazy-loading architecture.
 
 ### Conceptual Lazy Loading Architecture Diagram
 
@@ -147,16 +147,16 @@ The frontend of DISSECT is governed by the [PanelCoordinator](file:///c/Users/Na
 The lazy-loading system integrates three core software design patterns:
 
 1. **Decoupled Dynamic Module Loading (ES Imports)**:
-   To prevent large visual components (such as [CFGVisualizer](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/cfgVisualizer.ts) or [EmulatorPanel](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/emulatorPanel.ts)) from bloating the initial JavaScript package size, heavy panels are imported dynamically on-demand using modern ES import syntax.
+   To prevent large visual components (such as [CFGVisualizer](file:///home/myname/projects/potato/src/ui/cfgVisualizer.ts) or [EmulatorPanel](file:///home/myname/projects/potato/src/ui/emulatorPanel.ts)) from bloating the initial JavaScript package size, heavy panels are imported dynamically on-demand using modern ES import syntax.
 2. **Global Panel Registry Cache**:
-   The registry [PANEL_REGISTRY](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelRegistry.ts) cache acts as a shared lookup object. Once a dynamic module loads, its class registration is stored globally so subsequent tab switches avoid unnecessary network overhead.
+   The registry [PANEL_REGISTRY](file:///home/myname/projects/potato/src/ui/panelRegistry.ts) cache acts as a shared lookup object. Once a dynamic module loads, its class registration is stored globally so subsequent tab switches avoid unnecessary network overhead.
 3. **Dirty-State Lifecycle Tracking**:
    Rather than updating all visual panels concurrently whenever a new binary is loaded, the `PanelCoordinator` marks all inactive panels as "dirty" via boolean flags (e.g. `cfgNeedsUpdate = true`). The panels are only refreshed when they are actually viewed.
 
 ### Lazy-Loading Lifecycle Mechanics
 
 #### 1. Ingestion and Dirty Marking
-When a binary loads, the coordinator runs [onBinaryLoaded()](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelCoordinator.ts#L112), resetting all panel dirty flags to `true`:
+When a binary loads, the coordinator runs [onBinaryLoaded()](file:///home/myname/projects/potato/src/ui/panelCoordinator.ts#L112), resetting all panel dirty flags to `true`:
 ```typescript
 this.cfgNeedsUpdate = true;
 this.emulatorNeedsUpdate = true;
@@ -166,7 +166,7 @@ this.collabNeedsUpdate = true;
 Only the primary tabs (Hex Viewer, Assembly View, Strings View) are eagerly initialized.
 
 #### 2. Tab Routing & Active Tab Dispatch
-When the user switches tabs, `handleTabChange` is invoked, which subsequently triggers [updateActiveTabPanel()](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelCoordinator.ts#L149):
+When the user switches tabs, `handleTabChange` is invoked, which subsequently triggers [updateActiveTabPanel()](file:///home/myname/projects/potato/src/ui/panelCoordinator.ts#L149):
 - Checks if the current active tab's dirty flag is set to `true`.
 - Invokes the corresponding initialization routine (e.g. `initCFGViewer()`, `initEmulatorPanel()`).
 - Clears the dirty flag (`this.cfgNeedsUpdate = false`) to prevent future redraw operations.

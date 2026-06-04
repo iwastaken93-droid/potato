@@ -8,17 +8,17 @@ DISSECT is designed as a modular, high-performance static and dynamic analysis t
 
 ## 📚 Table of Contents
 
-- [**🏗️ System Architecture & Data Flow**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/architecture.md)
+- [**🏗️ System Architecture & Data Flow**](file:///home/myname/projects/potato/docs/architecture.md)
   An overview of the end-to-end pipeline, from file input byte streams to interactive decompiled view and visual control-flow graphs. Contains Mermaid architecture and dataflow diagrams.
-- [**🧬 Binary Parsers (ELF, PE, Mach-O, DEX, WASM)**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/parsers.md)
+- [**🧬 Binary Parsers (ELF, PE, Mach-O, DEX, WASM)**](file:///home/myname/projects/potato/docs/parsers.md)
   Deep technical breakdown of how DISSECT parses compiled executables, bytecode formats, and web assemblies into a unified internal representation.
-- [**⚙️ Disassembler Router & Control Flow Graphs**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/disassembler_router.md)
+- [**⚙️ Disassembler Router & Control Flow Graphs**](file:///home/myname/projects/potato/docs/disassembler_router.md)
   Understand the automatic format detector, opcode decoder routing rules, Basic Block splitting, loop-finding algorithms, and dominator tree building.
-- [**🧠 Virtual CPU Emulator State & Memory Model**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/emulator.md)
+- [**🧠 Virtual CPU Emulator State & Memory Model**](file:///home/myname/projects/potato/docs/emulator.md)
   Detailed look at the virtual environment, including sub-register aliasing, memory page maps, read/write/execute permissions, step execution, and breakpoint control.
-- [**📊 Static Analyzers (Entropy, Signatures, Search)**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/analyzers.md)
+- [**📊 Static Analyzers (Entropy, Signatures, Search)**](file:///home/myname/projects/potato/docs/analyzers.md)
   Details on Shannon entropy calculations, sliding-window signatures (compilers/cryptography/packers), string extraction rules, and xref (cross-reference) analysis.
-- [**💻 Developer Setup & Engineering Guidelines**](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/docs/developer_setup.md)
+- [**💻 Developer Setup & Engineering Guidelines**](file:///home/myname/projects/potato/docs/developer_setup.md)
   Guide on environment prerequisites (`npm`), CLI operations, running the test suites (`vitest`), formatting standards (`prettier`), and production packaging (`vite`).
 
 ---

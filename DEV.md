@@ -54,8 +54,8 @@ graph TD
 ### Core Design Philosophy
 1. **Separation of Concerns:** Low-level file format decoding is isolated in the `src/parser/` module and normalized into schema-conforming objects before reaching disassembly or execution.
 2. **Platform-Independent Representation:** Architecture-specific machine instructions are decoded and immediately lifted into a target-independent Intermediate Representation (IR). All optimization passes (such as copy propagation, constant folding, and loop-invariant code motion) execute strictly on this target-independent IR, decoupling analyses from the source Instruction Set Architecture (ISA).
-3. **Responsive Visual Frontend:** To prevent thread-blocking during heavy analysis tasks (e.g., parsing large binaries, computing dominance frontiers, or rendering vast call graphs), URET employs asynchronous processing. Visualizations interact with the backend core using specialized coordinators such as [panelCoordinator.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelCoordinator.ts).
-4. **Dynamic Emulation Co-existence:** Static structural data (recovered symbols and section boundaries) directly initializes pages within the virtual [CPU Emulator](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/emulator.ts) memory sandbox, allowing seamless transitions between static graph traversal and step-by-step micro-emulation.
+3. **Responsive Visual Frontend:** To prevent thread-blocking during heavy analysis tasks (e.g., parsing large binaries, computing dominance frontiers, or rendering vast call graphs), URET employs asynchronous processing. Visualizations interact with the backend core using specialized coordinators such as [panelCoordinator.ts](file:///home/myname/projects/potato/src/ui/panelCoordinator.ts).
+4. **Dynamic Emulation Co-existence:** Static structural data (recovered symbols and section boundaries) directly initializes pages within the virtual [CPU Emulator](file:///home/myname/projects/potato/src/emulator/emulator.ts) memory sandbox, allowing seamless transitions between static graph traversal and step-by-step micro-emulation.
 
 ---
 
@@ -89,28 +89,29 @@ The directory structure of URET is logically organized to isolate parsing, disas
 
 | Directory / File | Clickable Link | Description / Responsibilities |
 | :--- | :--- | :--- |
-| **Ingestion Pipeline** | [src/analyzer/binaryProcessor.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/binaryProcessor.ts) | Coordinates raw upload ingestion, magic-byte format detection, section mapping, symbol extraction, and initial disassembly routing. |
-| **Parser: ELF** | [src/parser/elf.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/elf.ts) | Parses Unix/Linux Executable and Linkable Format, resolving section tables, symbols, and dynamic linkage fields. |
-| **Parser: PE** | [src/parser/pe.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/pe.ts) | Decodes Windows Portable Executable headers, Optional Headers, section data, and walks Import/Export address tables. |
-| **Parser: Mach-O** | [src/parser/macho.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/macho.ts) | Decodes Darwin/macOS executable command loads, Fat slices, segments, and code signatures. |
-| **Parser: DEX** | [src/parser/dex.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/dex.ts) | Decodes Android Dalvik Executable files, pools of types, string tables, class metadata, and bytecode instructions. |
-| **Parser: WASM** | [src/parser/wasm.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/wasm.ts) | Parses WebAssembly binaries utilizing variable-length LEB128 decoders, function types, code signatures, and expression trees. |
-| **Hex Loader** | [src/parser/hexLoader.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/hexLoader.ts) | Translates raw Intel HEX and Motorola S-Record formats into continuous byte regions. |
-| **Disassembly Router** | [src/disassembler/router.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/router.ts) | Analyzes input buffer headers to identify target ISA and dispatches parsing blocks to target disassemblers. |
-| **CFG Builder** | [src/disassembler/cfg.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/cfg.ts) | Reconstructs Basic Blocks and Control Flow Graph edges from disassembled linear lists of instructions. |
-| **Intermediate Rep** | [src/disassembler/ir.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts) | Defines uniform Intermediate Representation micro-ops ([IROp](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts#L14)), operand structures, translation mappings, and the [SSABuilder](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts#L296) compiler pass. |
-| **IR Optimizer** | [src/disassembler/optimizer.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/optimizer.ts) | Runs target-independent optimizations: Constant folding, dead-code elimination, copy propagation, strength reduction, algebraic and phi simplification, liveness analysis, and natural loop hoisting (LICM). |
-| **Register Allocator** | [src/disassembler/registerAllocator.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/registerAllocator.ts) | Uses liveness-based graph-coloring to assign versioned SSA variables to virtual or physical register banks. |
-| **Decompiler Core** | [src/disassembler/decompiler.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/decompiler.ts) | Builds dominator structures, extracts control patterns, parses high-level AST blocks, and emits decompiled C-like pseudocode. |
-| **Emulation Sandbox** | [src/emulator/emulator.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/emulator.ts) | Implements the step-by-step CPU instruction emulation state, memory address pages mapping, register mappings, and system call interceptions. |
-| **UI Main Layout** | [src/ui/layout.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/layout.ts) | Renders the premium IDE container layout, panels drag-resize boundaries, and coordinates sub-elements. |
-| **UI CFG Viewer** | [src/ui/cfgVisualizer.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/cfgVisualizer.ts) | Generates beautiful interactive SVG renderings of Control Flow Graphs with dynamic branching lines and jump highlights. |
+| **Ingestion Pipeline** | [src/analyzer/binaryProcessor.ts](file:///home/myname/projects/potato/src/analyzer/binaryProcessor.ts) | Coordinates raw upload ingestion, magic-byte format detection, section mapping, symbol extraction, and initial disassembly routing. |
+| **Parser: ELF** | [src/parser/elf.ts](file:///home/myname/projects/potato/src/parser/elf.ts) | Parses Unix/Linux Executable and Linkable Format, resolving section tables, symbols, and dynamic linkage fields. |
+| **Parser: PE** | [src/parser/pe.ts](file:///home/myname/projects/potato/src/parser/pe.ts) | Decodes Windows Portable Executable headers, Optional Headers, section data, and walks Import/Export address tables. |
+| **Parser: Mach-O** | [src/parser/macho.ts](file:///home/myname/projects/potato/src/parser/macho.ts) | Decodes Darwin/macOS executable command loads, Fat slices, segments, and code signatures. |
+| **Parser: DEX** | [src/parser/dex.ts](file:///home/myname/projects/potato/src/parser/dex.ts) | Decodes Android Dalvik Executable files, pools of types, string tables, class metadata, and bytecode instructions. |
+| **Parser: WASM** | [src/parser/wasm.ts](file:///home/myname/projects/potato/src/parser/wasm.ts) | Parses WebAssembly binaries utilizing variable-length LEB128 decoders, function types, code signatures, and expression trees. |
+| **Hex Loader** | [src/parser/hexLoader.ts](file:///home/myname/projects/potato/src/parser/hexLoader.ts) | Translates raw Intel HEX and Motorola S-Record formats into continuous byte regions. |
+| **Disassembly Router** | [src/disassembler/router.ts](file:///home/myname/projects/potato/src/disassembler/router.ts) | Analyzes input buffer headers to identify target ISA and dispatches parsing blocks to target disassemblers. |
+| **CFG Builder** | [src/disassembler/cfg.ts](file:///home/myname/projects/potato/src/disassembler/cfg.ts) | Reconstructs Basic Blocks and Control Flow Graph edges from disassembled linear lists of instructions. |
+| **Intermediate Rep** | [src/disassembler/ir.ts](file:///home/myname/projects/potato/src/disassembler/ir.ts) | Defines uniform Intermediate Representation micro-ops ([IROp](file:///home/myname/projects/potato/src/disassembler/ir.ts#L14)), operand structures, translation mappings, and the [SSABuilder](file:///home/myname/projects/potato/src/disassembler/ir.ts#L296) compiler pass. |
+| **IR Optimizer** | [src/disassembler/optimizer.ts](file:///home/myname/projects/potato/src/disassembler/optimizer.ts) | Runs target-independent optimizations: Constant folding, dead-code elimination, copy propagation, strength reduction, algebraic and phi simplification, liveness analysis, and natural loop hoisting (LICM). |
+| **Register Allocator** | [src/disassembler/registerAllocator.ts](file:///home/myname/projects/potato/src/disassembler/registerAllocator.ts) | Uses liveness-based graph-coloring to assign versioned SSA variables to virtual or physical register banks. |
+| **Decompiler Core** | [src/disassembler/decompiler.ts](file:///home/myname/projects/potato/src/disassembler/decompiler.ts) | Builds dominator structures, extracts control patterns, parses high-level AST blocks, and emits decompiled C-like pseudocode. |
+| **Emulation Sandbox** | [src/emulator/emulator.ts](file:///home/myname/projects/potato/src/emulator/emulator.ts) | Implements the step-by-step CPU instruction emulation state, memory address pages mapping, register mappings, and system call interceptions. |
+| **UI Main Layout** | [src/ui/layout.ts](file:///home/myname/projects/potato/src/ui/layout.ts) | Renders the premium IDE container layout, panels drag-resize boundaries, and coordinates sub-elements. |
+| **UI CFG Viewer** | [src/ui/cfgVisualizer.ts](file:///home/myname/projects/potato/src/ui/cfgVisualizer.ts) | Generates beautiful interactive SVG renderings of Control Flow Graphs with dynamic branching lines and jump highlights. |
+| **MCP Server** | [src/mcp-server.ts](file:///home/myname/projects/potato/src/mcp-server.ts) | Exposes the URET analysis engines as MCP tools, including recursive JSON parameter parsing, 10MB input file size limits, and suffix-matching workspace path resolution. |
 
 ---
 
 ## 🔁 3. Ingestion & Preprocessing Pipeline
 
-The primary entry point for binary loading is [processBinaryData](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/binaryProcessor.ts#L35) within [src/analyzer/binaryProcessor.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/binaryProcessor.ts). When a file is uploaded to the UI or processed via the MCP server, it goes through the following sequence:
+The primary entry point for binary loading is [processBinaryData](file:///home/myname/projects/potato/src/analyzer/binaryProcessor.ts#L35) within [src/analyzer/binaryProcessor.ts](file:///home/myname/projects/potato/src/analyzer/binaryProcessor.ts). When a file is uploaded to the UI or processed via the MCP server, it goes through the following sequence:
 
 ### Sequence of Ingestion Steps
 
@@ -178,17 +179,21 @@ sequenceDiagram
 ```
 
 ### Detailed Pipeline Mechanics
-1. **Intel HEX / S-Record Loading:** Before validating file format signatures, [detectFormat](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/hexLoader.ts) inspects the byte arrays for ASCII records starting with `:` (Intel HEX) or `S` (Motorola S-Record). If detected, these records are parsed into separate memory chunks and merged into a continuous byte array.
-2. **Architecture Detection:** [DisassemblerRouter.detectArchitecture](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/router.ts) inspects header magic bytes (e.g. `\x7fELF`, `MZ`, `\xfe\xed\xfa\xce`) to establish the executable format. In the case of ELF, it also reads the architecture indicator offset (e.g. machine flags) to resolve whether the underlying ISA is `x86_64`, `arm`, or `arm64`.
+1. **Intel HEX / S-Record Loading:** Before validating file format signatures, [detectFormat](file:///home/myname/projects/potato/src/parser/hexLoader.ts) inspects the byte arrays for ASCII records starting with `:` (Intel HEX) or `S` (Motorola S-Record). If detected, these records are parsed into separate memory chunks and merged into a continuous byte array.
+2. **Architecture Detection:** [DisassemblerRouter.detectArchitecture](file:///home/myname/projects/potato/src/disassembler/router.ts) inspects header magic bytes (e.g. `\x7fELF`, `MZ`, `\xfe\xed\xfa\xce`) to establish the executable format. In the case of ELF, it also reads the architecture indicator offset (e.g. machine flags) to resolve whether the underlying ISA is `x86_64`, `arm`, or `arm64`.
 3. **Normalizing Metadata:** Every parser output is mapped to common structures, exposing entry points, section boundaries, and symbols.
 4. **Disassembly Routing:** Instructions are decoded starting from the entry point and symbol-labeled addresses. The disassembler handles prefixes, operand sizes, and memory reference layouts.
-5. **Basic Block Segmentation:** The [buildCFG](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/cfg.ts) function segments linear instructions. Blocks are split on leaders, and execution paths are linked via successor-predecessor maps.
+5. **Basic Block Segmentation:** The [buildCFG](file:///home/myname/projects/potato/src/disassembler/cfg.ts) function segments linear instructions. Blocks are split on leaders, and execution paths are linked via successor-predecessor maps.
+6. **Workspace Path Resolution & Recursive JSON Ingestion:** When loaded via the [MCP Server](file:///home/myname/projects/potato/src/mcp-server.ts), inputs are normalized dynamically:
+   - **Recursive JSON Loading:** The resolver checks if the input is a JSON string. If it contains fields like `filePath` or `data`, it recursively parses and traverses them to load the final payload.
+   - **Suffix-Matching Resolution:** If the file path does not exist directly, the parser splits the path and matches suffixes backwards against the workspace root (e.g., matching `src/mcp-server.ts` even if prefixed with an outdated absolute path).
+   - **File Size Safeties:** A strict 10MB input file size limit is enforced prior to reading files into session buffers, preventing high-memory pressure.
 
 ---
 
 ## 🧬 4. File Parsers Structure & Schema
 
-All executable and bytecode parsers implementation under [src/parser/](file:///c/Users/NaThA/hacks/sbx/potato/src/parser) output consistent definitions to ensure decoupling.
+All executable and bytecode parsers implementation under [src/parser/](file:///home/myname/projects/potato/src/parser) output consistent definitions to ensure decoupling.
 
 ### Unified Interface Schemas
 
@@ -224,26 +229,26 @@ export interface UnifiedSymbol {
 
 ### Executable Format Implementations
 
-#### 1. ELF Parser ([src/parser/elf.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/elf.ts))
+#### 1. ELF Parser ([src/parser/elf.ts](file:///home/myname/projects/potato/src/parser/elf.ts))
 * **Bitness Handling:** Dynamically reads identification bytes (`e_ident[4]`) to parse either 32-bit (Elf32) or 64-bit (Elf64) header offsets.
 * **Endianness Support:** Detects big-endian or little-endian modes (`e_ident[5]`) and adjusts helper functions to swap byte alignments accordingly.
 * **Symbol Extraction:** Parses the program string tables (`.shstrtab` and `.strtab`) to resolve name strings for section headers, static local variables, and global function entry points.
 
-#### 2. PE Parser ([src/parser/pe.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/pe.ts))
+#### 2. PE Parser ([src/parser/pe.ts](file:///home/myname/projects/potato/src/parser/pe.ts))
 * **DOS Stub Extraction:** Matches the `MZ` bytes (0x5A4D) at offset `0x00`, reads the location pointer `e_lfanew` at `0x3C`, and jumps directly to the COFF PE Signature header.
 * **Directory Routing:** Walks the directory mapping array in the Optional Header (e.g. Export Directory, Import Directory) to identify standard dynamic linkage libraries (DLLs) and ordinal mappings.
 * **PE32 vs PE32+:** Translates memory offset addresses differently based on whether the magic bytes are `0x10b` or `0x20b` to accommodate 64-bit pointers.
 
-#### 3. Mach-O Parser ([src/parser/macho.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/macho.ts))
+#### 3. Mach-O Parser ([src/parser/macho.ts](file:///home/myname/projects/potato/src/parser/macho.ts))
 * **Universal Binarics (Fat Executables):** Matches universal header magic values (`0xcafebabe` or `0xbebafeca`). Loops over architecture slices, maps their internal boundaries, and extracts the slice matching the target machine.
 * **Load Commands Dispatch:** Sequentially parses variable-length load commands. Routs segment mappings (`LC_SEGMENT` / `LC_SEGMENT_64`), symbol metadata tables (`LC_SYMTAB`), and entry points (`LC_MAIN`).
 
-#### 4. DEX Parser ([src/parser/dex.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/dex.ts))
+#### 4. DEX Parser ([src/parser/dex.ts](file:///home/myname/projects/potato/src/parser/dex.ts))
 * **Android Bytecode Tables:** Parses the class definitions and methods table.
 * **String and Type Pools:** Maps LEB128-encoded lengths to compile structural prototypes and parameter types.
 * **CodeItem Extraction:** Locates method execution blocks, mapping register allocations, catch blocks, and JVM bytecode arrays.
 
-#### 5. WASM Parser ([src/parser/wasm.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/parser/wasm.ts))
+#### 5. WASM Parser ([src/parser/wasm.ts](file:///home/myname/projects/potato/src/parser/wasm.ts))
 * **Section Scan Loops:** Parses section headers (Type, Function, Import, Code, etc.) using LEB128 varint numbers.
 * **Signature Mapping:** Exposes function types (arguments, result counts) to reconstruct the call graphs.
 
@@ -255,7 +260,7 @@ Once basic blocks are built, URET's disassembler pipeline lifts target-dependent
 
 ### 1. Translation to Target-Independent IR
 
-The translator [IRTranslator](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts#L115) maps target machine opcodes into target-independent operations ([IROp](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts#L14)).
+The translator [IRTranslator](file:///home/myname/projects/potato/src/disassembler/ir.ts#L115) maps target machine opcodes into target-independent operations ([IROp](file:///home/myname/projects/potato/src/disassembler/ir.ts#L14)).
 
 ```typescript
 export enum IROp {
@@ -266,7 +271,7 @@ export enum IROp {
 }
 ```
 
-* **Register Virtualization:** Operands are lifted to uniform [IROperand](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts#L61) definitions. Registers (e.g., `rax`, `rbx`, `r0`) are mapped as variable symbols.
+* **Register Virtualization:** Operands are lifted to uniform [IROperand](file:///home/myname/projects/potato/src/disassembler/ir.ts#L61) definitions. Registers (e.g., `rax`, `rbx`, `r0`) are mapped as variable symbols.
 * **Implicit Side Effect Expansion:** Target-specific instruction behavior is expanded into explicit operations. For example, `push rdi` is translated into two IR operations:
   ```
   SUB rsp, rsp, 8
@@ -275,10 +280,10 @@ export enum IROp {
 
 ### 2. Static Single Assignment (SSA) Form
 
-To enable advanced compiler optimizations, the [SSABuilder](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts#L296) transforms the target-independent IR Control Flow Graph into SSA form.
+To enable advanced compiler optimizations, the [SSABuilder](file:///home/myname/projects/potato/src/disassembler/ir.ts#L296) transforms the target-independent IR Control Flow Graph into SSA form.
 
 #### Step 1: Phi Node Insertion
-For join nodes in the CFG (basic blocks with more than one predecessor), the builder calculates variables modified along incoming paths. It inserts [PHI](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ir.ts#L38) operations at the beginning of the block:
+For join nodes in the CFG (basic blocks with more than one predecessor), the builder calculates variables modified along incoming paths. It inserts [PHI](file:///home/myname/projects/potato/src/disassembler/ir.ts#L38) operations at the beginning of the block:
 ```
 var_2 = PHI(var_0, var_1)
 ```
@@ -298,7 +303,7 @@ After all block definitions are versioned, the builder traverses join blocks aga
 
 ### 3. Target-Independent Optimization Passes
 
-URET implements a suite of optimization passes in [IROptimizer](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/optimizer.ts#L6).
+URET implements a suite of optimization passes in [IROptimizer](file:///home/myname/projects/potato/src/disassembler/optimizer.ts#L6).
 
 ```mermaid
 graph LR
@@ -321,11 +326,11 @@ graph LR
   // After
   x_1 = MOV 15
   ```
-* [ssaConstantFolding](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/optimizer.ts#L598) propagates folded constants through versioned SSA definitions globally.
+* [ssaConstantFolding](file:///home/myname/projects/potato/src/disassembler/optimizer.ts#L598) propagates folded constants through versioned SSA definitions globally.
 
 #### 2. Dead Code Elimination (DCE) & SSA Dead Code Elimination
 * Removes instructions that compute values that are never used.
-* [ssaDeadCodeElimination](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/optimizer.ts#L723) walks the SSA usage tree:
+* [ssaDeadCodeElimination](file:///home/myname/projects/potato/src/disassembler/optimizer.ts#L723) walks the SSA usage tree:
   1. Counts the number of times each versioned variable (e.g., `rax_2`) is read.
   2. If an instruction has a destination register and that variable has a read count of 0, the instruction is removed.
   3. Memory writes (`STORE`), function calls (`CALL`), returns (`RET`), and control flow branches are preserved.
@@ -378,7 +383,7 @@ graph LR
 
 ### 4. Register Allocation
 
-After optimizing the IR, the [RegisterAllocator](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/registerAllocator.ts#L7) maps versioned SSA variables back to physical registers or stack slots.
+After optimizing the IR, the [RegisterAllocator](file:///home/myname/projects/potato/src/disassembler/registerAllocator.ts#L7) maps versioned SSA variables back to physical registers or stack slots.
 
 #### Step 1: Def & Use Sets Identification
 For each block, the allocator collects variables defined (`def`) and variables used (`use`) before definition.
@@ -400,7 +405,7 @@ The allocator builds a graph where nodes represent variables. An edge is added b
 
 ## 💻 6. CPU Register Banks & Sub-Register Aliasing
 
-The virtual CPU register layout and translation details are defined in [cpu.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts). 
+The virtual CPU register layout and translation details are defined in [cpu.ts](file:///home/myname/projects/potato/src/emulator/cpu.ts). 
 
 URET implements x86_64 general-purpose register (GPR) structures with complete support for sub-register aliasing (e.g., reading or writing `eax` or `al` correctly interacts with the underlying `rax` register).
 
@@ -427,7 +432,7 @@ This map is populated programmatically for all GPRs (`rax`, `rbx`, etc.) and the
 
 ### Reading and Writing Registers
 
-Reads and writes are processed dynamically through the [CPU.read](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L170) and [CPU.write](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/cpu.ts#L185) methods:
+Reads and writes are processed dynamically through the [CPU.read](file:///home/myname/projects/potato/src/emulator/cpu.ts#L170) and [CPU.write](file:///home/myname/projects/potato/src/emulator/cpu.ts#L185) methods:
 
 ```typescript
 read(name: string): bigint {
@@ -465,7 +470,7 @@ write(name: string, value: bigint): void {
 
 ## 🧠 7. Page-Aligned Virtual Memory & Page Permission Faults
 
-The page management and virtual mapping layer resides in [memory.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts).
+The page management and virtual mapping layer resides in [memory.ts](file:///home/myname/projects/potato/src/emulator/memory.ts).
 
 ### Page Table Structure
 Rather than allocating a contiguous array representing the entire 64-bit virtual memory space (which is impossible due to memory constraints), URET implements a sparse page table using virtual page keys:
@@ -474,7 +479,7 @@ Rather than allocating a contiguous array representing the entire 64-bit virtual
 - **Memory Regions**: A flat array of `MemoryRegion` structures tracking mapped address ranges, names, and permission flags (`read`, `write`, `execute`).
 
 ### Access Verification & Fault Injection
-Memory access checks are performed before every read or write using [Memory.checkPermission](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts#L149):
+Memory access checks are performed before every read or write using [Memory.checkPermission](file:///home/myname/projects/potato/src/emulator/memory.ts#L149):
 
 ```typescript
 private checkPermission(
@@ -501,13 +506,13 @@ private checkPermission(
 ```
 
 ### Bypass Phase
-During early stage environment creation, the loader must load executable sections (such as `.text`) directly into pages. Because the `.text` segment has its permissions configured as read/execute-only, typical writes would throw permissions errors. The [Memory.write8](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/memory.ts#L210) method provides a `bypassPermissions` flag which bypasses these checks, enabling the binary loader to write code blocks during setup.
+During early stage environment creation, the loader must load executable sections (such as `.text`) directly into pages. Because the `.text` segment has its permissions configured as read/execute-only, typical writes would throw permissions errors. The [Memory.write8](file:///home/myname/projects/potato/src/emulator/memory.ts#L210) method provides a `bypassPermissions` flag which bypasses these checks, enabling the binary loader to write code blocks during setup.
 
 ---
 
 ## 🔌 8. GDB RSP Remote Debugger Protocol Engine
 
-The Remote Serial Protocol (RSP) parser, serial stream wrapper, and debugger execution logic are located in [gdbProtocol.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/gdbProtocol.ts).
+The Remote Serial Protocol (RSP) parser, serial stream wrapper, and debugger execution logic are located in [gdbProtocol.ts](file:///home/myname/projects/potato/src/emulator/gdbProtocol.ts).
 
 ### Packet Framing & Checksums
 All RSP packets are framed with a starting character `$`, a payload, an ending `#`, and a 2-digit hex checksum:
@@ -516,19 +521,19 @@ $$\text{Checksum} = \sum_{c \in \text{Payload}} \text{ASCII}(c) \pmod{256}$$
 Special characters (`$`, `#`, `}`, `*`) within the payload are escaped with `}` followed by the character XORed with `0x20`.
 
 ### Stream Parser State Machine
-To handle fragmented incoming TCP data streams, [GDBProtocolParser](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/gdbProtocol.ts#L183) processes data character-by-character through four states:
+To handle fragmented incoming TCP data streams, [GDBProtocolParser](file:///home/myname/projects/potato/src/emulator/gdbProtocol.ts#L183) processes data character-by-character through four states:
 1. `idle`: Looking for packet start (`$`), ack (`+`), or nak (`-`).
 2. `data`: Reading characters until `#` is reached.
 3. `checksum1`: Reading the first hex checksum character.
 4. `checksum2`: Reading the second hex checksum character, calculating the checksum, comparing it, and triggering callbacks.
 
 ### RSP Command Dispatch
-Inside [handleGDBCommand](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/gdbProtocol.ts#L250), URET translates GDB protocol commands into actions on the virtual [Emulator](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/emulator.ts) state:
+Inside [handleGDBCommand](file:///home/myname/projects/potato/src/emulator/gdbProtocol.ts#L250), URET translates GDB protocol commands into actions on the virtual [Emulator](file:///home/myname/projects/potato/src/emulator/emulator.ts) state:
 
 | Packet Command | Purpose | Expected RSP Response |
 |---|---|---|
 | `?` | Query halt reason | `S05` (representing stop status SIGTRAP) |
-| `g` | Read all registers | Hex stream mapping [X86_64_REGISTERS](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/gdbProtocol.ts#L21) layout in little-endian |
+| `g` | Read all registers | Hex stream mapping [X86_64_REGISTERS](file:///home/myname/projects/potato/src/emulator/gdbProtocol.ts#L21) layout in little-endian |
 | `G` | Write all registers | `OK` or `E01` |
 | `p[idx]` | Read a single register | Hex-encoded value of the register at `idx` |
 | `P[idx]=[val]` | Write a single register | `OK` or `E01` |
@@ -542,7 +547,7 @@ Inside [handleGDBCommand](file:///c/Users/NaThA/hacks/sbx/potato/src/emulator/gd
 
 ## 🎛️ 9. Dashboard Coordination: UI Panel Coordinators
 
-The main UI coordinator logic is contained in [panelCoordinator.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelCoordinator.ts).
+The main UI coordinator logic is contained in [panelCoordinator.ts](file:///home/myname/projects/potato/src/ui/panelCoordinator.ts).
 
 ### Central Mediator Pattern
 The `PanelCoordinator` coordinates interactions between separate tabs and panels (such as Assembly, Hex, CFG, Yara, and Scripting). Instead of components coupling to each other directly, they call back into the mediator, which delegates state updates and tab switches.
@@ -563,14 +568,14 @@ graph TD
 ### Lazy Loading and Resource Management
 To ensure fast load times, URET implements lazy initialization of heavy analytical views (e.g., dependency graphs, decompiled blocks, control flow graphs):
 1. **Critical Path**: `HexViewer`, `AssemblyView`, and `StringsView` load immediately upon binary ingestion.
-2. **On-Demand**: When a user selects a tab, [updateActiveTabPanel](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelCoordinator.ts#L149) checks dirty flags (e.g., `cfgNeedsUpdate`, `yaraNeedsUpdate`). If dirty, the component module is imported dynamically (via dynamic `import` or using [PANEL_REGISTRY](file:///c/Users/NaThA/hacks/sbx/potato/src/ui/panelRegistry.ts)) and rendered.
+2. **On-Demand**: When a user selects a tab, [updateActiveTabPanel](file:///home/myname/projects/potato/src/ui/panelCoordinator.ts#L149) checks dirty flags (e.g., `cfgNeedsUpdate`, `yaraNeedsUpdate`). If dirty, the component module is imported dynamically (via dynamic `import` or using [PANEL_REGISTRY](file:///home/myname/projects/potato/src/ui/panelRegistry.ts)) and rendered.
 3. **Dirty Flags**: Ingesting a new binary marks all lazy view dirty flags to `true`, clearing outdated cache contexts and forcing updates upon selection.
 
 ---
 
 ## 🔒 10. Execution Sandbox: Sandboxed Scripting Context
 
-Script parsing and evaluation occurs inside [scripting.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/scripting.ts).
+Script parsing and evaluation occurs inside [scripting.ts](file:///home/myname/projects/potato/src/analyzer/scripting.ts).
 
 ### Scripting Context API
 The engine accepts user-written scripts, exposing a clean API structure for static analysis tasks:
@@ -602,7 +607,7 @@ To run user scripts securely without blocking the primary browser rendering pipe
 
 ## 🔍 11. YARA-Like Signature Rules Execution
 
-The YARA pattern matching and rule execution suite is in [yara.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/analyzer/yara.ts).
+The YARA pattern matching and rule execution suite is in [yara.ts](file:///home/myname/projects/potato/src/analyzer/yara.ts).
 
 ### Rule Compilation & Brace Parsing
 The compiler analyzes a ruleset source string by:
@@ -625,7 +630,7 @@ The parser compiles the YARA condition string (such as `$a and not $b` or `any o
 
 ## 🧪 12. Test Setup & Vitest Settings
 
-Build configuration and testing suites are managed via [vite.config.ts](file:///c/Users/NaThA/hacks/sbx/potato/vite.config.ts).
+Build configuration and testing suites are managed via [vite.config.ts](file:///home/myname/projects/potato/vite.config.ts).
 
 ### Testing Parameters
 - **Test Inclusions**: Resolves testing targets within the root directory and main testing directory:
@@ -670,7 +675,7 @@ Editing workspace settings or configurations in Windows and executing them in WS
 Automated scripts passing absolute file paths from Windows editors to WSL terminal runners may cause path resolution errors.
 * **Symptom**: `FileNotFound` or permission errors when passing standard paths (e.g., `C:\Users\...`).
 * **Resolution**: Use the `wslpath` utility to perform path translations:
-  * Translate Windows path to WSL: `wslpath 'C:\Users\NaThA\hacks\sbx\potato'` $\rightarrow$ `/mnt/c/Users/NaThA/hacks/sbx/potato`
-  * Translate WSL path to Windows: `wslpath -w '/mnt/c/Users/NaThA/hacks/sbx/potato'` $\rightarrow$ `C:\Users\NaThA\hacks\sbx\potato`
+  * Translate Windows path to WSL: `wslpath '/home/myname/projects/potato'` $\rightarrow$ `/mnt//home/myname/projects/potato`
+  * Translate WSL path to Windows: `wslpath -w '/mnt//home/myname/projects/potato'` $\rightarrow$ `/home/myname/projects/potato`
 
-For more developer environment setups, review [developer_setup.md](file:///c/Users/NaThA/hacks/sbx/potato/docs/developer_setup.md).
+For more developer environment setups, review [developer_setup.md](file:///home/myname/projects/potato/docs/developer_setup.md).

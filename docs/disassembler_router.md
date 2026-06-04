@@ -38,7 +38,7 @@ graph TD
 
 ## 🔀 1. Disassembler Router & Auto-Detection
 
-The `DisassemblerRouter` ([router.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/router.ts)) is the central entry point for byte-to-instruction conversion.
+The `DisassemblerRouter` ([router.ts](file:///home/myname/projects/potato/src/disassembler/router.ts)) is the central entry point for byte-to-instruction conversion.
 
 ### Auto-Detection Logic
 
@@ -72,25 +72,25 @@ graph TD
 
 DISSECT includes multiple specialized disassembly modules optimized for sequential byte-stream parsing.
 
-### 💻 A. x86_64 Engine ([x86.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/x86.ts))
+### 💻 A. x86_64 Engine ([x86.ts](file:///home/myname/projects/potato/src/disassembler/x86.ts))
 
 - **Prefix Decoder**: Decodes legacy prefixes (operand size override `0x66`, repeat prefixes `0xf2`/`0xf3`) and 64-bit REX prefixes (`0x40` to `0x4f`), mapping registers to their extended 64-bit counterparts (e.g. `r8`-`r15`, REX.W width control).
 - **ModR/M & SIB Parsing**: Inspects the ModR/M byte to determine addressing modes (direct register, register indirect, or displacement). Decodes the Scale-Index-Base (SIB) byte for complex memory offsets (e.g., `[rax + rbx * 4 + 0x10]`).
 - **Mnemonic Translation**: Decodes primary opcodes for arithmetic (ADD, SUB, XOR, CMP), control flow (JMP, Jcc, CALL, RET), string ops, and register moves.
 
-### 🛡️ B. ARM / ARM32 / Thumb Engine ([arm.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/arm.ts), [arm32.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/arm32.ts))
+### 🛡️ B. ARM / ARM32 / Thumb Engine ([arm.ts](file:///home/myname/projects/potato/src/disassembler/arm.ts), [arm32.ts](file:///home/myname/projects/potato/src/disassembler/arm32.ts))
 
 - **AArch64 (ARM 64-bit)**: Processes fixed 32-bit instruction words. Decodes opcodes based on mask configurations to resolve SIMD operations, conditional branches, system registers, loads, stores, and arithmetic.
 - **AArch32 (ARM 32-bit)**: Maps standard 32-bit instructions (e.g. data processing, branching with conditions) and parses conditional execution fields.
 - **Thumb Mode**: Handles compact 16-bit instructions (and 32-bit Thumb-2 extensions), shifting decoder modes based on program state.
 
-### 🤖 C. Dalvik Engine ([dalvik.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/dalvik.ts))
+### 🤖 C. Dalvik Engine ([dalvik.ts](file:///home/myname/projects/potato/src/disassembler/dalvik.ts))
 
 - **Register-Based Stack**: Maps instruction arguments directly to virtual local registers (`v0`-`v255`).
 - **Dex Metadata Resolvers**: Resolves type names, method signatures, field names, and string constants using metadata indexes parsed from the DEX file.
 - **Opcode Decoder**: Decodes DEX operations like `move`, `const`, `return`, `invoke-virtual`, `invoke-direct`, and branch instructions.
 
-### 🕸️ D. WebAssembly Engine ([wasm.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/wasm.ts))
+### 🕸️ D. WebAssembly Engine ([wasm.ts](file:///home/myname/projects/potato/src/disassembler/wasm.ts))
 
 - **WASM bytecode parser**: Directly processes stack-based bytecode instructions.
 - **Operand Stack Mapping**: Translates instructions (e.g. `i32.const`, `local.get`, `call`) into typed representations containing arguments and stack height adjustments.
@@ -98,14 +98,14 @@ DISSECT includes multiple specialized disassembly modules optimized for sequenti
 
 ### ⚙️ E. Other CPU Architectures
 
-- **RISC-V Engine** ([riscv.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/riscv.ts)): Decodes standard RV32/RV64 I, M, A, F, D, and C (Compressed 16-bit) instruction sets.
-- **MIPS Engine** ([mips.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/mips.ts)): Decodes 32-bit MIPS fixed-width instructions for both Little Endian (mipsel) and Big Endian modes.
-- **PowerPC Engine** ([ppc.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/ppc.ts)): Handles PowerPC/PowerPC64 instruction words.
-- **SPARC Engine** ([sparc.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/sparc.ts)): Handles SPARC and SPARC V9 instruction decoding.
-- **Z80 & MOS 6502** ([z80.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/z80.ts), [m6502.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/m6502.ts)): Vintage 8-bit instruction decoders for retro-gaming analysis and legacy microprocessors.
-- **CIL / .NET IL Engine** ([dotnetIl.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/dotnetIl.ts)): Parses stack-based MSIL bytecode and maps metadata tokens to class and method names.
+- **RISC-V Engine** ([riscv.ts](file:///home/myname/projects/potato/src/disassembler/riscv.ts)): Decodes standard RV32/RV64 I, M, A, F, D, and C (Compressed 16-bit) instruction sets.
+- **MIPS Engine** ([mips.ts](file:///home/myname/projects/potato/src/disassembler/mips.ts)): Decodes 32-bit MIPS fixed-width instructions for both Little Endian (mipsel) and Big Endian modes.
+- **PowerPC Engine** ([ppc.ts](file:///home/myname/projects/potato/src/disassembler/ppc.ts)): Handles PowerPC/PowerPC64 instruction words.
+- **SPARC Engine** ([sparc.ts](file:///home/myname/projects/potato/src/disassembler/sparc.ts)): Handles SPARC and SPARC V9 instruction decoding.
+- **Z80 & MOS 6502** ([z80.ts](file:///home/myname/projects/potato/src/disassembler/z80.ts), [m6502.ts](file:///home/myname/projects/potato/src/disassembler/m6502.ts)): Vintage 8-bit instruction decoders for retro-gaming analysis and legacy microprocessors.
+- **CIL / .NET IL Engine** ([dotnetIl.ts](file:///home/myname/projects/potato/src/disassembler/dotnetIl.ts)): Parses stack-based MSIL bytecode and maps metadata tokens to class and method names.
 
-### 📦 F. Capstone WASM Engine ([capstoneWasm.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/capstoneWasm.ts))
+### 📦 F. Capstone WASM Engine ([capstoneWasm.ts](file:///home/myname/projects/potato/src/disassembler/capstoneWasm.ts))
 
 Provides an alternative high-performance native-speed disassembly pipeline using a compiled Capstone WASM module.
 - Supports `x86_64`, `arm` (ARM64), and `mips`.
@@ -115,7 +115,7 @@ Provides an alternative high-performance native-speed disassembly pipeline using
 
 ## 📜 Class & Method API Listings
 
-### Disassembler Router ([router.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/router.ts))
+### Disassembler Router ([router.ts](file:///home/myname/projects/potato/src/disassembler/router.ts))
 
 ```typescript
 export type Architecture =
@@ -154,7 +154,7 @@ export class DisassemblerRouter {
 }
 ```
 
-### Capstone WASM Engine ([capstoneWasm.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/capstoneWasm.ts))
+### Capstone WASM Engine ([capstoneWasm.ts](file:///home/myname/projects/potato/src/disassembler/capstoneWasm.ts))
 
 ```typescript
 export class CapstoneWasmEngine {
@@ -190,7 +190,7 @@ Each specialized disassembly file exports a top-level, zero-dependency disassemb
 
 ## ⛓️ 3. Control Flow Graph (CFG) Construction
 
-The `CFGBuilder` ([cfg.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/cfg.ts)) processes flat arrays of `Instruction` objects to generate basic blocks.
+The `CFGBuilder` ([cfg.ts](file:///home/myname/projects/potato/src/disassembler/cfg.ts)) processes flat arrays of `Instruction` objects to generate basic blocks.
 
 ### Basic Block Splitting Algorithm
 
@@ -212,7 +212,7 @@ After splitting the instructions at leader boundaries into individual blocks, th
 
 ## 🧩 4. Decompiler & AST Restructuring
 
-The decompiler ([decompiler.ts](file:///c/Users/NaThA/hacks/sbx/potato/src/disassembler/decompiler.ts)) reconstructs high-level structures from the flat, graph-based representation:
+The decompiler ([decompiler.ts](file:///home/myname/projects/potato/src/disassembler/decompiler.ts)) reconstructs high-level structures from the flat, graph-based representation:
 
 ### Dominator Trees
 

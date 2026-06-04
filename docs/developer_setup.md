@@ -58,7 +58,7 @@ To ensure codebase cleanliness and standard formatting across files, DISSECT inc
 
 ### Prettier Styling Formatting
 
-Prettier rules are specified in [.prettierrc](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/.prettierrc) to govern tab sizing, bracket spacing, and quote preferences:
+Prettier rules are specified in [.prettierrc](file:///home/myname/projects/potato/.prettierrc) to govern tab sizing, bracket spacing, and quote preferences:
 
 - **Tab Width**: 2 spaces
 - **Quotes**: Single quotes
@@ -66,11 +66,11 @@ Prettier rules are specified in [.prettierrc](file:///C:/Users/NaThA/hacks/antig
 
 ### ESLint Rules
 
-Linting logic is declared in [eslint.config.js](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/eslint.config.js) leveraging TypeScript recommended practices.
+Linting logic is declared in [eslint.config.js](file:///home/myname/projects/potato/eslint.config.js) leveraging TypeScript recommended practices.
 
 ### TypeScript Compilation Constraints
 
-Configure configurations in [tsconfig.json](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/tsconfig.json):
+Configure configurations in [tsconfig.json](file:///home/myname/projects/potato/tsconfig.json):
 
 - **Module Resolution**: `node16` / `nodenext` configuration is enforced, which mandates that all relative imports must include standard `.js` file extensions.
 - **Bitness/Bignum Compatibility**: Requires the target version to support native JavaScript ESNext/ES2020 features (specifically `BigInt` operations).

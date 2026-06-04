@@ -45,7 +45,7 @@ graph TD
 
 ### 📉 1. Shannon Entropy Calculator
 
-The entropy engine ([entropy.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/entropy.ts)) calculates Shannon entropy to evaluate byte-level information density.
+The entropy engine ([entropy.ts](file:///home/myname/projects/potato/src/analyzer/entropy.ts)) calculates Shannon entropy to evaluate byte-level information density.
 
 #### Shannon Entropy Formula
 
@@ -59,7 +59,7 @@ Where $P(x_i)$ is the frequency of occurrence of byte value $x_i$ in the file.
 
 ### 🏷️ 2. Signature Scanner
 
-The signature engine ([signatures.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/signatures.ts)) scans the binary for known byte sequences.
+The signature engine ([signatures.ts](file:///home/myname/projects/potato/src/analyzer/signatures.ts)) scans the binary for known byte sequences.
 
 - **Compile Signatures**: Identifies build systems and runtimes (e.g. GCC, MSVC, Clang, Go, Rust).
 - **Packer & Protector Signatures**: Flags packing layers (e.g. UPX, Themida, VMProtect).
@@ -71,12 +71,12 @@ The signature engine ([signatures.ts](file:///C:/Users/NaThA/hacks/antigravity_t
 
 ### 🧵 3. String & Xref Extractors
 
-- **String Analyzer** ([strings.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/strings.ts)): Inspects binary pages to find continuous blocks of printable characters (ASCII or UTF-8). It filters entries below a configurable length threshold (e.g., minimum 4 characters) and indexes their byte locations.
-- **Xref Analyzer** ([xrefs.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/xrefs.ts)): Scans decoded instruction blocks looking for target destination addresses. It constructs a dictionary mapping memory addresses to references (who calls who), allowing developers to quickly check where a string or function is utilized.
+- **String Analyzer** ([strings.ts](file:///home/myname/projects/potato/src/analyzer/strings.ts)): Inspects binary pages to find continuous blocks of printable characters (ASCII or UTF-8). It filters entries below a configurable length threshold (e.g., minimum 4 characters) and indexes their byte locations.
+- **Xref Analyzer** ([xrefs.ts](file:///home/myname/projects/potato/src/analyzer/xrefs.ts)): Scans decoded instruction blocks looking for target destination addresses. It constructs a dictionary mapping memory addresses to references (who calls who), allowing developers to quickly check where a string or function is utilized.
 
 ### 📝 4. Report Generator
 
-The report coordinator ([reportGenerator.ts](file:///C:/Users/NaThA/hacks/antigravity_things/agy/test/src/analyzer/reportGenerator.ts)) aggregates analysis output into unified formats:
+The report coordinator ([reportGenerator.ts](file:///home/myname/projects/potato/src/analyzer/reportGenerator.ts)) aggregates analysis output into unified formats:
 
 - **JSON Report**: Exportable schema containing structured lists of section entropy ratios, signature match offsets, symbols, and extracted strings.
 - **Markdown Report**: A formatted report summarizing imports/exports, highest entropy blocks, packer warnings, and signature summaries.
